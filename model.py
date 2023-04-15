@@ -9,13 +9,14 @@ import random
 import logging
 import math
 import typer
+import sys
 
 # from utils.utilities import readConfigYaml, saveConfigYaml, format_tousands, generate_logger, GeneratePathFolder
 
 
 class Config:
-    T = 1000  # time (1000)
-    N = 50    # number of banks
+    T = 100# 1000  # time (1000)
+    N = 10# 50    # number of banks
     
     d=  1     # out-degree
     
@@ -69,8 +70,7 @@ class Model:
             removeAddBanks()
             
             determineMu()
-            Status.logger.debug(f"Iteration {Model.t}")
-
+             
         
        
     
@@ -88,6 +88,9 @@ class Bank:
     def getLender(self):
         return Model.banks[self.id-1]
     
+    def getLoanInterest(self):
+        return 0.03
+    
     def getId(self):
         return f"bank#{self.id}"
     
@@ -95,37 +98,93 @@ class Bank:
         self.id = id
     
 
+            
 def setupLinks():
     pass
 
 def doShocks():
     # first shock: (equation 2)    
     for bank in Model.banks:
-        bank.newD = bank.D * ( Config.µ + Config.ω * random.random())
-    
+        bank.B = 0  # bad debt
+        bank.newD = bank.D * ( Config.µ + Config.ω * random.random())        
+        bank.ΔD= bank.newD - bank.D
+        if bank.ΔD + bank.C > 0: 
+            bank.s= bank.ΔD + bank.C      # lender
+            bank.d= 0
+        else:
+            bank.d= abs(bank.ΔD + bank.C) # borrower
+            bank.s= 0
+        bank.D = bank.newD
+            
+    Status.logBanks()
     for bank in Model.banks:
-        bank.incrD = bank.newD - bank.D
-        # decrement -> should reduce C
-        if bank.incrD + bank.C < 0: 
-            
-            bank.s = bank.getLender().incrD if bank.getLender().incrD>0 else 0 
-            bank.d = -bank.incrD
-            bank.l = bank.d if bank.d<bank.s else bank.s
-            bank.incrL = (bank.d-bank.s)/Config.ρ
-            #Status.logger.debug(f"{bank.getId()} s={bank.s} d={bank.d} l={bank.l} incrD={bank.incrD}")
-            
-            if bank.incrL > 0:
-                pass # Status.logger.debug(f"{bank.getId()} should sell L={bank.incrL} to cover {bank.incrD} as lender only gives {bank.s}")
+        # decrement in which we should borrow
+        if bank.ΔD + bank.C < 0: 
+            #TODO getLender
+            if bank.d>bank.getLender().s:                
+                bank.l = bank.getLender().s
+                bank.getLender().s = 0
+                bank.sellL = (bank.d-bank.l)/Config.ρ
             else:
-                Status.logger.debug(f"{bank.getId()} obtains loan from {bank.getLender().getId()} of {bank.s}")
-                
+                bank.l = bank.d
+                bank.getLender().s -= bank.d # bank.d
+                bank.sellL = 0
             
+            if bank.sellL > 0:
+                bank.L -= bank.sellL
+                bank.C = 0
+                Status.logger.debug(f"#{Model.t:03},SHOCK1: {bank.getId()} firesales L={bank.sellL:.3f} to cover ΔD={bank.ΔD:.3f} as {bank.getLender().getId()} gives {bank.l:.3f} and C={bank.C:.3f}")
+            else:
+                bank.C -= bank.d
+                Status.logger.debug(f"#{Model.t:03},SHOCK1: {bank.getId()} borrows {bank.l:.3f} from {bank.getLender().getId()} (who still has {bank.getLender().s:.3f}) to cover ΔD={bank.ΔD:.3f} and C={bank.C:.3f}")
+                
+        # increment of deposits or decrement covered by own capital 
+        else:
+            bank.l = 0
+            bank.sellL = 0
+            if bank.ΔD<0:
+                bank.C -= bank.ΔD
+                Status.logger.debug(f"#{Model.t:03},SHOCK1: {bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
+        
+    Status.logBanks()
     # second shock: (equation 2)
+    # bank should return bank.s + costs of bank.sellL + possible shock 2 effects
     for bank in Model.banks:
-        bank.newD = bank.D * ( Config.µ + Config.ω * random.random())
-    
-    # 
-    
+        bank.newD = bank.D * ( Config.µ + Config.ω * random.random())        
+        bank.ΔD= bank.newD - bank.D
+        if bank.ΔD + bank.C > 0:
+            bank.s= +bank.ΔD + bank.C  # lender
+            bank.d= 0
+        else:
+            bank.d= -bank.ΔD + bank.C  # borrower
+            bank.s= 0
+        bank.D = bank.newD
+        
+    for bank in Model.banks:
+        loanProfits  = bank.getLoanInterest()*bank.l
+        loanToReturn = bank.l + loanProfits
+        # (equation 3)
+        # i) the change is sufficent to repay the principal and the interest
+        if bank.ΔD - loanToReturn>0:
+            bank.E -= loanToReturn
+            bank.getLender().s += bank.l
+            bank.getLender().E += loanProfits
+            Status.logger.debug(f"#{Model.t:03},SHOCK2: {bank.getId()} pays loan {loanToReturn:.3f} to {bank.getLender().getId()} (lender also ΔE={loanProfits:.3f}), now E={bank.C:.3f}")
+            
+        # ii) not enough increment: then firesale of L to cover the loan to return and interests
+        else:
+            bank.sellL = -(bank.ΔD - loanToReturn)/Config.ρ                    
+            # bankrupcy: not enough L to sell and cover the obligations:
+            if bank.sellL > bank.L:
+                Status.logger.debug(f"#{Model.t:03},SHOCK2: {bank.getId()} bankrupted (should return {loanToReturn:.3f} and L={bank.L}")
+                bank.getLender().B += bank.l - bank.L*(1-Config.ρ)
+            # the firesale covers the loan 
+            else:
+                bank.L -= bank.sellL
+                bank.getLender().s += bank.l 
+                bank.getLender().E += loanProfits
+                Status.logger.debug(f"#{Model.t:03},SHOCK2: {bank.getId()} loses ΔL={bank.sellL:.3f} to return loan {loanToReturn:.3f} {bank.getLender().getId()} (lender also ΔE={loanProfits:.3f})")        
+    Status.logBanks()
     
 def doRepayments():
     pass
@@ -139,22 +198,46 @@ def determineMu():
 
 #%%
 
+
 class Status:    
     logger = logging.getLogger("model")
 
     @staticmethod
-    def runInteractive(debug:bool= typer.Option( False, help="Log DEBUG messages" )):
+    def logBanks():
+      for bank in Model.banks:
+        if hasattr(bank,'l'):
+            Status.logger.debug(f"#{Model.t:03},{bank.getId()} s={bank.s:.3f} d={bank.d:.3f} l={bank.l:.3f} ΔD={bank.ΔD:.3f} D={bank.D:.3f} newD={bank.newD:.3f} C={bank.C:.3f}")
+        else:
+            Status.logger.debug(f"#{Model.t:03},{bank.getId()} s={bank.s:.3f} d={bank.d:.3f} D={bank.D:.3f} C={bank.C:.3f}")
+
+    @staticmethod
+    def getLevel( option ):
+        try:
+            return getattr(logging,option.upper())
+        except:
+            logging.error( f" '--log' must contain a valid logging level and {option.upper()} is not.")
+            sys.exit(-1)
+            return None
+            
+    @staticmethod
+    def runInteractive(log:str= typer.Option( 'ERROR', help="Log level messages (ERROR,DEBUG,INFO...)" ), \
+                       logfile:str=typer.Option(None,help="File to send logs to")):
         """
         Run interactively the model
         """        
         # https://typer.tiangolo.com/
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        ch.setFormatter(formatter)    
-        if debug:
-            Status.logger.setLevel(logging.DEBUG)
-        Status.logger.addHandler(ch)        
+        formatter = logging.Formatter('%(levelname)s - %(message)s')
+        Status.logger.setLevel( Status.getLevel(log.upper()))        
+        if logfile:
+            fh = logging.FileHandler( logfile, 'w', 'utf-8' )
+            fh.setLevel( Status.getLevel(log.upper()))
+            fh.setFormatter(formatter)
+            Status.logger.addHandler(fh)
+        else:
+            ch = logging.StreamHandler()
+            ch.setLevel( Status.getLevel(log.upper()))
+            ch.setFormatter(formatter)    
+            Status.logger.addHandler(ch)            
         Status.run()
 
     @staticmethod
