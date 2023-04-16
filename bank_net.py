@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Apr 11 18:08:29 2023
-
 @author: hector@bith.net
 """
 
@@ -10,10 +9,7 @@ import logging
 import math
 import typer
 import sys
-
-
-# from utils.utilities import readConfigYaml, saveConfigYaml, format_tousands, generate_logger, GeneratePathFolder
-
+#TODO from utils.utilities import readConfigYaml, saveConfigYaml, format_tousands, generate_logger, GeneratePathFolder
 
 class Config:
     T = 10  # 1000  # time (1000)
@@ -68,11 +64,9 @@ class Model:
     def doSimulation():
         doShock()
         for Model.t in range(Config.T):
-            # Status.pauseLog()
             doLoans()
             doShock()
             doRepayments()
-            # Status.resumeLog()
             determineMu()
             setupLinks()
 
@@ -97,34 +91,28 @@ class Bank:
         self.failures = 0
         self.__assign_defaults__()
 
-    def newLender(self, argument=None):
+    def newLender(self):
         newvalue = None
-        #arg = argument if argument else 3
-        #print("hola",argument)
         # r_i0 is used the first time the bank is created:
         if self.lender == None:
             self.r = [Config.r_i0 for i in range(Config.N)]
             self.π = [ 0 for i in range(Config.N) ]
             self.r[self.id] = None  # to ourselves, we don't want to lend anything
             # if it's just created, only not to be ourselves is enough
-            newvalue = argument if argument!=None else random.randrange(Config.N - 1 )
+            newvalue = random.randrange(Config.N - 1 )
         else:
             # if we have a previous lender, new should not be the same
-            newvalue = argument if argument!=None else random.randrange(Config.N - 2 )
+            newvalue = random.randrange(Config.N - 2 )
 
         if newvalue >= self.id:
-            #print (f"suma1 {argument} {newvalue}")
             newvalue += 1
             if self.lender and newvalue >= self.lender:
                 newvalue += 1
-                #print(f"suma2 {newvalue}")
         else:
           if self.lender and newvalue >= self.lender:
             newvalue += 1
-            #print ("suma3")
             if newvalue >= self.id:
                 newvalue += 1
-                #print ("suma4")
 
         return newvalue
 
@@ -143,67 +131,6 @@ class Bank:
         self.__assign_defaults__()
 
 
-def setupLinks():
-    # (equation 5)
-    # p = probability borrower not failing
-    # c = lending capacity
-    # λ = leverage
-    # h = borrower haircut
-    maxE = max(Model.banks, key=lambda i: i.E).E
-    maxC = max(Model.banks, key=lambda i: i.C).C
-    for bank in Model.banks:
-        bank.p = bank.E / maxE
-        bank.λ = bank.L / bank.E
-
-    maxλ = max(Model.banks, key=lambda i: i.λ).λ
-    for bank in Model.banks:
-        bank.h = bank.λ / maxλ
-        bank.A = bank.L / bank.λ + bank.D
-
-    # determine c (lending capacity) for all other banks (to whom give loans):
-    for bank in Model.banks:
-        bank.c = []
-        for i in range(Config.N):
-            c = 0 if i == bank.id else (1 - Model.banks[i].h) * Model.banks[i].A
-            bank.c.append(c)
-
-    # (equation 6)
-    minr = Config.r_i0 * 1000
-    for bank_i in Model.banks:
-        for j in range(Config.N):
-            try:
-                if j != bank_i.id:
-                    bank_i.r[j] = (Config.Χ * Model.banks[j].A - \
-                                   Config.Φ * Model.banks[j].A - \
-                                   (1 - Model.banks[j].p) * \
-                                   (Config.ξ * Model.banks[j].A - bank_i.c[j])) \
-                                  / (Model.banks[j].p * bank_i.c[j])
-                else:
-                    bank_i.r[j] = None
-            except:  # TODO
-                bank_i.r[j] = Config.r_i0
-            if bank_i.r[j] and bank_i.r[j] < minr:
-                minr = bank_i.r[j]
-
-    # (equation 7)
-    for bank_i in Model.banks:
-        for j in range(Config.N):
-            if j != bank_i.id:
-                bank_i.π[j] = Model.ŋ * (bank.C / maxC) + (1 - Model.ŋ) * (minr / bank_i.r[j])
-            else:
-                bank_i.π[j] = None
-
-    # we can now break old links and set up new lenders, using probability P
-    # (equation 8)
-    for bank in Model.banks:
-        possible_lender  = bank.newLender()
-        possible_lender_π= Model.banks[possible_lender].π[bank.id]
-        current_lender_π = bank.getLender().π[bank.id]
-        bank.P = 1 / (1 + math.exp(-Config.β * ( possible_lender_π - current_lender_π ) ))
-
-        if bank.P >= 0.5:
-            bank.lender = possible_lender
-
 
 def doShock():
     # (equation 2)
@@ -211,7 +138,7 @@ def doShock():
         bank.B = 0  # bad debt
         bank.newD = bank.D * (Config.µ + Config.ω * random.random())
         bank.ΔD = bank.newD - bank.D
-    Status.logBanks(details=False)
+    Status.debugBanks(details=False)
 
 
 def doLoans():
@@ -239,12 +166,12 @@ def doLoans():
             if bank.sellL > 0:
                 bank.L -= bank.sellL
                 bank.C = 0
-                Status.logger.debug(
-                    f"t={Model.t:03},Loans: {bank.getId()} firesales L={bank.sellL:.3f} to cover ΔD={bank.ΔD:.3f} as {bank.getLender().getId()} gives {bank.l:.3f} and C={bank.C:.3f}")
+                Status.debug("loans",
+                    f"{bank.getId()} firesales L={bank.sellL:.3f} to cover ΔD={bank.ΔD:.3f} as {bank.getLender().getId()} gives {bank.l:.3f} and C={bank.C:.3f}")
             else:
                 bank.C -= bank.d
-                Status.logger.debug(
-                    f"t={Model.t:03},Loans: {bank.getId()} borrows {bank.l:.3f} from {bank.getLender().getId()} (who still has {bank.getLender().s:.3f}) to cover ΔD={bank.ΔD:.3f} and C={bank.C:.3f}")
+                Status.debug("loans",
+                    f"{bank.getId()} borrows {bank.l:.3f} from {bank.getLender().getId()} (who still has {bank.getLender().s:.3f}) to cover ΔD={bank.ΔD:.3f} and C={bank.C:.3f}")
 
         # increment of deposits or decrement covered by own capital 
         else:
@@ -252,9 +179,9 @@ def doLoans():
             bank.sellL = 0
             if bank.ΔD < 0:
                 bank.C += bank.ΔD
-                Status.logger.debug(
-                    f"t={Model.t:03},Loans: {bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
-    Status.logBanks(info='Loans after')
+                Status.debug("loans",
+                    f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
+    Status.debugBanks(info='Loans after')
 
 
 def doRepayments():
@@ -269,16 +196,16 @@ def doRepayments():
                 bank.E -= loanToReturn
                 bank.getLender().s += bank.l
                 bank.getLender().E += loanProfits
-                Status.logger.debug(
-                    f"t={Model.t:03},Payments: {bank.getId()} pays loan {loanToReturn:.3f} to {bank.getLender().getId()} (lender also ΔE={loanProfits:.3f}), now E={bank.C:.3f}")
+                Status.debug("repay",
+                    f"{bank.getId()} pays loan {loanToReturn:.3f} to {bank.getLender().getId()} (lender also ΔE={loanProfits:.3f}), now E={bank.C:.3f}")
 
             # ii) not enough increment: then firesale of L to cover the loan to return and interests
             else:
                 bank.sellL = -(bank.ΔD - loanToReturn) / Config.ρ
                 # bankrupcy: not enough L to sell and cover the obligations:
                 if bank.sellL > bank.L:
-                    Status.logger.debug(
-                        f"t={Model.t:03},Payments: {bank.getId()} bankrupted (should return {loanToReturn:.3f}, ΔD={bank.ΔD:.3f} and L={bank.L})")
+                    Status.logger.debug("repay",
+                        f"t={bank.getId()} bankrupted (should return {loanToReturn:.3f}, ΔD={bank.ΔD:.3f} and L={bank.L})")
                     bank.getLender().B += bank.l - bank.L * (1 - Config.ρ)
                     bank.replaceBank()
                 # the firesale covers the loan 
@@ -286,15 +213,88 @@ def doRepayments():
                     bank.L -= bank.sellL
                     bank.getLender().s += bank.l
                     bank.getLender().E += loanProfits
-                    Status.logger.debug(
-                        f"t={Model.t:03},Payments: {bank.getId()} loses ΔL={bank.sellL:.3f} to return loan {loanToReturn:.3f} {bank.getLender().getId()} (lender also ΔE={loanProfits:.3f})")
+                    Status.debug("repay",
+                        f"{bank.getId()} loses ΔL={bank.sellL:.3f} to return loan {loanToReturn:.3f} {bank.getLender().getId()} (lender also ΔE={loanProfits:.3f})")
         # let's balance results:
         if bank.C + bank.L != bank.D + bank.E:
             bank.C = bank.D + bank.E - bank.L
-            Status.logger.debug(f"t={Model.t:03},Payments: {bank.getId()} modifies capital and C={bank.C:.3f}")
+            Status.debug("repay",f"{bank.getId()} modifies capital and C={bank.C:.3f}")
 
-    Status.logBanks(info="Payments after")
+    Status.debugBanks(info="After payments")
 
+
+
+
+def setupLinks():
+    # (equation 5)
+    # p = probability borrower not failing
+    # c = lending capacity
+    # λ = leverage
+    # h = borrower haircut
+
+
+    maxE = max(Model.banks, key=lambda i: i.E).E
+    maxC = max(Model.banks, key=lambda i: i.C).C
+    for bank in Model.banks:
+        bank.p = bank.E / maxE
+        bank.λ = bank.L / bank.E
+
+    maxλ = max(Model.banks, key=lambda i: i.λ).λ
+    for bank in Model.banks:
+        bank.h = bank.λ / maxλ
+        bank.A = bank.L / bank.λ + bank.D
+
+    # determine c (lending capacity) for all other banks (to whom give loans):
+    for bank in Model.banks:
+        bank.c = []
+        for i in range(Config.N):
+            c = 0 if i == bank.id else (1 - Model.banks[i].h) * Model.banks[i].A
+            bank.c.append(c)
+
+    # (equation 6)
+    minr = Config.r_i0 * 1000
+    for bank_i in Model.banks:
+        for j in range(Config.N):
+            try:
+                if j == bank_i.id:
+                    bank_i.r[j] = None
+                else:
+                    bank_i.r[j] = (Config.Χ * Model.banks[j].A -
+                                   Config.Φ * Model.banks[j].A -
+                                   (1 - Model.banks[j].p) *
+                                   (Config.ξ * Model.banks[j].A - bank_i.c[j])) \
+                                  / (Model.banks[j].p * bank_i.c[j])
+            except:  # TODO: problema, como no toco E,C, esta división es cero la primera vez
+                bank_i.r[j] = Config.r_i0
+            if bank_i.r[j] and bank_i.r[j] < minr:
+                minr = bank_i.r[j]
+
+    Status.debug("links",f"maxE={maxE} maxC={maxC} maxλ={maxλ} minr={minr} ŋ={Model.ŋ}")
+
+    # (equation 7)
+    for bank_i in Model.banks:
+        loginfo = ""
+        for j in range(Config.N):
+            if j != bank_i.id:
+                bank_i.π[j] = Model.ŋ * (bank.C / maxC) + (1 - Model.ŋ) * (minr / bank_i.r[j])
+                loginfo += f"{j}:{bank_i.π[j]:.3f},"
+            else:
+                bank_i.π[j] = None
+        Status.debug("links", f"{bank_i.getId()} π=[{loginfo}]")
+
+    # we can now break old links and set up new lenders, using probability P
+    # (equation 8)
+    for bank in Model.banks:
+        possible_lender  = bank.newLender()
+        possible_lender_π= Model.banks[possible_lender].π[bank.id]
+        current_lender_π = bank.getLender().π[bank.id]
+        bank.P = 1 / (1 + math.exp(-Config.β * ( possible_lender_π - current_lender_π ) ))
+
+        if bank.P >= 0.5:
+            bank.lender = possible_lender
+            Status.debug("links", f"{bank.getId()} new lender is {possible_lender} with %{bank.P:.3f} ( {possible_lender_π} - {current_lender_π} )")
+        else:
+            Status.debug("links", f"{bank.getId()} maintains lender {bank.getLender().getId()} with %{1-bank.P:.3f}")
 
 def determineMu():
     pass
@@ -307,17 +307,16 @@ class Status:
     logger = logging.getLogger("model")
 
     @staticmethod
-    def logBanks(details: bool = True, info: str = ''):
+    def debugBanks(details: bool = True, info: str = ''):
+        if info:
+            info += ': '
         for bank in Model.banks:
-            text = f"t={Model.t:03}"
-            if info:
-                text += f",{info}:"
-            text += f" {bank.getId()} C={bank.C:.3f} L={bank.L:.3f} | D={bank.D:.3f} E={bank.E:.3f}"
+            text = f"{info}{bank.getId()} C={bank.C:.3f} L={bank.L:.3f} | D={bank.D:.3f} E={bank.E:.3f}"
             if not details and hasattr(bank, 'ΔD'):
                 text += f" ΔD={bank.ΔD:.3f}"
             if details and hasattr(bank, 'l'):
                 text += f" s={bank.s:.3f} d={bank.d:.3f} l={bank.l:.3f}"
-            Status.logger.debug(text)
+            Status.info("-----",text)
 
     @staticmethod
     def getLevel(option):
@@ -329,15 +328,22 @@ class Status:
             return None
 
     @staticmethod
-    def pauseLog():
-        Status.logger.setLevel(Status.getLevel("ERROR"))
+    def debug(module,text):
+        if Status.modules == [] or module in Status.modules:
+            Status.logger.debug(f"t={Model.t:03}/{module} {text}")
 
     @staticmethod
-    def resumeLog():
-        Status.logger.setLevel(Status.logLevel)
+    def info(module,text):
+        if Status.modules == [] or module in Status.modules:
+            Status.logger.info(f" t={Model.t:03}/{module} {text}")
+
+    @staticmethod
+    def error(module,text):
+        Status.logger.error(f"t={Model.t:03}/{module} {text}")
 
     @staticmethod
     def runInteractive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
+                       modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
                        logfile: str = typer.Option(None, help="File to send logs to"),
                        n: int = typer.Option(Config.N, help=f"Number of banks"),
                        t: int = typer.Option(Config.T, help=f"Time repetitions"),
@@ -353,6 +359,7 @@ class Status:
             Config.T = t
         if n != Config.N:
             Config.N = n
+        Status.modules = modules.split(",") if modules else []
         if logfile:
             fh = logging.FileHandler(logfile, 'w', 'utf-8')
             fh.setLevel(Status.logLevel)
