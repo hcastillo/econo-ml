@@ -305,7 +305,7 @@ def determineMu():
 
 class Status:
     logger = logging.getLogger("model")
-
+    modules= []
     @staticmethod
     def debugBanks(details: bool = True, info: str = ''):
         if info:
@@ -346,8 +346,7 @@ class Status:
                        modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
                        logfile: str = typer.Option(None, help="File to send logs to"),
                        n: int = typer.Option(Config.N, help=f"Number of banks"),
-                       t: int = typer.Option(Config.T, help=f"Time repetitions"),
-                       check: bool = typer.Option(False, help="Check if it working properly with last tested values")):
+                       t: int = typer.Option(Config.T, help=f"Time repetitions")):
         """
         Run interactively the model
         """
@@ -370,33 +369,12 @@ class Status:
             ch.setLevel(Status.logLevel)
             ch.setFormatter(formatter)
             Status.logger.addHandler(ch)
-        if check:
-            Config.T = 10
-            Config.N = 5
         Status.run()
-        if check:
-            Status.check()
 
     @staticmethod
     def run():
         Model.initilize()
         Model.doSimulation()
-
-    @staticmethod
-    def check():
-        # t=9 Payments after: bank#1 C=111.400 L=45.729 | D=142.129 E=15.000 s=111.400 d=0.000 l=0.000
-        ok = True
-        if Model.banks[1].C != 111.39963659882957:
-            print(f"Model.banks[1].C!=111.39963659882957: {Model.banks[1].C}")
-            ok = False
-        if Model.banks[3].D != 57.474067689866615:
-            print(f"Model.banks[3].D!=57.474067689866615: {Model.banks[3].D}")
-            ok = False
-        if Model.banks[4].E != 14.617990922946303:
-            print(f"Model.banks[4].E!=14.617990922946303: {Model.banks[4].E}")
-            ok = False
-        if ok:
-            print("ok")
 
     @staticmethod
     def isNotebook():
