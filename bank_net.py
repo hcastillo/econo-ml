@@ -9,50 +9,41 @@ import logging
 import math
 import typer
 import sys
+import matplotlib.pyplot as plt
+
+
 #TODO from utils.utilities import readConfigYaml, saveConfigYaml, format_tousands, generate_logger, GeneratePathFolder
 
 class Config:
-    T = 10  # 1000  # time (1000)
-    N = 5  # 50    # number of banks
-
-    d = 1  # out-degree
+    T: int = 1000    # time (1000)
+    N: int = 50      # number of banks
 
     # TODO ȓ = 0.02  # reserves percentage
 
-    c = 1  # parameter bankruptcy cost equation
-    α = 0.08  # alpha, ratio equity-loan
-    g = 1.1  # variable cost
-    # markdown interest rate (the higher it is, the monopolistic power of banks)
-
-    d = 100  # location cost
-    e = 0.1  # sensivity
-
-    µ = 0.7  # pi
-    ω = 0.55  # omega
+    µ: float = 0.7  # pi
+    ω: float = 0.55  # omega
 
     # screening costs
-    Φ = 0.025  # phi
-    Χ = 0.015  # ji
+    Φ: float = 0.025  # phi
+    Χ: float = 0.015  # ji
     # liquidation cost of collateral
-    ξ = 0.3  # xi
-    ρ = 0.3  # fire-sale price
+    ξ: float = 0.3    # xi
+    ρ: float = 0.3    # fire-sale price
 
-    β = 5  # intensity of breaking the connection
-    prob_initially_isolated = 0.25
+    β: float = 5      # intensity of breaking the connection
 
     # banks initial parameters
-    L_i0 = 120  # long term assets
-    C_i0 = 30  # capital
-    D_i0 = 135  # deposits
-    E_i0 = 15  # equity
-    r_i0 = 0.02  # initial rate
+    L_i0: float = 120   # long term assets
+    C_i0: float = 30    # capital
+    D_i0: float = 135   # deposits
+    E_i0: float = 15    # equity
+    r_i0: float = 0.02  # initial rate
 
 
 class Model:
     banks = []
-    t = 0
-
-    ŋ = 0.5  # eta : policy
+    t: int = 0
+    ŋ: float = 0.5  # eta : policy
 
     @staticmethod
     def initilize():
@@ -67,6 +58,8 @@ class Model:
             doLoans()
             doShock()
             doRepayments()
+            Statistics.computeLiquidity()
+            Statistics.computeBestLender()
             determineMu()
             setupLinks()
 
@@ -129,6 +122,7 @@ class Bank:
     def replaceBank(self):
         self.failures += 1
         self.__assign_defaults__()
+        Statistics.bankruptcy[Model.t] += 1
 
 
 
@@ -208,6 +202,7 @@ def doRepayments():
                         f"t={bank.getId()} bankrupted (should return {loanToReturn:.3f}, ΔD={bank.ΔD:.3f} and L={bank.L})")
                     bank.getLender().B += bank.l - bank.L * (1 - Config.ρ)
                     bank.replaceBank()
+
                 # the firesale covers the loan 
                 else:
                     bank.L -= bank.sellL
@@ -303,9 +298,52 @@ def determineMu():
 # %%
 
 
+class Statistics:
+    bankruptcy = []
+    bestLender = []
+    bestLenderClients = []
+    liquidity = []
+
+    @staticmethod
+    def reset():
+        Statistics.bankruptcy = [0 for i in range(Config.T)]
+        Statistics.bestLender = [-1 for i in range(Config.T)]
+        Statistics.bestLenderClients = [0 for i in range(Config.T)]
+        Statistics.liquidity = [0 for i in range(Config.T)]
+
+    @staticmethod
+    def computeBestLender():
+
+        lenders = {}
+        for bank in Model.banks:
+            if bank.lender in lenders:
+                lenders[bank.lender] += 1
+            else:
+                lenders[bank.lender] = 1
+        best = -1
+        bestValue = -1
+        for lender in lenders.keys():
+            if lenders[lender]>bestValue:
+                best = lender
+                bestValue = lenders[lender]
+
+        Statistics.bestLender[ Model.t ] = best
+        Statistics.bestLenderClients[ Model.t ] = bestValue
+
+    @staticmethod
+    def computeLiquidity():
+        total = 0
+        for bank in Model.banks:
+            total += bank.C
+        Statistics.liquidity[ Model.t ] = total
+
+
 class Status:
     logger = logging.getLogger("model")
     modules= []
+
+    [Config.r_i0 for i in range(Config.N)]
+
     @staticmethod
     def debugBanks(details: bool = True, info: str = ''):
         if info:
@@ -316,7 +354,7 @@ class Status:
                 text += f" ΔD={bank.ΔD:.3f}"
             if details and hasattr(bank, 'l'):
                 text += f" s={bank.s:.3f} d={bank.d:.3f} l={bank.l:.3f}"
-            Status.info("-----",text)
+            Status.debug("-----",text)
 
     @staticmethod
     def getLevel(option):
@@ -373,8 +411,10 @@ class Status:
 
     @staticmethod
     def run():
+        Statistics.reset()
         Model.initilize()
         Model.doSimulation()
+        Graph.generate()
 
     @staticmethod
     def isNotebook():
@@ -388,6 +428,60 @@ class Status:
             return False
         return True
 
+class Graph:
+    @staticmethod
+    def bankruptcies():
+        plt.clf()
+        xx = []
+        yy = []
+        for i in range(Config.T):
+            xx.append(i)
+            yy.append(Statistics.bankruptcy[i])
+        plt.plot(xx, yy, 'b-')
+        plt.ylabel("num of bankruptcies")
+        plt.xlabel("t")
+        plt.title("Bankrupted firms")
+        plt.show() if Status.isNotebook() else plt.savefig("output/bankrupted.svg")
+
+    @staticmethod
+    def liquidity():
+        plt.clf()
+        xx = []
+        yy = []
+        for i in range(Config.T):
+            xx.append(i)
+            yy.append(Statistics.liquidity[i])
+        plt.plot(xx, yy, 'b-')
+        plt.ylabel("liquidity")
+        plt.xlabel("t")
+        plt.title("C of all banks")
+        plt.show() if Status.isNotebook() else plt.savefig("output/liquidity.svg")
+
+    @staticmethod
+    def bestLender():
+        plt.clf()
+        fig,ax = plt.subplots()
+        xx = []
+        yy = []
+        yy2= []
+        for i in range(Config.T):
+            xx.append(i)
+            yy.append(Statistics.bestLender[i])
+            yy2.append(Statistics.bestLenderClients[i])
+        ax.plot(xx, yy, 'b-')
+        ax.set_ylabel("Best Lender",color='blue')
+        ax.set_xlabel("t")
+        ax2 = ax.twinx()
+        ax2.plot(xx,yy2,'r-')
+        ax2.set_ylabel("Best Lender # clients",color='red')
+        plt.title("Best lender and # clients")
+        plt.show() if Status.isNotebook() else plt.savefig("output/best_lender.svg")
+
+    @staticmethod
+    def generate():
+        Graph.bankruptcies()
+        Graph.liquidity()
+        Graph.bestLender()
 
 # %%
 
