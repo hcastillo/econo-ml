@@ -9,4 +9,4 @@ class ValuesTestCase(unittest.TestCase):
     def test_values_after_execution(self):
         self.assertEqual( bank_net.Model.banks[1].C, 0.13382435876260956)
         self.assertEqual( bank_net.Model.banks[3].D, 135)
-        self.assertEqual( bank_net.Model.banks[4].E, 15)
+        self.assertEqual( bank_net.Model.banks[4].E, -13.26847831510539)

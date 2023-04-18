@@ -16,8 +16,8 @@ import sys
 import matplotlib.pyplot as plt
 
 class Config:
-    T: int = 10    # time (1000)
-    N: int = 3     # number of banks (50)
+    T: int = 100    # time (1000)
+    N: int = 5     # number of banks (50)
 
     #  ȓ = 0.02  # percentage reserves (at the moment, no R is used)
 
@@ -65,7 +65,7 @@ class Model:
             Statistics.computeBestLender()
             determineMu()
             setupLinks()
-
+        Statistics.finalInfo()
 
 # %%
 
@@ -135,7 +135,7 @@ def doShock(whichShock):
         newD = bank.D * (Config.µ + Config.ω * random.random())
         bank.ΔD = newD - bank.D
         bank.D  = newD
-
+        Statistics.incrementD[Model.t] += bank.ΔD
 
 
     Status.debugBanks(details=False,info=whichShock)
@@ -177,7 +177,7 @@ def doLoans():
         else:
             bank.l = 0
             bank.sellL = 0
-            if bank.ΔD < 0:
+            if bank.ΔD < 0:  # increment D negative -> decreases C also
                 bank.C += bank.ΔD
                 Status.debug("loans",
                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
@@ -258,7 +258,7 @@ def doRepayments():
         if bank.C + bank.L != bank.D + bank.E:
             bank.E = bank.C+ bank.L - bank.E
             Status.debug("repay",f"{bank.getId()} modifies E={bank.C:.3f}")
-
+    Status.debug("repay",f"this step ΔD={Statistics.incrementD[Model.t]} and failures={Statistics.bankruptcy[Model.t]}")
     Status.debugBanks(info="After payments")
 
 
@@ -351,6 +351,7 @@ class Statistics:
     bestLender = []
     bestLenderClients = []
     liquidity = []
+    incrementD = []
 
     @staticmethod
     def reset():
@@ -358,6 +359,7 @@ class Statistics:
         Statistics.bestLender = [-1 for i in range(Config.T)]
         Statistics.bestLenderClients = [0 for i in range(Config.T)]
         Statistics.liquidity = [0 for i in range(Config.T)]
+        Statistics.incrementD = [0 for i in range(Config.T)]
 
     @staticmethod
     def computeBestLender():
@@ -385,12 +387,18 @@ class Statistics:
             total += bank.C
         Statistics.liquidity[ Model.t ] = total
 
+    @staticmethod
+    def finalInfo():
+        total = 0
+        for i in Statistics.incrementD:
+            total += i
+        Status.debug("final",f"after {Config.T} we have Σ ΔD={total}")
 
 class Status:
     logger = logging.getLogger("model")
     modules= []
 
-    [Config.r_i0 for i in range(Config.N)]
+    ## [Config.r_i0 for i in range(Config.N)]
 
     @staticmethod
     def debugBanks(details: bool = True, info: str = ''):
