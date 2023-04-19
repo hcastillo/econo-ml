@@ -16,8 +16,8 @@ import sys
 import matplotlib.pyplot as plt
 
 class Config:
-    T: int = 100    # time (1000)
-    N: int = 5     # number of banks (50)
+    T: int = 1000    # time (1000)
+    N: int = 50      # number of banks (50)
 
     #  ȓ = 0.02  # percentage reserves (at the moment, no R is used)
 
@@ -56,7 +56,9 @@ class Model:
     @staticmethod
     def doSimulation():
         # initially all banks have a random lender
+        # -> la matriz de creditos hasta t=10, para generar heterogeneidad
         for Model.t in range(Config.T):
+            # -----> matrix de creditos deberia de ir aqui
             doShock("First shock")
             doLoans()
             doShock("Second shock")
@@ -117,6 +119,7 @@ class Bank:
         self.C = Config.C_i0
         self.D = Config.D_i0
         self.E = Config.E_i0
+        self.failed = False
         # interbank rates
         self.lender = None
         self.lender = self.newLender()
@@ -127,6 +130,32 @@ class Bank:
         self.__assign_defaults__()
         Statistics.bankruptcy[Model.t] += 1
 
+    def __doBankrupcy__(self,phase):
+        self.failed = True
+        whatWeObtainAtFiresaleAll = self.L * Config.ρ
+        badDebt = self.l - whatWeObtainAtFiresaleAll
+        if badDebt > 0:
+            self.getLender().B += badDebt
+            self.getLender().E += whatWeObtainAtFiresaleAll
+            Status.debug(phase,
+                         f"t={self.getId()} bankrupted (B={badDebt:.3f}, recovered E={whatWeObtainAtFiresaleAll:.3f})")
+        else:
+            self.getLender().E = self.l  # we don't recover more than the loan if it is
+            Status.debug(phase,
+                         f"t={self.getId()} bankrupted (recovered all as E={whatWeObtainAtFiresaleAll:.3f})")
+        self.getLender().s -= self.l  # the loan is not paid correctly, but we remove it
+
+    def doFiresalesL( self,amountToSell, reason, phase):
+        costOfSell = amountToSell / Config.ρ
+        self.C = 0
+        if costOfSell > self.L:
+            self.__doBankrupcy__(phase)
+            Status.debug("loans",
+                         f"{self.getId()} cost fire sale {costOfSell:.3f} > L{self.L:.3f}: {reason}")
+        else:
+            self.L -= costOfSell
+            Status.debug("loans",
+                         f"{self.getId()} fire sale {amountToSell:.3f} , cost {costOfSell:.3f}: {reason}")
 
 
 def doShock(whichShock):
@@ -135,9 +164,9 @@ def doShock(whichShock):
         newD = bank.D * (Config.µ + Config.ω * random.random())
         bank.ΔD = newD - bank.D
         bank.D  = newD
+        if bank.ΔD > 0:
+            bank.C += bank.ΔD
         Statistics.incrementD[Model.t] += bank.ΔD
-
-
     Status.debugBanks(details=False,info=whichShock)
 
 
@@ -145,120 +174,88 @@ def doLoans():
     for bank in Model.banks:
         bank.B = 0
         if bank.ΔD + bank.C > 0:
-            bank.s = bank.ΔD + bank.C  # lender
-            bank.d = 0
+            if bank.ΔD>=0:
+                bank.s = bank.ΔD + bank.C  # lender
+            else:
+                # it will not lend money due to not increase
+                bank.s = 0
+            bank.d = 0 # it will not need to borrow
         else:
-            bank.d = abs(bank.ΔD + bank.C)  # borrower
-            bank.s = 0
+            bank.d = abs(bank.ΔD + bank.C)  # it will need money
+            bank.s = 0 # no lender this time
 
     for bank in Model.banks:
         # decrement in which we should borrow
-        if bank.ΔD + bank.C < 0:
-            if bank.d > bank.getLender().s:
-                bank.l = bank.getLender().s
-                bank.getLender().s = 0
-                bank.sellL = (bank.d - bank.l) / Config.ρ
+        if bank.d > 0:
+            if bank.getLender().d > 0:
+                # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
+                bank.doFiresalesL( bank.d,"lender gives no money","loans" )
+                bank.l = 0
             else:
-                bank.l = bank.d
-                bank.getLender().s -= bank.d  # bank.d
-                bank.sellL = 0
+                # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
+                if bank.d > bank.getLender().s:
+                    bank.doFiresalesL( bank.d - bank.getLender().s,
+                                       f"lender gives {bank.getLender().s:.3f} and we need {bank.d:.3f}","loans")
+                    bank.l = bank.getLender().s
+                    bank.getLender().s = 0
+                else:
+                    bank.l = bank.d
+                    bank.getLender().s -= bank.d  # bank.d
 
-            if bank.sellL > 0:
-                bank.L -= bank.sellL
-                bank.C = 0
-                Status.debug("loans",
-                    f"{bank.getId()} firesales L={bank.sellL:.3f} to cover ΔD={bank.ΔD:.3f} as {bank.getLender().getId()} gives {bank.l:.3f} and C={bank.C:.3f}")
-            else:
-                bank.C -= bank.d
-                Status.debug("loans",
-                    f"{bank.getId()} borrows {bank.l:.3f} from {bank.getLender().getId()} (who still has {bank.getLender().s:.3f}) to cover ΔD={bank.ΔD:.3f} and C={bank.C:.3f}")
-
-        # increment of deposits, or decrement covered by own capital
+        # the shock can be covered by own capital
         else:
             bank.l = 0
-            bank.sellL = 0
             if bank.ΔD < 0:  # increment D negative -> decreases C also
                 bank.C += bank.ΔD
                 Status.debug("loans",
                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
     # Status.debugBanks(info='Loans after')
 
-
 def doRepayments():
     for bank in Model.banks:
-        # let's return previous loan bank.l (if it exists):
-        # if bank.l>0 , sure we have bank.C = ΔD
-        if bank.l > 0:
+        # first we should pay D (if ΔD < 0): in this moment, only with own C
+        # or doing firesales:
+        if bank.ΔD < 0:
+            if bank.C + bank.ΔD >= 0:
+                bank.C -= bank.ΔD
+                Status.debug("repay",
+                         f"{bank.getId()} second shock ΔD={bank.ΔD:.3f} paid with cash, now C={bank.C:.3f}")
+            else:
+                bank.doFiresalesL(abs(bank.ΔD + bank.C),f"second shock ΔD={bank.ΔD:.3f} but C={bank.C:.3f}","repay")
+
+        # now, even ΔD<0 nor ΔD>0, let's return previous loan bank.l (if it exists), but only
+        # if the bank is not bankrupted!
+        if bank.l > 0 and not bank.failed:
             loanProfits  = bank.getLoanInterest() * bank.l
             loanToReturn = bank.l + loanProfits
             # (equation 3)
-            # i) the new shock gives ΔD positive and with it, we can pay the loan:
-            if bank.ΔD - loanToReturn > 0:
+            if loanToReturn > bank.C:
+                weNeedToSell = loanToReturn - bank.C
+                bank.doFiresalesL( weNeedToSell,f"return loan and interest {loanToReturn:.3f} is higher than C={bank.C:.3f}","repay")
+            # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
+            if not bank.failed:
                 bank.C -= loanToReturn
                 bank.E -= loanProfits
-                bank.getLender().s -= bank.l       # we reduce the current 's' => the bank could have more loans
+                bank.getLender().s -= bank.l       # we reduce the  's' => the lender could have more loans
                 bank.getLender().C += bank.l       # we return the loan
                 bank.getLender().E += loanProfits  # the profits are paid as E
                 Status.debug("repay",
                     f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
 
-            # ii) not enough increment to pay the loan: then firesales of L to cover the loan to return and interests
-            else:
-                weNeedToSell = loanToReturn - bank.ΔD
-                firesaleCost = weNeedToSell / Config.ρ
-                # the firesale covers the loan
-                if firesaleCost <= bank.L:
-                    bank.C = 0
-                    bank.L -= firesaleCost
-                    bank.E = bank.L - bank.D
-                    bank.getLender().s -= bank.l  # we reduce the current 's' => the bank could have more loans
-                    bank.getLender().C += bank.l  # we return the loan
-                    bank.getLender().E += loanProfits  # the profits are paid as E
-                    Status.debug("repay",
-                        f"{bank.getId()} fire sales={firesaleCost:.3f} to pay loan {loanToReturn:.3f} (C=0,L={bank.L:.3f},E={bank.E:.3f}) to lender {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
+        if bank.failed:
+            bank.replaceBank()
 
-                # iii) the worst: bankrupcy, not enough L to sell and cover bank obligations:
-                else:
-                    bank.getLender().s -= bank.l  # the loan is not paid correctly, but we remove it
-                    # bank.getLender().C is not increased -> the loan is failed. We move the fire sales to lender E
-                    fireSaleBankrupt = bank.L * (1 - Config.ρ)
-                    # l = 5
-                    # fireSaleBankrupt = 3 -> B=2 (not recovered) E+=3,
-                    if bank.l>fireSaleBankrupt:
-                        bank.getLender().E += fireSaleBankrupt
-                        bank.getLender().B += (bank.l-fireSaleBankrupt)
-                    # l= 5
-                    # fireSaleBankrupt = 7 -> B=0, E+=5, all recovered
-                    else:
-                        bank.getLender().E += bank.l
-                    Status.debug("repay",
-                          f"t={bank.getId()} bankrupted (should return {loanToReturn:.3f}, ΔD={bank.ΔD:.3f} and L={bank.L:.3f})")
-                    bank.replaceBank()
-        else:
-            # if no previous loan (bank.l=0), but also in this new shock bank.d>0, we have not enough money and we should fire sales!
-            # (no loan at this moment)
-            if bank.d<0:
-                weNeedToSell = bank.d
-                firesaleCost = weNeedToSell / Config.ρ
-                # the fire sale is enough:
-                if firesaleCost <= bank.L:
-                    bank.C = 0
-                    bank.L -= firesaleCost
-                    bank.E = bank.L - bank.D
-                    Status.debug("repay",
-                        f"{bank.getId()} fire sales={firesaleCost:.3f} to pay {bank.d:.3f} (C=0,L={bank.L:.3f},E={bank.E:.3f}) in second shock)")
-                else:
-                    # the fire sale is not enough: could this really happen? TODO
-                    Status.debug("repay",
-                        f"t={bank.getId()} bankrupted (should fire sale {weNeedToSell:.3f} but L={bank.L})")
-                    bank.replaceBank()
-
-
-        # let's balance results: the solution is to decrease or increase E
+        # let's balance results: if we have fire sale L, surely it's time to decrease E
         if bank.C + bank.L != bank.D + bank.E:
-            bank.E = bank.C+ bank.L - bank.E
-            Status.debug("repay",f"{bank.getId()} modifies E={bank.C:.3f}")
-    Status.debug("repay",f"this step ΔD={Statistics.incrementD[Model.t]} and failures={Statistics.bankruptcy[Model.t]}")
+            bank.E = bank.C + bank.L - bank.D
+            if bank.E <= 0:
+                bank.C = -bank.E-2
+                bank.E = 2 #TODO
+                Status.debug("repay", f"{bank.getId()} modifies C={bank.C:.3f}")
+            else:
+                Status.debug("repay", f"{bank.getId()} modifies E={bank.E:.3f}")
+
+    Status.debug("repay",f"this step ΔD={Statistics.incrementD[Model.t]:.3f} and failures={Statistics.bankruptcy[Model.t]}")
     Status.debugBanks(info="After payments")
 
 
@@ -276,6 +273,7 @@ def setupLinks():
     maxC = max(Model.banks, key=lambda i: i.C).C
     for bank in Model.banks:
         bank.p = bank.E / maxE
+        print(bank.E)
         bank.λ = bank.L / bank.E
 
     maxλ = max(Model.banks, key=lambda i: i.λ).λ
@@ -392,7 +390,7 @@ class Statistics:
         total = 0
         for i in Statistics.incrementD:
             total += i
-        Status.debug("final",f"after {Config.T} we have Σ ΔD={total}")
+        Status.debug("final",f"after {Config .T} we have Σ ΔD={total}")
 
 class Status:
     logger = logging.getLogger("model")
@@ -534,10 +532,30 @@ class Graph:
         plt.show() if Status.isNotebook() else plt.savefig("output/best_lender.svg")
 
     @staticmethod
+    def bestLenderBokeh():
+        from bokeh.plotting import figure, show
+
+        xx = []
+        yy = []
+        yy2 = []
+        for i in range(Config.T):
+            xx.append(i)
+            yy.append(Statistics.bestLender[i])
+            yy2.append(Statistics.bestLenderClients[i])
+        p = figure(title="Best Lender", x_axis_label='x', y_axis_label='y',
+                   sizing_mode="stretch_width",
+                   height=350)
+        p.line(xx, yy, legend_label="Best lender id", color="blue", line_width=2)
+        p.line(xx, yy2, legend_label="Best lender num clients", color="red", line_width=2)
+        show(p)
+
+    @staticmethod
     def generate():
         Graph.bankruptcies()
         Graph.liquidity()
         Graph.bestLender()
+        Graph.bestLenderBokeh()
+
 
 # %%
 
