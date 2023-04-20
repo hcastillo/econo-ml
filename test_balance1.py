@@ -1,42 +1,25 @@
 import unittest,bank_net
+from bank_net_testclass import BankTest
 from mock import patch, Mock
 
-class ValuesTestCase(unittest.TestCase):
+# 1. borrower can pays the loan using C, no loan and no second shock
+# -------------------
 
-    shocks = [
-        # t=0, for each bank
-        {  "shock1" :[ -15, 5 ], "shock2": [ -10, 10 ], },
-        # t=1... etc
-        {  "shock1" :[ -15, 5 ], "shock2": [ -10, 10 ], },
-    ]
+class BalanceTestCase(BankTest):
 
-    def mockedShock(whichShock):
-        for bank in bank_net.Model.banks:
-            bank.newD = bank.D + ValuesTestCase.shocks[ bank_net.Model.t ][whichShock][bank.id]
-            bank.ΔD = bank.newD - bank.D
-            bank.D = bank.newD
-            if bank.ΔD > 0:
-                bank.C += bank.ΔD
-            bank_net.Statistics.incrementD[bank_net.Model.t] += bank.ΔD
-        bank_net.Status.debugBanks(details=False, info=whichShock)
-
-    @patch.object(bank_net, "doShock",mockedShock)
-    def setUp(self):
-        bank_net.Config.N = 2
-        bank_net.Config.T = 1
-
-        bank_net.Status.defineLog('DEBUG')
-        bank_net.Model.initilize()
-        bank_net.Statistics.reset()
-        bank_net.Status.debugBanks()
-
-        bank_net.Model.doSimulation()
-
-        bank_net.Status.debugBanks()
-
+    def initialValues(self):
+        self.setBank(bank=bank_net.Model.banks[0] ,C=10.0,L=15.0,D=15.0,E=10.0)
+        self.setBank(bank=bank_net.Model.banks[1] ,C=10.0,L=15.0,D=15.0,E=10.0)
 
     def test_values_after_execution(self):
-        #self.assertEqual( bank_net.Model.banks[1].C, 0.13382435876260956)
-        #self.assertEqual( bank_net.Model.banks[3].D, 135)
-        #self.assertEqual( bank_net.Model.banks[4].E, -13.26847831510539)
-        pass
+        self.assertBank( bank=bank_net.Model.banks[0], C=7.0, L=15.0, D=12.0, E=10.0, l=0, s=0)
+        self.assertBank( bank=bank_net.Model.banks[1], C=13.0, L=15.0, D=18.0, E=10.0, l=0, s=13)
+
+    @patch.object(bank_net, "doShock", BankTest.mockedShock)
+    def setUp(self):
+        self.configureTest( N=2,T=1,
+                            shocks=[
+                                {"shock1": [-3, 3], "shock2": [0, 0], },
+                            ])
+        self.initialValues()
+        self.doTest()

@@ -78,11 +78,12 @@ class Bank:
     def getLoanInterest(self):
         return Model.banks[self.lender].r[self.id]
 
-    def getId(self):
+    def getId(self,short:bool=False):
+        init = "bank#" if not short else "#"
         if self.failures > 0:
-            return f"bank#{self.id}.{self.failures}"
+            return f"{init}{self.id}.{self.failures}"
         else:
-            return f"bank#{self.id}"
+            return f"{init}{self.id}"
 
     def __init__(self, id):
         self.id = id
@@ -126,6 +127,8 @@ class Bank:
         # interbank rates
         self.lender = None
         self.lender = self.newLender()
+
+        self.activeBorrowers = {}
         # TODO self.R = Config.ȓ * Config.D_i0
 
     def replaceBank(self):
@@ -139,14 +142,17 @@ class Bank:
         badDebt = self.l - whatWeObtainAtFiresaleAll
         if badDebt > 0:
             self.getLender().B += badDebt
-            self.getLender().E += whatWeObtainAtFiresaleAll
+            self.getLender().C += whatWeObtainAtFiresaleAll
             Status.debug(phase,
-                         f"t={self.getId()} bankrupted (B={badDebt:.3f}, recovered E={whatWeObtainAtFiresaleAll:.3f})")
+                         f"t={self.getId()} bankrupted (B={badDebt:.3f}, recovered C={whatWeObtainAtFiresaleAll:.3f})")
         else:
-            self.getLender().E = self.l  # we don't recover more than the loan if it is
+            self.getLender().C = self.l  # we don't recover more than the loan if it is
             Status.debug(phase,
-                         f"t={self.getId()} bankrupted (recovered all as E={whatWeObtainAtFiresaleAll:.3f})")
-        self.getLender().s -= self.l  # the loan is not paid correctly, but we remove it
+                         f"t={self.getId()} bankrupted (recovered all as C={whatWeObtainAtFiresaleAll:.3f})")
+
+        # the loan is not paid correctly, but we remove it
+        self.getLender().s -= self.l
+        del self.getLender().activeBorrowers[ self.id ]
 
     def doFiresalesL( self,amountToSell, reason, phase):
         print("--------->firesales")
@@ -154,11 +160,11 @@ class Bank:
         self.C = 0
         if costOfSell > self.L:
             self.__doBankrupcy__(phase)
-            Status.debug("loans",
+            Status.debug(phase,
                          f"{self.getId()} cost fire sale {costOfSell:.3f} > L{self.L:.3f}: {reason}")
         else:
             self.L -= costOfSell
-            Status.debug("loans",
+            Status.debug(phase,
                          f"{self.getId()} fire sale {amountToSell:.3f} , cost {costOfSell:.3f}: {reason}")
 
 
@@ -179,7 +185,7 @@ def doLoans():
         bank.B = 0
         if bank.ΔD + bank.C > 0:
             if bank.ΔD>=0:
-                bank.s = bank.ΔD + bank.C  # lender
+                bank.s = bank.C  # lender capital
             else:
                 # it will not lend money due to not increase
                 bank.s = 0
@@ -200,11 +206,16 @@ def doLoans():
                 if bank.d > bank.getLender().s:
                     bank.doFiresalesL( bank.d - bank.getLender().s,
                                        f"lender gives {bank.getLender().s:.3f} and we need {bank.d:.3f}","loans")
-                    bank.l = bank.getLender().s
+                    bank.l = bank.getLender().s # amount of loan (writed in the borrower)
+                    bank.getLender().activeBorrowers[ bank.id ] = bank.getLender().s # amount of loan (writed in the lender)
                     bank.getLender().s = 0
                 else:
-                    bank.l = bank.d
-                    bank.getLender().s -= bank.d  # bank.d
+                    bank.l = bank.d # amount of loan (writed in the borrower)
+                    bank.getLender().activeBorrowers[ bank.id ] = bank.d # amount of loan (writed in the lender)
+                    bank.getLender().s -= bank.d # the loan reduces our lender's capacity to borrow to others
+                    Status.debug("loans",
+                                 f"{bank.getId()} obtains a loan of {bank.d:.3f} from {bank.getLender().getId()}")
+
 
         # the shock can be covered by own capital
         else:
@@ -214,9 +225,14 @@ def doLoans():
                 Status.debug("loans",
                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
             else:
-                Status.debug("loans",
-                    f"{bank.getId()} obtains ΔD={bank.ΔD:.3f}, now C={bank.C:.3f}")
-    # Status.debugBanks(info='Loans after')
+                if len(bank.activeBorrowers)>0:
+                    list_borrowers=""
+                    amount_borrowed = 0
+                    for bank_i in bank.activeBorrowers:
+                        list_borrowers+=Model.banks[bank_i].getId(short=True)+","
+                        amount_borrowed+= bank.activeBorrowers[bank_i]
+                    Status.debug("loans",
+                                 f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with [{list_borrowers[:-1]}] of l={amount_borrowed}")
 
 def doRepayments():
     for bank in Model.banks:
@@ -264,6 +280,9 @@ def doRepayments():
                 Status.debug("repay", f"{bank.getId()} modifies C={bank.C:.3f}")
             else:
                 Status.debug("repay", f"{bank.getId()} modifies E={bank.E:.3f}")
+
+    for bank in Model.banks:
+        bank.activeBorrowers = {}
 
     Status.debug("repay",f"this step ΔD={Statistics.incrementD[Model.t]:.3f} and failures={Statistics.bankruptcy[Model.t]}")
     Status.debugBanks()
@@ -399,7 +418,7 @@ class Statistics:
         total = 0
         for i in Statistics.incrementD:
             total += i
-        Status.debug("final",f"after {Config .T} we have Σ ΔD={total}")
+        Status.debug("final",f"after iteration#{Config .T} all banks Σ ΔD={total}")
 
 class Status:
     logger = logging.getLogger("model")
