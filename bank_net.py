@@ -58,7 +58,6 @@ class Model:
         # initially all banks have a random lender
         # -> la matriz de creditos hasta t=10, para generar heterogeneidad
         for Model.t in range(Config.T):
-            # -----> matrix de creditos deberia de ir aqui
             doShock("shock1")
             doLoans()
             doShock("shock2")
@@ -151,11 +150,14 @@ class Bank:
                          f"t={self.getId()} bankrupted (recovered all as C={whatWeObtainAtFiresaleAll:.3f})")
 
         # the loan is not paid correctly, but we remove it
-        self.getLender().s -= self.l
-        del self.getLender().activeBorrowers[ self.id ]
+        if self.id in self.getLender().activeBorrowers:
+            self.getLender().s -= self.l
+            del self.getLender().activeBorrowers[ self.id ]
+        else:
+            # TODO . que pasa si quiebra el banco que TIENE prestamos, y no el prestado
+            pass
 
     def doFiresalesL( self,amountToSell, reason, phase):
-        print("--------->firesales")
         costOfSell = amountToSell / Config.ρ
         self.C = 0
         if costOfSell > self.L:
@@ -174,38 +176,43 @@ def doShock(whichShock):
         bank.newD = bank.D * (Config.µ + Config.ω * random.random())
         bank.ΔD = bank.newD - bank.D
         bank.D  = bank.newD
-        if bank.ΔD > 0:
+        if bank.ΔD >= 0:
             bank.C += bank.ΔD
+            bank.s = bank.C  # lender capital to borrow
+            bank.d = 0       # it will not need to borrow
+            Status.debug(whichShock,
+                         f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
+        else:
+            bank.s = 0  # we will not be a lender this time
+            if bank.ΔD + bank.C >= 0:
+                bank.d = 0  # it will not need to borrow
+                bank.C += bank.ΔD
+                Status.debug(whichShock,
+                    f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
+            else:
+                bank.d = abs(bank.ΔD + bank.C)  # it will need money
+                Status.debug(whichShock,
+                    f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
+                bank.C = 0  # we run out of capital
+
+        bank.B = 0  # no bad debt we have from previous step TODO
         Statistics.incrementD[Model.t] += bank.ΔD
     Status.debugBanks(details=False,info=whichShock)
 
 
 def doLoans():
     for bank in Model.banks:
-        bank.B = 0
-        if bank.ΔD + bank.C > 0:
-            if bank.ΔD>=0:
-                bank.s = bank.C  # lender capital
-            else:
-                # it will not lend money due to not increase
-                bank.s = 0
-            bank.d = 0 # it will not need to borrow
-        else:
-            bank.d = abs(bank.ΔD + bank.C)  # it will need money
-            bank.s = 0 # no lender this time
-
-    for bank in Model.banks:
         # decrement in which we should borrow
         if bank.d > 0:
             if bank.getLender().d > 0:
                 # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
-                bank.doFiresalesL( bank.d,"lender gives no money","loans" )
+                bank.doFiresalesL( bank.d,"fire sales: lender has no money to give us","loans" )
                 bank.l = 0
             else:
                 # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
                 if bank.d > bank.getLender().s:
                     bank.doFiresalesL( bank.d - bank.getLender().s,
-                                       f"lender gives {bank.getLender().s:.3f} and we need {bank.d:.3f}","loans")
+                                       f"fire sales: lender has {bank.getLender().s:.3f} and we need {bank.d:.3f}","loans")
                     bank.l = bank.getLender().s # amount of loan (writed in the borrower)
                     bank.getLender().activeBorrowers[ bank.id ] = bank.getLender().s # amount of loan (writed in the lender)
                     bank.getLender().s = 0
@@ -216,23 +223,18 @@ def doLoans():
                     Status.debug("loans",
                                  f"{bank.getId()} obtains a loan of {bank.d:.3f} from {bank.getLender().getId()}")
 
-
         # the shock can be covered by own capital
         else:
             bank.l = 0
-            if bank.ΔD < 0:  # increment D negative -> decreases C also
-                bank.C += bank.ΔD
+            if len(bank.activeBorrowers) > 0:
+                list_borrowers = ""
+                amount_borrowed = 0
+                for bank_i in bank.activeBorrowers:
+                    list_borrowers += Model.banks[bank_i].getId(short=True) + ","
+                    amount_borrowed += bank.activeBorrowers[bank_i]
                 Status.debug("loans",
-                    f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
-            else:
-                if len(bank.activeBorrowers)>0:
-                    list_borrowers=""
-                    amount_borrowed = 0
-                    for bank_i in bank.activeBorrowers:
-                        list_borrowers+=Model.banks[bank_i].getId(short=True)+","
-                        amount_borrowed+= bank.activeBorrowers[bank_i]
-                    Status.debug("loans",
-                                 f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with [{list_borrowers[:-1]}] of l={amount_borrowed}")
+                             f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with [{list_borrowers[:-1]}] of l={amount_borrowed}")
+
 
 def doRepayments():
     for bank in Model.banks:
@@ -244,6 +246,7 @@ def doRepayments():
                 Status.debug("repay",
                          f"{bank.getId()} second shock ΔD={bank.ΔD:.3f} paid with cash, now C={bank.C:.3f}")
             else:
+                #TODO
                 bank.doFiresalesL(abs(bank.ΔD + bank.C),f"second shock ΔD={bank.ΔD:.3f} but C={bank.C:.3f}","repay")
         else:
             Status.debug("repay",

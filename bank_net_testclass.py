@@ -31,11 +31,27 @@ class BankTest(unittest.TestCase):
 
     def mockedShock(whichShock):
         for bank in bank_net.Model.banks:
-            bank.newD = bank.D + BankTest.shocks[ bank_net.Model.t ][whichShock][bank.id]
-            bank.ΔD = bank.newD - bank.D
-            bank.D = bank.newD
+            bank.ΔD = BankTest.shocks[ bank_net.Model.t ][whichShock][bank.id]
+            bank.D += bank.ΔD
             if bank.ΔD > 0:
                 bank.C += bank.ΔD
+                bank.s = bank.C  # lender capital to borrow
+                bank.d = 0  # it will not need to borrow
+                bank_net.Status.debug(whichShock,
+                             f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
+
+            else:
+                bank.s = 0  # we will not be a lender this time
+                if bank.ΔD + bank.C >= 0:
+                    bank.d = 0  # it will not need to borrow
+                    bank.C += bank.ΔD
+                    bank_net.Status.debug(whichShock,
+                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
+                else:
+                    bank.d = abs(bank.ΔD + bank.C)  # it will need money
+                    bank_net.Status.debug(whichShock,
+                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}, now C=0")
+                    bank.C = 0  # we run out of capital
             bank_net.Statistics.incrementD[bank_net.Model.t] += bank.ΔD
         bank_net.Status.debugBanks(details=False, info=whichShock)
 
