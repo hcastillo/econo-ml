@@ -59,9 +59,9 @@ class Model:
         # -> la matriz de creditos hasta t=10, para generar heterogeneidad
         for Model.t in range(Config.T):
             # -----> matrix de creditos deberia de ir aqui
-            doShock("First shock")
+            doShock("shock1")
             doLoans()
-            doShock("Second shock")
+            doShock("shock2")
             doRepayments()
             Statistics.computeLiquidity()
             Statistics.computeBestLender()
@@ -100,17 +100,20 @@ class Bank:
             newvalue = random.randrange(Config.N - 1 )
         else:
             # if we have a previous lender, new should not be the same
-            newvalue = random.randrange(Config.N - 2 )
+            newvalue = random.randrange(Config.N - 2 if Config.N>2 else 1 )
 
-        if newvalue >= self.id:
-            newvalue += 1
-            if self.lender and newvalue >= self.lender:
-                newvalue += 1
+        if Config.N == 2:
+            newvalue = 1 if self.id == 0 else 0
         else:
-          if self.lender and newvalue >= self.lender:
-            newvalue += 1
             if newvalue >= self.id:
                 newvalue += 1
+                if self.lender and newvalue >= self.lender:
+                    newvalue += 1
+            else:
+                if self.lender and newvalue >= self.lender:
+                    newvalue += 1
+                    if newvalue >= self.id:
+                        newvalue += 1
 
         return newvalue
 
@@ -146,6 +149,7 @@ class Bank:
         self.getLender().s -= self.l  # the loan is not paid correctly, but we remove it
 
     def doFiresalesL( self,amountToSell, reason, phase):
+        print("--------->firesales")
         costOfSell = amountToSell / Config.ρ
         self.C = 0
         if costOfSell > self.L:
@@ -161,9 +165,9 @@ class Bank:
 def doShock(whichShock):
     # (equation 2)
     for bank in Model.banks:
-        newD = bank.D * (Config.µ + Config.ω * random.random())
-        bank.ΔD = newD - bank.D
-        bank.D  = newD
+        bank.newD = bank.D * (Config.µ + Config.ω * random.random())
+        bank.ΔD = bank.newD - bank.D
+        bank.D  = bank.newD
         if bank.ΔD > 0:
             bank.C += bank.ΔD
         Statistics.incrementD[Model.t] += bank.ΔD
@@ -209,6 +213,9 @@ def doLoans():
                 bank.C += bank.ΔD
                 Status.debug("loans",
                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
+            else:
+                Status.debug("loans",
+                    f"{bank.getId()} obtains ΔD={bank.ΔD:.3f}, now C={bank.C:.3f}")
     # Status.debugBanks(info='Loans after')
 
 def doRepayments():
@@ -222,6 +229,9 @@ def doRepayments():
                          f"{bank.getId()} second shock ΔD={bank.ΔD:.3f} paid with cash, now C={bank.C:.3f}")
             else:
                 bank.doFiresalesL(abs(bank.ΔD + bank.C),f"second shock ΔD={bank.ΔD:.3f} but C={bank.C:.3f}","repay")
+        else:
+            Status.debug("repay",
+                         f"{bank.getId()} second shock ΔD={bank.ΔD:.3f} now C={bank.C:.3f}")
 
         # now, even ΔD<0 nor ΔD>0, let's return previous loan bank.l (if it exists), but only
         # if the bank is not bankrupted!
@@ -256,7 +266,7 @@ def doRepayments():
                 Status.debug("repay", f"{bank.getId()} modifies E={bank.E:.3f}")
 
     Status.debug("repay",f"this step ΔD={Statistics.incrementD[Model.t]:.3f} and failures={Statistics.bankruptcy[Model.t]}")
-    Status.debugBanks(info="After payments")
+    Status.debugBanks()
 
 
 
@@ -273,8 +283,7 @@ def setupLinks():
     maxC = max(Model.banks, key=lambda i: i.C).C
     for bank in Model.banks:
         bank.p = bank.E / maxE
-        print(bank.E)
-        bank.λ = bank.L / bank.E
+        bank.λ = bank.L / bank.E #TODO
 
     maxλ = max(Model.banks, key=lambda i: i.λ).λ
     for bank in Model.banks:
@@ -399,16 +408,20 @@ class Status:
     ## [Config.r_i0 for i in range(Config.N)]
 
     @staticmethod
+    def __get_string_debug_banks__(details,bank):
+        text = f"{bank.getId()} C={bank.C:.3f} L={bank.L:.3f} | D={bank.D:.3f} E={bank.E:.3f}"
+        if not details and hasattr(bank, 'ΔD'):
+            text += f" ΔD={bank.ΔD:.3f}"
+        if details and hasattr(bank, 'l'):
+            text += f" s={bank.s:.3f} d={bank.d:.3f} l={bank.l:.3f}"
+        return text
+
+    @staticmethod
     def debugBanks(details: bool = True, info: str = ''):
-        if info:
-            info += ': '
         for bank in Model.banks:
-            text = f"{info}{bank.getId()} C={bank.C:.3f} L={bank.L:.3f} | D={bank.D:.3f} E={bank.E:.3f}"
-            if not details and hasattr(bank, 'ΔD'):
-                text += f" ΔD={bank.ΔD:.3f}"
-            if details and hasattr(bank, 'l'):
-                text += f" s={bank.s:.3f} d={bank.d:.3f} l={bank.l:.3f}"
-            Status.debug("-----",text)
+            if not info:
+                info="-----"
+            Status.debug(info,Status.__get_string_debug_banks__(details,bank))
 
     @staticmethod
     def getLevel(option):
@@ -422,35 +435,24 @@ class Status:
     @staticmethod
     def debug(module,text):
         if Status.modules == [] or module in Status.modules:
-            Status.logger.debug(f"t={Model.t:03}/{module} {text}")
+            Status.logger.debug(f"t={Model.t:03}/{module:6} {text}")
 
     @staticmethod
     def info(module,text):
         if Status.modules == [] or module in Status.modules:
-            Status.logger.info(f" t={Model.t:03}/{module} {text}")
+            Status.logger.info(f" t={Model.t:03}/{module:6} {text}")
 
     @staticmethod
     def error(module,text):
-        Status.logger.error(f"t={Model.t:03}/{module} {text}")
+        Status.logger.error(f"t={Model.t:03}/{module:6} {text}")
 
     @staticmethod
-    def runInteractive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
-                       modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
-                       logfile: str = typer.Option(None, help="File to send logs to"),
-                       n: int = typer.Option(Config.N, help=f"Number of banks"),
-                       t: int = typer.Option(Config.T, help=f"Time repetitions")):
-        """
-        Run interactively the model
-        """
+    def defineLog( log:str,logfile:str='',modules:str=''):
+        Status.modules = modules.split(",") if modules else []
         # https://typer.tiangolo.com/
         formatter = logging.Formatter('%(levelname)s - %(message)s')
         Status.logLevel = Status.getLevel(log.upper())
         Status.logger.setLevel(Status.logLevel)
-        if t != Config.T:
-            Config.T = t
-        if n != Config.N:
-            Config.N = n
-        Status.modules = modules.split(",") if modules else []
         if logfile:
             fh = logging.FileHandler(logfile, 'a', 'utf-8')
             fh.setLevel(Status.logLevel)
@@ -461,6 +463,21 @@ class Status:
             ch.setLevel(Status.logLevel)
             ch.setFormatter(formatter)
             Status.logger.addHandler(ch)
+
+    @staticmethod
+    def runInteractive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
+                       modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
+                       logfile: str = typer.Option(None, help="File to send logs to"),
+                       n: int = typer.Option(Config.N, help=f"Number of banks"),
+                       t: int = typer.Option(Config.T, help=f"Time repetitions")):
+        """
+        Run interactively the model
+        """
+        if t != Config.T:
+            Config.T = t
+        if n != Config.N:
+            Config.N = n
+        Status.defineLog(log,logfile,modules)
         Status.run()
 
     @staticmethod

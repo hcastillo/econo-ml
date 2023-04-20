@@ -1,5 +1,6 @@
 import unittest,bank_net
 
+
 class BankTestCase(unittest.TestCase):
     def setUp(self):
         bank_net.Config.N = 10
