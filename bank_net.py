@@ -102,7 +102,7 @@ class Bank:
         if self.lender == None:
             self.r = [Config.r_i0 for i in range(Config.N)]
             self.π = [ 0 for i in range(Config.N) ]
-            self.r[self.id] = None  # to ourselves, we don't want to lend anything
+            self.r[self.id] = None  # to ourselves, we don't want to lend us
             # if it's just created, only not to be ourselves is enough
             newvalue = random.randrange(Config.N - 1 )
         else:
@@ -159,7 +159,7 @@ class Bank:
             self.getLender().E -= badDebt
             self.getLender().C += recovered
             Status.debug(phase,
-                         f"{self.getId()} bankrupted (fire sale={whatWeObtainAtFiresaleAll:.3f},recovers={recovered},paidD={self.D})(lender{self.getLender().getId(short=True)}.ΔB={badDebt:.3f},ΔC={recovered:.3f})")
+                         f"{self.getId()} bankrupted (fire sale={whatWeObtainAtFiresaleAll:.3f},recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}.ΔB={badDebt:.3f},ΔC={recovered:.3f})")
         else:
             # self.l=0 no current loan to return:
             if self.l>0:
@@ -239,7 +239,7 @@ def doLoans():
         if bank.d > 0:
             if bank.getLender().d > 0:
                 # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
-                bank.doFiresalesL( bank.d,"lender has no money to borrow us","loans" )
+                bank.doFiresalesL( bank.d,f"lender {bank.getLender().getId(short=True)} has no money","loans" )
                 bank.l = 0
             else:
                 # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
@@ -472,6 +472,8 @@ class Status:
         result = f"{number:5.2f}"
         while len(result)>5 and result[-1]=="0":
             result = result[:-1]
+        while len(result)>5 and result.find('.')>0:
+            result = result[:-1]
         return result
 
     @staticmethod
@@ -500,10 +502,13 @@ class Status:
                 text += f" d={Status.__format_number__(bank.d)}"
             else:
                 text += "        "
-        if details and hasattr(bank, 'd') and bank.d>0:
-            text += f" lender{bank.getLender().getId(short=True)},r={bank.getLoanInterest():.2f}%"
+        if bank.failed:
+            text += f" FAILED "
         else:
-            text += list_borrowers
+            if details and hasattr(bank, 'd') and bank.d>0:
+                text += f" lender{bank.getLender().getId(short=True)},r={bank.getLoanInterest():.2f}%"
+            else:
+                text += list_borrowers
         text += f" B={Status.__format_number__(bank.B)}" if bank.B else "        "
         return text
 
@@ -538,10 +543,11 @@ class Status:
         Status.logger.error(f"t={Model.t:03}/{module:6} {text}")
 
     @staticmethod
-    def defineLog( log:str,logfile:str='',modules:str=''):
+    def defineLog( log:str,logfile:str='',modules:str='',script:str=''):
         Status.modules = modules.split(",") if modules else []
         # https://typer.tiangolo.com/
-        formatter = logging.Formatter('%(levelname)s - %(message)s')
+        scriptName = script if script else "%(module)s"
+        formatter = logging.Formatter('%(levelname)s-'+scriptName+'- %(message)s')
         Status.logLevel = Status.getLevel(log.upper())
         Status.logger.setLevel(Status.logLevel)
         if logfile:

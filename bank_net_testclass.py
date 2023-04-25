@@ -14,7 +14,7 @@ class BankTest(unittest.TestCase):
             bank_net.Config.N = N
         if T:
             bank_net.Config.T = T
-        bank_net.Status.defineLog('DEBUG')
+        bank_net.Status.defineLog(log='DEBUG',script=self.id().split('.')[0])
         bank_net.Model.initilize()
 
     def doTest(self):
