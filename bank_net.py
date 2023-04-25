@@ -61,14 +61,18 @@ class Model:
         # initially all banks have a random lender
         # -> la matriz de creditos hasta t=10, para generar heterogeneidad
         for Model.t in range(Config.T):
+            initStep()
             doShock("shock1")
             doLoans()
+            Status.debugBanks()
             doShock("shock2")
             doRepayments()
+            Status.debugBanks()
             Statistics.computeLiquidity()
             Statistics.computeBestLender()
             determineMu()
             setupLinks()
+            Status.debugBanks()
         Statistics.finalInfo()
 
 # %%
@@ -227,11 +231,7 @@ def doShock(whichShock):
                 Status.debug(whichShock,
                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
                 bank.C = 0  # we run out of capital
-
-        bank.B = 0  # no bad debt we have from previous step
         Statistics.incrementD[Model.t] += bank.ΔD
-    Status.debugBanks(details=False,info=whichShock)
-
 
 def doLoans():
     for bank in Model.banks:
@@ -320,11 +320,15 @@ def doRepayments():
         bank.activeBorrowers = {}
         if bank.failed:
             bank.replaceBank()
-    Status.debugBanks()
     Status.debug("repay",f"this step ΔD={Statistics.incrementD[Model.t]:.3f} and failures={Statistics.bankruptcy[Model.t]}")
 
 
 
+def initStep():
+    for bank in Model.banks:
+        bank.B = 0
+    if Model.t == 0:
+        Status.debugBanks()
 
 def setupLinks():
     # (equation 5)
@@ -403,7 +407,8 @@ def setupLinks():
             Status.debug("links", f"{bank.getId()} maintains lender {bank.getLender().getId()} with %{1-bank.P:.3f}")
 
 def determineMu():
-    pass
+    for bank in Model.banks:
+        pass
 
 
 # %%
@@ -423,6 +428,7 @@ class Statistics:
         Statistics.bestLenderClients = [0 for i in range(Config.T)]
         Statistics.liquidity = [0 for i in range(Config.T)]
         Statistics.incrementD = [0 for i in range(Config.T)]
+        Statistics.B = [0 for i in range(Config.T)]
 
     @staticmethod
     def computeBestLender():
@@ -452,38 +458,53 @@ class Statistics:
 
     @staticmethod
     def finalInfo():
-        total = 0
-        for i in Statistics.incrementD:
-            total += i
+        totalB = 0
+        for bank_i in Model.banks:
+            totalB += bank_i.B
+        Statistics.B[Model.t] = totalB
 
 class Status:
     logger = logging.getLogger("model")
     modules= []
 
-    ## [Config.r_i0 for i in range(Config.N)]
+    @staticmethod
+    def __format_number__(number):
+        result = f"{number:5.2f}"
+        while len(result)>5 and result[-1]=="0":
+            result = result[:-1]
+        return result
 
     @staticmethod
     def __get_string_debug_banks__(details,bank):
-        text = f"{bank.getId():8} C={bank.C:5.2f} L={bank.L:5.2f}"
-        text += f" B={bank.B:5.2f}" if bank.B else "        "
-        if details and hasattr(bank, 'd') and bank.d:
-            text += f" d={bank.d:5.2f}"
+        text = f"{bank.getId():8} C={Status.__format_number__(bank.C)} L={Status.__format_number__(bank.L)}"
+        amount_borrowed = 0
+        list_borrowers = " borrows=["
+        for bank_i in bank.activeBorrowers:
+            list_borrowers += Model.banks[bank_i].getId(short=True) + ","
+            amount_borrowed += bank.activeBorrowers[bank_i]
+        if amount_borrowed:
+            text += f" l={Status.__format_number__(amount_borrowed)}"
+            list_borrowers= list_borrowers[:-1]+"]"
         else:
             text += "        "
-        text += f" | D={bank.D:5.2f} E={bank.E:5.2f}"
-        #if details and hasattr(bank, 'l') and bank.l:
-        #    text += f" l={bank.l:5.2f}"
-        #else:
-        #    text += "        "
+            list_borrowers=""
+        text += f" | D={Status.__format_number__(bank.D)} E={Status.__format_number__(bank.E)}"
+        if details and hasattr(bank, 'd') and bank.d and bank.l:
+            text += f" l={Status.__format_number__(bank.d)}"
+        else:
+            text += "        "
         if details and hasattr(bank, 's') and bank.s:
-            text += f" s={bank.s:5.2f}"
+            text += f" s={Status.__format_number__(bank.s)}"
         else:
-            text += "        "
-        #if details and hasattr(bank, 'ΔD') and bank.ΔD:
-        #    text += f" ΔD={bank.ΔD:6.2f}"
-        #else:
-        #    text += "        "
-        text += f" lender={bank.getLender().getId(short=True)}"
+            if details and hasattr(bank, 'd') and bank.d:
+                text += f" d={Status.__format_number__(bank.d)}"
+            else:
+                text += "        "
+        if details and hasattr(bank, 'd') and bank.d>0:
+            text += f" lender{bank.getLender().getId(short=True)},r={bank.getLoanInterest():.2f}%"
+        else:
+            text += list_borrowers
+        text += f" B={Status.__format_number__(bank.B)}" if bank.B else "        "
         return text
 
     @staticmethod

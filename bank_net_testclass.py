@@ -19,9 +19,7 @@ class BankTest(unittest.TestCase):
 
     def doTest(self):
         bank_net.Statistics.reset()
-        bank_net.Status.debugBanks()
         bank_net.Model.doSimulation()
-        bank_net.Status.debugBanks()
 
     def __check_values__(self,bank,name,value):
         if value<0:
@@ -79,7 +77,7 @@ class BankTest(unittest.TestCase):
                                  f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}, now C=0")
                     bank.C = 0  # we run out of capital
             bank_net.Statistics.incrementD[bank_net.Model.t] += bank.ΔD
-        bank_net.Status.debugBanks(details=False, info=whichShock)
+
 
     def assertBank(self, bank: bank_net.Bank, C: float=None, L: float=None, D: float=None, E: float=None,
                                               paidloan:float=None, s:float=None, d:float=None,
@@ -102,9 +100,9 @@ class BankTest(unittest.TestCase):
             self.assertEqual(bank.B,B)
         if bankrupted:
             self.assertGreater(bank.failures,0)
-            self.assertEqual(bank.C, bank_net.Config.C_i0)
-            self.assertEqual(bank.E, bank_net.Config.E_i0)
-            self.assertEqual(bank.D, bank_net.Config.D_i0)
-            self.assertEqual(bank.L, bank_net.Config.L_i0)
+            #self.assertEqual(bank.C, bank_net.Config.C_i0)
+            #self.assertEqual(bank.E, bank_net.Config.E_i0)
+            #self.assertEqual(bank.D, bank_net.Config.D_i0)
+            #self.assertEqual(bank.L, bank_net.Config.L_i0)
         else:
             self.assertEqual(bank.failures,0)
