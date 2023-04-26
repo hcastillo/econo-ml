@@ -1,4 +1,6 @@
 .ipynb_checkpoints/
 __pycache__/
 alessio/
-output/
+output/*
+*.txt
+

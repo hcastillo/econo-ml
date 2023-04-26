@@ -1,6 +1,6 @@
 @echo off
 
-python -m unittest discover
+python -m unittest discover -s test
 if %errorlevel%==0 (
  jupytext bank_net.py --to notebook
  git add .

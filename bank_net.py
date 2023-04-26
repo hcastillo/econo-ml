@@ -13,7 +13,7 @@ import logging
 import math
 import typer
 import sys
-import matplotlib.pyplot as plt
+import bokeh.plotting
 
 class Config:
     T: int = 1000    # time (1000)
@@ -129,6 +129,7 @@ class Bank:
         self.C = Config.C_i0
         self.D = Config.D_i0
         self.E = Config.E_i0
+        self.l = 0
         self.B = 0
         self.failed = False
         # interbank rates
@@ -599,56 +600,43 @@ class Status:
 class Graph:
     @staticmethod
     def bankruptcies():
-        plt.clf()
+        title="Bankruptcies"
         xx = []
         yy = []
         for i in range(Config.T):
             xx.append(i)
             yy.append(Statistics.bankruptcy[i])
-        plt.plot(xx, yy, 'b-')
-        plt.ylabel("num of bankruptcies")
-        plt.xlabel("t")
-        plt.title("Bankrupted firms")
-        plt.show() if Status.isNotebook() else plt.savefig("output/bankrupted.svg")
+        p = bokeh.plotting.figure(title=title, x_axis_label="Time", y_axis_label="num of bankruptcies",
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        if Status.isNotebook():
+            bokeh.plotting.show(p)
+        else:
+            bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ", "_").lower(), title=title)
+            bokeh.plotting.save(p)
 
     @staticmethod
     def liquidity():
-        plt.clf()
+        title = "Liquidity"
         xx = []
         yy = []
         for i in range(Config.T):
             xx.append(i)
             yy.append(Statistics.liquidity[i])
-        plt.plot(xx, yy, 'b-')
-        plt.ylabel("liquidity")
-        plt.xlabel("t")
-        plt.title("C of all banks")
-        plt.show() if Status.isNotebook() else plt.savefig("output/liquidity.svg")
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Ʃ liquidity',
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        if Status.isNotebook():
+            bokeh.plotting.show(p)
+        else:
+            bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
+            bokeh.plotting.save(p)
 
     @staticmethod
     def bestLender():
-        plt.clf()
-        fig,ax = plt.subplots()
-        xx = []
-        yy = []
-        yy2= []
-        for i in range(Config.T):
-            xx.append(i)
-            yy.append(Statistics.bestLender[i])
-            yy2.append(Statistics.bestLenderClients[i])
-        ax.plot(xx, yy, 'b-')
-        ax.set_ylabel("Best Lender",color='blue')
-        ax.set_xlabel("t")
-        ax2 = ax.twinx()
-        ax2.plot(xx,yy2,'r-')
-        ax2.set_ylabel("Best Lender # clients",color='red')
-        plt.title("Best lender and # clients")
-        plt.show() if Status.isNotebook() else plt.savefig("output/best_lender.svg")
-
-    @staticmethod
-    def bestLenderBokeh():
-        from bokeh.plotting import figure, show
-
+        title="Best Lender"
         xx = []
         yy = []
         yy2 = []
@@ -656,20 +644,22 @@ class Graph:
             xx.append(i)
             yy.append(Statistics.bestLender[i])
             yy2.append(Statistics.bestLenderClients[i])
-        p = figure(title="Best Lender", x_axis_label='x', y_axis_label='y',
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Best lenders',
                    sizing_mode="stretch_width",
-                   height=350)
-        p.line(xx, yy, legend_label="Best lender id", color="blue", line_width=2)
-        p.line(xx, yy2, legend_label="Best lender num clients", color="red", line_width=2)
-        show(p)
+                   height=550)
+        p.line(xx, yy, legend_label=f"{title} id", color="blue", line_width=2)
+        p.line(xx, yy2, legend_label=f"{title} num clients", color="red", line_width=2)
+        if Status.isNotebook():
+            bokeh.plotting.show(p)
+        else:
+            bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
+            bokeh.plotting.save(p)
 
     @staticmethod
     def generate():
         Graph.bankruptcies()
         Graph.liquidity()
         Graph.bestLender()
-        Graph.bestLenderBokeh()
-
 
 # %%
 
