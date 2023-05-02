@@ -657,6 +657,11 @@ class Graph:
 
     @staticmethod
     def generate():
+
+        if Status.isNotebook():
+            from bokeh.io import output_notebook
+            output_notebook()
+
         Graph.bankruptcies()
         Graph.liquidity()
         Graph.bestLender()
