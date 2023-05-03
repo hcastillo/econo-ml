@@ -4,5 +4,3 @@ seaborn==0.12.*
 pandas
 argparse
 matplotlib
-unittest
-mock
