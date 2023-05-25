@@ -14,6 +14,10 @@ import math
 import typer
 import sys
 import bokeh.plotting
+import bokeh.io
+from bokeh.io import export_svg
+import numpy as np
+import matplotlib.pyplot as plt
 
 class Config:
     T: int = 1000    # time (1000)
@@ -32,7 +36,7 @@ class Config:
     ξ: float = 0.3    # xi
     ρ: float = 0.3    # fire sale cost
 
-    β: float = 5      # intensity of breaking the connection
+    β: float = 0      # intensity of breaking the connection
     α: float = 0.1    # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
@@ -46,7 +50,7 @@ class Config:
 class Model:
     banks = []
     t: int = 0
-    ŋ: float = 0.5  # eta : policy
+    ŋ: float = 1  # eta : policy
 
     @staticmethod
     def initilize():
@@ -70,6 +74,7 @@ class Model:
             Status.debugBanks()
             Statistics.computeLiquidity()
             Statistics.computeBestLender()
+            Statistics.computeInterest()
             determineMu()
             setupLinks()
             Status.debugBanks()
@@ -82,7 +87,7 @@ class Bank:
         return Model.banks[self.lender]
 
     def getLoanInterest(self):
-        return Model.banks[self.lender].r[self.id]
+        return Model.banks[self.lender].rij[self.id]
 
     def getId(self,short:bool=False):
         init = "bank#" if not short else "#"
@@ -100,9 +105,10 @@ class Bank:
         newvalue = None
         # r_i0 is used the first time the bank is created:
         if self.lender == None:
-            self.r = [Config.r_i0 for i in range(Config.N)]
-            self.π = [ 0 for i in range(Config.N) ]
-            self.r[self.id] = None  # to ourselves, we don't want to lend us
+            self.rij = [Config.r_i0 for i in range(Config.N)]
+            self.rij[self.id] = 0
+            self.r = Config.r_i0
+            self.π = 0
             # if it's just created, only not to be ourselves is enough
             newvalue = random.randrange(Config.N - 1 )
         else:
@@ -114,14 +120,13 @@ class Bank:
         else:
             if newvalue >= self.id:
                 newvalue += 1
-                if self.lender and newvalue >= self.lender:
+                if self.lender!=None and newvalue >= self.lender:
                     newvalue += 1
             else:
-                if self.lender and newvalue >= self.lender:
+                if self.lender!=None and newvalue >= self.lender:
                     newvalue += 1
                     if newvalue >= self.id:
                         newvalue += 1
-
         return newvalue
 
     def __assign_defaults__(self):
@@ -349,63 +354,77 @@ def setupLinks():
     maxλ = max(Model.banks, key=lambda i: i.λ).λ
     for bank in Model.banks:
         bank.h = bank.λ / maxλ
-        bank.A = bank.L / bank.λ + bank.D
+        bank.A = bank.C+bank.L # bank.L / bank.λ + bank.D
 
     # determine c (lending capacity) for all other banks (to whom give loans):
     for bank in Model.banks:
         bank.c = []
         for i in range(Config.N):
+            ##print((1 - Model.banks[i].h) * Model.banks[i].A, Model.banks[i].h,Model.banks[i].A)
             c = 0 if i == bank.id else (1 - Model.banks[i].h) * Model.banks[i].A
             bank.c.append(c)
 
     # (equation 6)
     minr = Config.r_i0 * 1000
+    lines = []
     for bank_i in Model.banks:
+        line1=""
+        line2=""
         for j in range(Config.N):
             try:
                 if j == bank_i.id:
-                    bank_i.r[j] = None
+                    bank_i.rij[j] = 0
                 else:
-                    bank_i.r[j] = (Config.Χ * Model.banks[j].A -
-                                   Config.Φ * Model.banks[j].A -
-                                   (1 - Model.banks[j].p) *
-                                   (Config.ξ * Model.banks[j].A - bank_i.c[j])) \
-                                  / (Model.banks[j].p * bank_i.c[j])
+                    bank_i.rij[j] = (Config.Χ * bank_i.A -
+                                     Config.Φ * Model.banks[j].A -
+                                     (1 - Model.banks[j].p) *
+                                     (Config.ξ * Model.banks[j].A - bank_i.c[j])) \
+                                     / (Model.banks[j].p * bank_i.c[j])
+                    if bank_i.rij[j] < 0:
+                        bank_i.rij[j] = Config.r_i0
             # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
             # L and E are equal for all banks, and so maxλ=anyλ and h=1 , so cij=(1-1)A=0, and r division
             # by zero -> solution then is to use still r_i0:
             except ZeroDivisionError:
-                bank_i.r[j] = Config.r_i0
-            if bank_i.r[j] and bank_i.r[j] < minr:
-                minr = bank_i.r[j]
+                bank_i.rij[j] = Config.r_i0
 
+            line1 += f"{bank_i.rij[j]:.3f},"
+            line2 += f"{bank_i.c[j]:.3f},"
+        if lines!=[]:
+            lines.append("  |" + line2[:-1] + "|   |" + line1[:-1]+f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
+        else:
+            lines.append("c=|" + line2[:-1] + "| r=|" + line1[:-1]+f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
+        bank_i.r = np.sum( bank_i.rij ) / (Config.N - 1)
+        if bank_i.r < minr:
+            minr = bank_i.r
+
+    if Config.N<10:
+      for line in lines:
+        Status.debug("links",f"{line}")
     Status.debug("links",f"maxE={maxE:.3f} maxC={maxC:.3f} maxλ={maxλ:.3f} minr={minr:.3f} ŋ={Model.ŋ:.3f}")
 
     # (equation 7)
-    for bank_i in Model.banks:
-        loginfo = ""
-        for j in range(Config.N):
-            if j != bank_i.id:
-                ##TODO print(maxC,bank_i.r[j]) --> maxC es cero si Config.N = 3
-                bank_i.π[j] = Model.ŋ * (bank.C / maxC) + (1 - Model.ŋ) * (minr / bank_i.r[j])
-                loginfo += f"{j}:{bank_i.π[j]:.3f},"
-            else:
-                bank_i.π[j] = None
-        Status.debug("links", f"{bank_i.getId()} π=[{loginfo}]")
+    loginfo = loginfo1 = ""
+    for bank in Model.banks:
+        bank.π = Model.ŋ * (bank.C / maxC) + (1 - Model.ŋ) * (minr / bank.r)
+        loginfo += f"{bank.getId(short=True)}:{bank.π:.3f},"
+        loginfo1+= f"{bank.getId(short=True)}:{bank.r:.3f},"
+    if Config.N<10:
+        Status.debug("links", f"π=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
     # we can now break old links and set up new lenders, using probability P
     # (equation 8)
     for bank in Model.banks:
         possible_lender  = bank.newLender()
-        possible_lender_π= Model.banks[possible_lender].π[bank.id]
-        current_lender_π = bank.getLender().π[bank.id]
+        possible_lender_π= Model.banks[possible_lender].π
+        current_lender_π = bank.getLender().π
         bank.P = 1 / (1 + math.exp(-Config.β * ( possible_lender_π - current_lender_π ) ))
 
         if bank.P >= 0.5:
+            Status.debug("links", f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}")
             bank.lender = possible_lender
-            Status.debug("links", f"{bank.getId()} new lender is {possible_lender} with %{bank.P:.3f} ( {possible_lender_π:.3f} - {current_lender_π:.3f} )")
         else:
-            Status.debug("links", f"{bank.getId()} maintains lender {bank.getLender().getId()} with %{1-bank.P:.3f}")
+            Status.debug("links", f"{bank.getId()} maintains lender #{bank.lender} with %{1-bank.P:.3f}")
 
 def determineMu():
     for bank in Model.banks:
@@ -420,6 +439,7 @@ class Statistics:
     bestLender = []
     bestLenderClients = []
     liquidity = []
+    interest = []
     incrementD = []
 
     @staticmethod
@@ -428,6 +448,7 @@ class Statistics:
         Statistics.bestLender = [-1 for i in range(Config.T)]
         Statistics.bestLenderClients = [0 for i in range(Config.T)]
         Statistics.liquidity = [0 for i in range(Config.T)]
+        Statistics.interest = [0 for i in range(Config.T)]
         Statistics.incrementD = [0 for i in range(Config.T)]
         Statistics.B = [0 for i in range(Config.T)]
 
@@ -449,6 +470,17 @@ class Statistics:
 
         Statistics.bestLender[ Model.t ] = best
         Statistics.bestLenderClients[ Model.t ] = bestValue
+
+
+    @staticmethod
+    def computeInterest():
+
+        interest = 0
+        for bank in Model.banks:
+            interest += bank.getLoanInterest()
+        interest = interest / Config.N
+
+        Statistics.interest[ Model.t ] = interest
 
     @staticmethod
     def computeLiquidity():
@@ -479,7 +511,7 @@ class Status:
 
     @staticmethod
     def __get_string_debug_banks__(details,bank):
-        text = f"{bank.getId():8} C={Status.__format_number__(bank.C)} L={Status.__format_number__(bank.L)}"
+        text = f"{bank.getId():10} C={Status.__format_number__(bank.C)} L={Status.__format_number__(bank.L)}"
         amount_borrowed = 0
         list_borrowers = " borrows=["
         for bank_i in bank.activeBorrowers:
@@ -579,6 +611,10 @@ class Status:
         Status.run()
 
     @staticmethod
+    def runNotebook():
+        Status.run()
+
+    @staticmethod
     def run():
         Statistics.reset()
         Model.initilize()
@@ -616,6 +652,27 @@ class Graph:
             bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ", "_").lower(), title=title)
             bokeh.plotting.save(p)
 
+
+    @staticmethod
+    def interestRate():
+        title = "Interest"
+        xx = []
+        yy = []
+        for i in range(Config.T):
+            xx.append(i)
+            yy.append(Statistics.interest[i])
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='interest',
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        if Status.isNotebook():
+            bokeh.plotting.show(p)
+        else:
+            bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
+            bokeh.plotting.save(p)
+
+
+
     @staticmethod
     def liquidity():
         title = "Liquidity"
@@ -642,18 +699,50 @@ class Graph:
         yy2 = []
         for i in range(Config.T):
             xx.append(i)
-            yy.append(Statistics.bestLender[i])
-            yy2.append(Statistics.bestLenderClients[i])
+            yy.append(Statistics.bestLender[i]/Config.N)
+            yy2.append(Statistics.bestLenderClients[i]/Config.N)
         p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Best lenders',
                    sizing_mode="stretch_width",
                    height=550)
-        p.line(xx, yy, legend_label=f"{title} id", color="blue", line_width=2)
-        p.line(xx, yy2, legend_label=f"{title} num clients", color="red", line_width=2)
+        p.line(xx, yy, legend_label=f"{title} id", color="black", line_width=2)
+        p.line(xx, yy2, legend_label=f"{title} num clients", color="red", line_width=2, line_dash='dashed')
         if Status.isNotebook():
             bokeh.plotting.show(p)
         else:
             bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
             bokeh.plotting.save(p)
+            export_svg(p,filename=f"output/{title}_bokeh.svg".replace(" ","_").lower(),width=1500,height=400)
+
+        plt.clf()
+        plt.figure(figsize=(20, 6))
+
+        fig,ax1 = plt.subplots()
+        ax1.set_xlabel("Time")
+        ax1.set_ylabel(f"{title} id",color="black")
+        ax2 = ax1.twinx()
+        ax1.plot(xx,yy,color="black")
+        ax2.set_ylabel(f"{title} num clients",color="red")
+        ax2.plot(xx,yy2,color="red")
+        fig.tight_layout()
+        plt.title(title)
+        #plt.figure(dpi=160)
+        if Status.isNotebook():
+            plt.show()
+        else:
+            plt.savefig(fname=f"output/{title}_pyplot.svg".replace(" ","_").lower(),dpi=600)
+
+
+        import plotly.graph_objs
+        import plotly.subplots
+
+        fig = plotly.subplots.make_subplots(specs=[[{"secondary_y":True}]])
+        fig.add_trace( plotly.graph_objs.Scatter(x=xx,y=yy,name=f"{title} id"),secondary_y=False)
+        fig.add_trace( plotly.graph_objs.Scatter(x=xx,y=yy2,name=f"{title} num clients"),secondary_y=True)
+        fig.update_layout(title_text=title)
+        fig.update_xaxes(title_text="Time")
+        fig.update_yaxes(title_text=f"{title} id",secondary_y=False)
+        fig.update_yaxes(title_text=f"{title} num clients",secondary_y=True)
+        fig.write_image(f"output/{title}_plotly.svg".replace(" ","_").lower() )
 
     @staticmethod
     def generate():
@@ -665,12 +754,40 @@ class Graph:
         Graph.bankruptcies()
         Graph.liquidity()
         Graph.bestLender()
+        Graph.interestRate()
 
 # %%
 
-
 if Status.isNotebook():
-    Status.run()
+    Status.runNotebook()
 else:
     if __name__ == "__main__":
         typer.run(Status.runInteractive)
+
+
+
+# functions to use when it is called as a package:
+# ----
+# import bank_net
+# bank_net.config( SSSSS=x )
+# bank_net.step()
+# bank_net.collect()
+
+def config(**kwargs):
+    for attribute in kwargs:
+        if hasattr(Config,attribute):
+            currentValue = getattr(Config,attribute)
+            if isinstance(currentValue,int):
+                setattr(Config, attribute, int(kwargs[attribute]))
+            else:
+                if isinstance(currentValue,float):
+                    setattr(Config, attribute, float(kwargs[attribute]))
+                else:
+                    raise Exception(f"type of Config.{attribute} not configured: {type(currentValue)}")
+        else:
+            raise LookupError("attribute not found in Config")
+    Statistics.reset()
+
+def prepare():
+    print("prueba")
+
