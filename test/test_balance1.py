@@ -12,7 +12,7 @@ class Balance1TestCase(bank_net_testclass.BankTest):
         self.setBank(bank=bank_net.Model.banks[0] ,C=10.0,L=15.0,D=15.0,E=10.0)
         self.setBank(bank=bank_net.Model.banks[1] ,C=10.0,L=15.0,D=15.0,E=10.0)
 
-    @patch.object(bank_net, "doShock", bank_net_testclass.BankTest.mockedShock)
+    @patch.object(bank_net.Model, "doShock", bank_net_testclass.BankTest.mockedShock)
     def setUp(self):
         self.configureTest( N=2,T=1,
                             shocks=[

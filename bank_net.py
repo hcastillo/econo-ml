@@ -84,18 +84,17 @@ class Model:
 
     @staticmethod
     def doAStepOfSimulation():
-        initStep()
-        doShock("shock1")
-        doLoans()
+        Model.initStep()
+        Model.doShock("shock1")
+        Model.doLoans()
         Status.debugBanks()
-        doShock("shock2")
-        doRepayments()
+        Model.doShock("shock2")
+        Model.doRepayments()
         Status.debugBanks()
         Statistics.computeLiquidity()
         Statistics.computeBestLender()
         Statistics.computeInterest()
-        determineMu()
-        setupLinks()
+        Model.setupLinks()
         Status.debugBanks()
 
 
@@ -117,7 +116,220 @@ class Model:
         for bank in Model.banks:
             globalμ += bank.μ
         return globalμ
-        
+
+    @staticmethod
+    def doShock(whichShock):
+        # (equation 2)
+        for bank in Model.banks:
+            bank.newD = bank.D * (Config.µ + Config.ω * random.random())
+            bank.ΔD = bank.newD - bank.D
+            bank.D = bank.newD
+            if bank.ΔD >= 0:
+                bank.C += bank.ΔD
+                # if "shock1" then we can be a lender:
+                if whichShock == "shock1":
+                    bank.s = bank.C
+                bank.d = 0  # it will not need to borrow
+                if bank.ΔD > 0:
+                    Status.debug(whichShock,
+                                 f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
+            else:
+                # if "shock1" then we cannot be a lender: we have lost deposits
+                if whichShock == "shock1":
+                    bank.s = 0
+                if bank.ΔD + bank.C >= 0:
+                    bank.d = 0  # it will not need to borrow
+                    bank.C += bank.ΔD
+                    Status.debug(whichShock,
+                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
+                else:
+                    bank.d = abs(bank.ΔD + bank.C)  # it will need money
+                    Status.debug(whichShock,
+                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
+                    bank.C = 0  # we run out of capital
+            Statistics.incrementD[Model.t] += bank.ΔD
+
+    @staticmethod
+    def doLoans():
+        for bank in Model.banks:
+            # decrement in which we should borrow
+            if bank.d > 0:
+                if bank.getLender().d > 0:
+                    # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
+                    bank.doFiresalesL(bank.d, f"lender {bank.getLender().getId(short=True)} has no money", "loans")
+                    bank.l = 0
+                else:
+                    # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
+                    if bank.d > bank.getLender().s:
+                        bank.doFiresalesL(bank.d - bank.getLender().s,
+                                          f"lender.s={bank.getLender().s:.3f} but need d={bank.d:.3f}", "loans")
+                        # only if lender has money, because if it .s=0, all is obtained by fire sales:
+                        if bank.getLender().s > 0:
+                            bank.l = bank.getLender().s  # amount of loan (writed in the borrower)
+                            bank.getLender().activeBorrowers[
+                                bank.id] = bank.getLender().s  # amount of loan (writed in the lender)
+                            bank.getLender().C -= bank.l  # amount of loan that reduces lender capital
+                            bank.getLender().s = 0
+                    else:
+                        bank.l = bank.d  # amount of loan (writed in the borrower)
+                        bank.getLender().activeBorrowers[bank.id] = bank.d  # amount of loan (writed in the lender)
+                        bank.getLender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
+                        bank.getLender().C -= bank.d  # amount of loan that reduces lender capital
+                        Status.debug("loans",
+                                     f"{bank.getId()} new loan l={bank.d:.3f} from {bank.getLender().getId()}")
+
+            # the shock can be covered by own capital
+            else:
+                bank.l = 0
+                if len(bank.activeBorrowers) > 0:
+                    list_borrowers = ""
+                    amount_borrowed = 0
+                    for bank_i in bank.activeBorrowers:
+                        list_borrowers += Model.banks[bank_i].getId(short=True) + ","
+                        amount_borrowed += bank.activeBorrowers[bank_i]
+                    Status.debug("loans", f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with " +
+                                 f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
+
+    @staticmethod
+    def doRepayments():
+        # first all borrowers must pay their loans:
+        for bank in Model.banks:
+            if bank.l > 0:
+                loanProfits = bank.getLoanInterest() * bank.l
+                loanToReturn = bank.l + loanProfits
+                # (equation 3)
+                if loanToReturn > bank.C:
+                    weNeedToSell = loanToReturn - bank.C
+                    bank.C = 0
+                    bank.paidloan = bank.doFiresalesL(weNeedToSell,
+                                                      f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
+                                                      "repay")
+                # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
+                else:
+                    bank.C -= loanToReturn
+                    bank.E -= loanProfits
+                    bank.paidloan = bank.l
+                    bank.l = 0
+                    bank.getLender().s -= bank.l  # we reduce the  's' => the lender could have more loans
+                    bank.getLender().C += loanToReturn  # we return the loan and it's profits
+                    bank.getLender().E += loanProfits  # the profits are paid as E
+                    Status.debug("repay",
+                                 f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
+                                 f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
+
+        # now  when ΔD<0 it's time to use Capital or sell L again (now we have the loans cancelled, or the bank bankrputed):
+        for bank in Model.banks:
+            if bank.d > 0 and not bank.failed:
+                bank.doFiresalesL(bank.d, f"fire sales due to not enough C", "repay")
+
+        for bank in Model.banks:
+            bank.activeBorrowers = {}
+            if bank.failed:
+                bank.replaceBank()
+        Status.debug("repay",
+                     f"this step ΔD={Statistics.incrementD[Model.t]:.3f} and failures={Statistics.bankruptcy[Model.t]}")
+
+    @staticmethod
+    def initStep():
+        for bank in Model.banks:
+            bank.B = 0
+        if Model.t == 0:
+            Status.debugBanks()
+
+    @staticmethod
+    def setupLinks():
+        # (equation 5)
+        # p = probability borrower not failing
+        # c = lending capacity
+        # λ = leverage
+        # h = borrower haircut
+
+        maxE = max(Model.banks, key=lambda i: i.E).E
+        maxC = max(Model.banks, key=lambda i: i.C).C
+        for bank in Model.banks:
+            bank.p = bank.E / maxE
+            bank.λ = bank.L / bank.E
+            bank.ΔD = 0
+
+        maxλ = max(Model.banks, key=lambda i: i.λ).λ
+        for bank in Model.banks:
+            bank.h = bank.λ / maxλ
+            bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
+
+        # determine c (lending capacity) for all other banks (to whom give loans):
+        for bank in Model.banks:
+            bank.c = []
+            for i in range(Config.N):
+                ##print((1 - Model.banks[i].h) * Model.banks[i].A, Model.banks[i].h,Model.banks[i].A)
+                c = 0 if i == bank.id else (1 - Model.banks[i].h) * Model.banks[i].A
+                bank.c.append(c)
+
+        # (equation 6)
+        minr = sys.maxsize
+        lines = []
+        for bank_i in Model.banks:
+            line1 = ""
+            line2 = ""
+            for j in range(Config.N):
+                try:
+                    if j == bank_i.id:
+                        bank_i.rij[j] = 0
+                    else:
+                        bank_i.rij[j] = (Config.Χ * bank_i.A -
+                                         Config.Φ * Model.banks[j].A -
+                                         (1 - Model.banks[j].p) *
+                                         (Config.ξ * Model.banks[j].A - bank_i.c[j])) \
+                                        / (Model.banks[j].p * bank_i.c[j])
+                        if bank_i.rij[j] < 0:
+                            bank_i.rij[j] = Config.r_i0
+                # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
+                # L and E are equal for all banks, and so maxλ=anyλ and h=1 , so cij=(1-1)A=0, and r division
+                # by zero -> solution then is to use still r_i0:
+                except ZeroDivisionError:
+                    bank_i.rij[j] = Config.r_i0
+
+                line1 += f"{bank_i.rij[j]:.3f},"
+                line2 += f"{bank_i.c[j]:.3f},"
+            if lines != []:
+                lines.append("  |" + line2[:-1] + "|   |" +
+                             line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
+            else:
+                lines.append("c=|" + line2[:-1] + "| r=|" +
+                             line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
+            bank_i.r = np.sum(bank_i.rij) / (Config.N - 1)
+            if bank_i.r < minr:
+                minr = bank_i.r
+
+        if Config.N < 10:
+            for line in lines:
+                Status.debug("links", f"{line}")
+        Status.debug("links", f"maxE={maxE:.3f} maxC={maxC:.3f} maxλ={maxλ:.3f} minr={minr:.3f} ŋ={Model.ŋ:.3f}")
+
+        # (equation 7)
+        loginfo = loginfo1 = ""
+        for bank in Model.banks:
+            bank.μ = Model.ŋ * (bank.C / maxC) + (1 - Model.ŋ) * (minr / bank.r)
+            loginfo += f"{bank.getId(short=True)}:{bank.μ:.3f},"
+            loginfo1 += f"{bank.getId(short=True)}:{bank.r:.3f},"
+        if Config.N < 10:
+            Status.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
+
+        # we can now break old links and set up new lenders, using probability P
+        # (equation 8)
+        for bank in Model.banks:
+            possible_lender = bank.newLender()
+            possible_lender_μ = Model.banks[possible_lender].μ
+            current_lender_μ = bank.getLender().μ
+            bank.P = 1 / (1 + math.exp(-Config.β * (possible_lender_μ - current_lender_μ)))
+
+            if bank.P >= 0.5:
+                Status.debug("links",
+                             f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}")
+                bank.lender = possible_lender
+            else:
+                Status.debug("links", f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}")
+
+
 # %%
 
 class Bank:
@@ -254,222 +466,6 @@ class Bank:
                                  f"E={recoveredE:.3f}: {reason}")
                     return amountToSell
 
-
-def doShock(whichShock):
-    # (equation 2)
-    for bank in Model.banks:
-        bank.newD = bank.D * (Config.µ + Config.ω * random.random())
-        bank.ΔD = bank.newD - bank.D
-        bank.D = bank.newD
-        if bank.ΔD >= 0:
-            bank.C += bank.ΔD
-            # if "shock1" then we can be a lender:
-            if whichShock == "shock1":
-                bank.s = bank.C
-            bank.d = 0  # it will not need to borrow
-            if bank.ΔD > 0:
-                Status.debug(whichShock,
-                             f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
-        else:
-            # if "shock1" then we cannot be a lender: we have lost deposits
-            if whichShock == "shock1":
-                bank.s = 0
-            if bank.ΔD + bank.C >= 0:
-                bank.d = 0  # it will not need to borrow
-                bank.C += bank.ΔD
-                Status.debug(whichShock,
-                             f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
-            else:
-                bank.d = abs(bank.ΔD + bank.C)  # it will need money
-                Status.debug(whichShock,
-                             f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
-                bank.C = 0  # we run out of capital
-        Statistics.incrementD[Model.t] += bank.ΔD
-
-
-def doLoans():
-    for bank in Model.banks:
-        # decrement in which we should borrow
-        if bank.d > 0:
-            if bank.getLender().d > 0:
-                # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
-                bank.doFiresalesL(bank.d, f"lender {bank.getLender().getId(short=True)} has no money", "loans")
-                bank.l = 0
-            else:
-                # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
-                if bank.d > bank.getLender().s:
-                    bank.doFiresalesL(bank.d - bank.getLender().s,
-                                      f"lender.s={bank.getLender().s:.3f} but need d={bank.d:.3f}", "loans")
-                    # only if lender has money, because if it .s=0, all is obtained by fire sales:
-                    if bank.getLender().s > 0:
-                        bank.l = bank.getLender().s  # amount of loan (writed in the borrower)
-                        bank.getLender().activeBorrowers[
-                            bank.id] = bank.getLender().s  # amount of loan (writed in the lender)
-                        bank.getLender().C -= bank.l  # amount of loan that reduces lender capital
-                        bank.getLender().s = 0
-                else:
-                    bank.l = bank.d  # amount of loan (writed in the borrower)
-                    bank.getLender().activeBorrowers[bank.id] = bank.d  # amount of loan (writed in the lender)
-                    bank.getLender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
-                    bank.getLender().C -= bank.d  # amount of loan that reduces lender capital
-                    Status.debug("loans",
-                                 f"{bank.getId()} new loan l={bank.d:.3f} from {bank.getLender().getId()}")
-
-        # the shock can be covered by own capital
-        else:
-            bank.l = 0
-            if len(bank.activeBorrowers) > 0:
-                list_borrowers = ""
-                amount_borrowed = 0
-                for bank_i in bank.activeBorrowers:
-                    list_borrowers += Model.banks[bank_i].getId(short=True) + ","
-                    amount_borrowed += bank.activeBorrowers[bank_i]
-                Status.debug("loans", f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with "+
-                             f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
-
-
-def doRepayments():
-    # first all borrowers must pay their loans:
-    for bank in Model.banks:
-        if bank.l > 0:
-            loanProfits = bank.getLoanInterest() * bank.l
-            loanToReturn = bank.l + loanProfits
-            # (equation 3)
-            if loanToReturn > bank.C:
-                weNeedToSell = loanToReturn - bank.C
-                bank.C = 0
-                bank.paidloan = bank.doFiresalesL(weNeedToSell,
-                                                  f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
-                                                  "repay")
-            # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
-            else:
-                bank.C -= loanToReturn
-                bank.E -= loanProfits
-                bank.paidloan = bank.l
-                bank.l = 0
-                bank.getLender().s -= bank.l  # we reduce the  's' => the lender could have more loans
-                bank.getLender().C += loanToReturn  # we return the loan and it's profits
-                bank.getLender().E += loanProfits  # the profits are paid as E
-                Status.debug("repay",
-                             f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender"+
-                             f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
-
-    # now  when ΔD<0 it's time to use Capital or sell L again (now we have the loans cancelled, or the bank bankrputed):
-    for bank in Model.banks:
-        if bank.d > 0 and not bank.failed:
-            bank.doFiresalesL(bank.d, f"fire sales due to not enough C", "repay")
-
-    for bank in Model.banks:
-        bank.activeBorrowers = {}
-        if bank.failed:
-            bank.replaceBank()
-    Status.debug("repay",
-                 f"this step ΔD={Statistics.incrementD[Model.t]:.3f} and failures={Statistics.bankruptcy[Model.t]}")
-
-
-def initStep():
-    for bank in Model.banks:
-        bank.B = 0
-    if Model.t == 0:
-        Status.debugBanks()
-
-
-def setupLinks():
-    # (equation 5)
-    # p = probability borrower not failing
-    # c = lending capacity
-    # λ = leverage
-    # h = borrower haircut
-
-    maxE = max(Model.banks, key=lambda i: i.E).E
-    maxC = max(Model.banks, key=lambda i: i.C).C
-    for bank in Model.banks:
-        bank.p = bank.E / maxE
-        bank.λ = bank.L / bank.E
-        bank.ΔD = 0
-
-    maxλ = max(Model.banks, key=lambda i: i.λ).λ
-    for bank in Model.banks:
-        bank.h = bank.λ / maxλ
-        bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
-
-    # determine c (lending capacity) for all other banks (to whom give loans):
-    for bank in Model.banks:
-        bank.c = []
-        for i in range(Config.N):
-            ##print((1 - Model.banks[i].h) * Model.banks[i].A, Model.banks[i].h,Model.banks[i].A)
-            c = 0 if i == bank.id else (1 - Model.banks[i].h) * Model.banks[i].A
-            bank.c.append(c)
-
-    # (equation 6)
-    minr = sys.maxsize
-    lines = []
-    for bank_i in Model.banks:
-        line1 = ""
-        line2 = ""
-        for j in range(Config.N):
-            try:
-                if j == bank_i.id:
-                    bank_i.rij[j] = 0
-                else:
-                    bank_i.rij[j] = (Config.Χ * bank_i.A -
-                                     Config.Φ * Model.banks[j].A -
-                                     (1 - Model.banks[j].p) *
-                                     (Config.ξ * Model.banks[j].A - bank_i.c[j])) \
-                                    / (Model.banks[j].p * bank_i.c[j])
-                    if bank_i.rij[j] < 0:
-                        bank_i.rij[j] = Config.r_i0
-            # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
-            # L and E are equal for all banks, and so maxλ=anyλ and h=1 , so cij=(1-1)A=0, and r division
-            # by zero -> solution then is to use still r_i0:
-            except ZeroDivisionError:
-                bank_i.rij[j] = Config.r_i0
-
-            line1 += f"{bank_i.rij[j]:.3f},"
-            line2 += f"{bank_i.c[j]:.3f},"
-        if lines != []:
-            lines.append("  |" + line2[:-1] + "|   |" +
-                         line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
-        else:
-            lines.append("c=|" + line2[:-1] + "| r=|" +
-                         line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
-        bank_i.r = np.sum(bank_i.rij) / (Config.N - 1)
-        if bank_i.r < minr:
-            minr = bank_i.r
-
-    if Config.N < 10:
-        for line in lines:
-            Status.debug("links", f"{line}")
-    Status.debug("links", f"maxE={maxE:.3f} maxC={maxC:.3f} maxλ={maxλ:.3f} minr={minr:.3f} ŋ={Model.ŋ:.3f}")
-
-    # (equation 7)
-    loginfo = loginfo1 = ""
-    for bank in Model.banks:
-        bank.μ = Model.ŋ * (bank.C / maxC) + (1 - Model.ŋ) * (minr / bank.r)
-        loginfo += f"{bank.getId(short=True)}:{bank.μ:.3f},"
-        loginfo1 += f"{bank.getId(short=True)}:{bank.r:.3f},"
-    if Config.N < 10:
-        Status.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
-
-    # we can now break old links and set up new lenders, using probability P
-    # (equation 8)
-    for bank in Model.banks:
-        possible_lender = bank.newLender()
-        possible_lender_μ = Model.banks[possible_lender].μ
-        current_lender_μ = bank.getLender().μ
-        bank.P = 1 / (1 + math.exp(-Config.β * (possible_lender_μ - current_lender_μ)))
-
-        if bank.P >= 0.5:
-            Status.debug("links",
-                         f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}")
-            bank.lender = possible_lender
-        else:
-            Status.debug("links", f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}")
-
-
-def determineMu():
-    for bank in Model.banks:
-        pass
 
 
 # %%

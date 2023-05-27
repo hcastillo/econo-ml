@@ -18,13 +18,12 @@ class BankTest(unittest.TestCase):
         bank_net.Model.initialize()
 
     def doTest(self):
-        #bank_net.Statistics.reset()
         bank_net.Model.doFullSimulation()
 
     def __check_values__(self,bank,name,value):
         if value<0:
             bank_net.Status.debug("******",
-                                  f"{bank.getId()} value {name}={value} <0 is not valid: I changed to 0")
+                                  f"{bank.getId()} value {name}={value} <0 is not valid: I changed it to 0")
             return 0
         else:
             return value
