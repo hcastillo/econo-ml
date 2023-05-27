@@ -1,8 +1,5 @@
 numpy==1.24.*
-matplotlib==3.*
-seaborn==0.12.*
-pandas
-argparse
-matplotlib
 unittest
 mock
+bokeh
+stable-baselines3[extra]

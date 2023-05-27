@@ -5,11 +5,11 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         bank_net.Config.N = 5
         bank_net.Config.T = 10
         bank_net.Status.defineLog('DEBUG')
-        bank_net.Model.initilize()
+        bank_net.Model.initialize()
 
         bank_net.Statistics.reset()
         bank_net.Status.debugBanks()
-        bank_net.Model.doSimulation()
+        bank_net.Model.doFullSimulation()
         bank_net.Status.debugBanks()
 
     def test_values_after_execution(self):

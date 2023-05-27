@@ -15,11 +15,11 @@ class BankTest(unittest.TestCase):
         if T:
             bank_net.Config.T = T
         bank_net.Status.defineLog(log='DEBUG',script=self.id().split('.')[0])
-        bank_net.Model.initilize()
+        bank_net.Model.initialize()
 
     def doTest(self):
-        bank_net.Statistics.reset()
-        bank_net.Model.doSimulation()
+        #bank_net.Statistics.reset()
+        bank_net.Model.doFullSimulation()
 
     def __check_values__(self,bank,name,value):
         if value<0:
