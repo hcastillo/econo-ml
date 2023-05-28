@@ -5,17 +5,17 @@
 
 
 - Interbank model usage:
-  - *bank_net.py*: use to execute standalone the Interbank simulation. It accepts command line options.
+  - *interbank.py*: use to execute standalone the Interbank simulation. It accepts command line options.
   When it is used as a package, the sequence should be:
 
-        import bank_net
-        bank_net.config( T=150,Φ=0.32 )
-        bank_net.do_step()
-        Modelμ = bank_net.get_current_fitness()
-        bank_net.set_policy_recommendation( 0.5 )
+        import interbank
+        interbank.config( T=150,Φ=0.32 )
+        interbank.do_step()
+        Modelμ = interbank.get_current_fitness()
+        interbank.set_policy_recommendation( 0.5 )
 
-  - *bank_net.ipynb*: Notebook version of the standalone bank_net.py with the same results but plotted using Bokeh.
-  - *bank_net.lml*: LabPlot2 file to plot the results of the bank_net.py.
+  - *interbank.ipynb*: Notebook version of the standalone interbank.py with the same results but plotted using Bokeh.
+  - *interbank.lml*: LabPlot2 file to plot the results of the interbank.py.
 
 
 - Reinforce learning with Pytorch and Stable Baselines3:

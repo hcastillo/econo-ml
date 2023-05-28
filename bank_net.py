@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Generates in MEMORY the simulation of Config.T iterations over Config.N banks.
-  Model is Reinforcement Learning Policy Recommendation for Interbank Network Stability
+Generates a simulation of an interbank network following the rules described in paper
+  Reinforcement Learning Policy Recommendation for Interbank Network Stability
   from Gabrielle and Alessio
 
 @author: hector@bith.net
