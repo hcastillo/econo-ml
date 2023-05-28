@@ -2,4 +2,6 @@ unittest
 mock
 bokeh
 stable-baselines3[extra]
+gymnasium
+
 

@@ -1,18 +1,18 @@
-import unittest,bank_net
-from bank_net_testclass import BankTest
+import unittest,interbank
+from interbank_testclass import InterbankTest
 from mock import patch, Mock
 
 # 3. borrower obtains a loan, and after does bankrupcy
 # -------------------
 
-class Balance3TestCase(BankTest):
+class Balance3TestCase(InterbankTest):
 
     def initialValues(self):
-        self.setBank(bank=bank_net.Model.banks[0], C=10.0, L=20.0, D=20.0, E=10.0)
-        self.setBank(bank=bank_net.Model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
-        self.setBank(bank=bank_net.Model.banks[2], C=30.0, L=120.0, D=135.0, E=15.0)
+        self.setBank(bank=interbank.Model.banks[0], C=10.0, L=20.0, D=20.0, E=10.0)
+        self.setBank(bank=interbank.Model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
+        self.setBank(bank=interbank.Model.banks[2], C=30.0, L=120.0, D=135.0, E=15.0)
 
-    @patch.object(bank_net.Model, "doShock", BankTest.mockedShock)
+    @patch.object(interbank.Model, "doShock", InterbankTest.mockedShock)
     def setUp(self):
         self.configureTest( N=3,T=5,
                             shocks=[
@@ -26,9 +26,9 @@ class Balance3TestCase(BankTest):
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=bank_net.Model.banks[0], C=24, L=120, D=129, E=15, bankrupted=True)
-        self.assertBank(bank=bank_net.Model.banks[1], C=36, L=20, D=46, E=10)
-        self.assertBank(bank=bank_net.Model.banks[2], C=35, L=120, D=143, E=12)
+        self.assertBank(bank=interbank.Model.banks[0], C=24, L=120, D=129, E=15, bankrupted=True)
+        self.assertBank(bank=interbank.Model.banks[1], C=36, L=20, D=46, E=10)
+        self.assertBank(bank=interbank.Model.banks[2], C=35, L=120, D=143, E=12)
 
 
 

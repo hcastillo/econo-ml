@@ -11,8 +11,8 @@
         import interbank
         interbank.config( T=150,Φ=0.32 )
         interbank.do_step()
-        Modelμ = interbank.get_current_fitness()
-        interbank.set_policy_recommendation( 0.5 )
+        μ = interbank.get_current_fitness()
+        interbank.set_policy_recommendation( ŋ=0.5 )
 
   - *interbank.ipynb*: Notebook version of the standalone interbank.py with the same results but plotted using Bokeh.
   - *interbank.lml*: LabPlot2 file to plot the results of the interbank.py.

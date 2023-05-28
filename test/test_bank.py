@@ -1,14 +1,14 @@
-import unittest,bank_net
+import unittest,interbank
 
 
 class BankTestCase(unittest.TestCase):
     def setUp(self):
-        bank_net.Config.N = 10
-        self.bank1 = bank_net.Bank(6)
+        interbank.Config.N = 10
+        self.bank1 = interbank.Bank(6)
         self.bank1.lender = self.bank1.newLender()
-        self.bank2 = bank_net.Bank(0)
+        self.bank2 = interbank.Bank(0)
         self.bank2.lender = self.bank2.newLender()
-        self.bank3 = bank_net.Bank(9)
+        self.bank3 = interbank.Bank(9)
         self.bank3.lender = self.bank3.newLender()
 
     def test_at_beginning_of_list(self):
