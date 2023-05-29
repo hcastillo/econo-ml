@@ -9,5 +9,6 @@ class PPOTestCase(unittest.TestCase):
         check_env(env)
         self.assertIsInstance(env, gymnasium.Env)
 
+
 if __name__ == '__main__':
     unittest.main()

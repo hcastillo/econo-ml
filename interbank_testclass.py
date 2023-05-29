@@ -7,22 +7,24 @@ import unittest,interbank
 class InterbankTest(unittest.TestCase):
 
     shocks = []
+    model = None
 
-    def configureTest(self, shocks:list, N:int=None,T:int=None ):
+    def configureTest(self, shocks:list, N:int=None, T:int=None ):
+        self.model = interbank.Model()
         InterbankTest.shocks = shocks
         if N:
-            interbank.Config.N = N
+            self.model.configure( N=N )
         if T:
-            interbank.Config.T = T
-        interbank.Model.log.defineLog(log='DEBUG',script=self.id().split('.')[0])
-        interbank.Model.initialize()
+            self.model.configure( T=T )
+        self.model.log.defineLog(log='DEBUG', script=self.id().split('.')[0])
+        self.model.initialize()
 
     def doTest(self):
-        interbank.Model.doFullSimulation()
+        self.model.doFullSimulation()
 
     def __check_values__(self,bank,name,value):
         if value<0:
-            interbank.Model.log.debug("******",
+            self.model.log.debug("******",
                                   f"{bank.getId()} value {name}={value} <0 is not valid: I changed it to 0")
             return 0
         else:
@@ -38,45 +40,12 @@ class InterbankTest(unittest.TestCase):
             E = L+C-D
             if E<0:
                 E = 0
-            interbank.Model.log.debug("******",
+            self.model.log.debug("******",
                                   f"{bank.getId()}  L+C must be equal to D+E => E modified to {E:.3f}")
         bank.L = L
         bank.E = E
         bank.C = C
         bank.D = D
-
-    def mockedShock(whichShock):
-        for bank in interbank.Model.banks:
-            bank.ΔD = InterbankTest.shocks[ interbank.Model.t ][whichShock][bank.id]
-            if bank.D + bank.ΔD < 0:
-                bank.ΔD = bank.D + bank.ΔD if bank.D>0 else 0
-                interbank.Model.log.debug("******",
-                                f"{bank.getId()} modified simulated ΔD={bank.ΔD:.3f} because we had only D={bank.D:.3f}")
-            bank.D += bank.ΔD
-            if bank.ΔD >= 0:
-                bank.C += bank.ΔD
-                if whichShock == "shock1":
-                    bank.s = bank.C  # lender capital to borrow
-                bank.d = 0  # it will not need to borrow
-                if bank.ΔD>0:
-                    interbank.Model.log.debug(whichShock,
-                             f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
-
-            else:
-                if whichShock == "shock1":
-                    bank.s = 0  # we will not be a lender this time
-                if bank.ΔD + bank.C >= 0:
-                    bank.d = 0  # it will not need to borrow
-                    bank.C += bank.ΔD
-                    interbank.Model.log.debug(whichShock,
-                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
-                else:
-                    bank.d = abs(bank.ΔD + bank.C)  # it will need money
-                    interbank.Model.log.debug(whichShock,
-                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}, now C=0")
-                    bank.C = 0  # we run out of capital
-            interbank.Model.statistics.incrementD[interbank.Model.t] += bank.ΔD
-
 
     def assertBank(self, bank: interbank.Bank, C: float=None, L: float=None, D: float=None, E: float=None,
                                               paidloan:float=None, s:float=None, d:float=None,
@@ -99,9 +68,38 @@ class InterbankTest(unittest.TestCase):
             self.assertEqual(bank.B,B)
         if bankrupted:
             self.assertGreater(bank.failures,0)
-            #self.assertEqual(bank.C, interbank.Config.C_i0)
-            #self.assertEqual(bank.E, interbank.Config.E_i0)
-            #self.assertEqual(bank.D, interbank.Config.D_i0)
-            #self.assertEqual(bank.L, interbank.Config.L_i0)
         else:
             self.assertEqual(bank.failures,0)
+
+
+
+def mockedShock(model,whichShock):
+    for bank in model.banks:
+        bank.ΔD = InterbankTest.shocks[model.t][whichShock][bank.id]
+        if bank.D + bank.ΔD < 0:
+            bank.ΔD = bank.D + bank.ΔD if bank.D > 0 else 0
+            model.log.debug("******",
+                        f"{bank.getId()} modified simulated ΔD={bank.ΔD:.3f} because we had only D={bank.D:.3f}")
+        bank.D += bank.ΔD
+        if bank.ΔD >= 0:
+            bank.C += bank.ΔD
+            if whichShock == "shock1":
+                bank.s = bank.C  # lender capital to borrow
+            bank.d = 0  # it will not need to borrow
+            if bank.ΔD > 0:
+                model.log.debug(whichShock, f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
+
+        else:
+            if whichShock == "shock1":
+                bank.s = 0  # we will not be a lender this time
+            if bank.ΔD + bank.C >= 0:
+                bank.d = 0  # it will not need to borrow
+                bank.C += bank.ΔD
+                model.log.debug(whichShock,
+                                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
+            else:
+                bank.d = abs(bank.ΔD + bank.C)  # it will need money
+                model.log.debug(whichShock,
+                                     f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}, now C=0")
+                bank.C = 0  # we run out of capital
+        model.statistics.incrementD[model.t] += bank.ΔD

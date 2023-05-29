@@ -1,18 +1,19 @@
-import unittest,interbank
-from interbank_testclass import InterbankTest
+import unittest
+import interbank
+import interbank_testclass
 from mock import patch, Mock
 
 # 3. bank does firesale but it is covered ok
 # -------------------
 
-class Balance3TestCase(InterbankTest):
+class Balance3TestCase(interbank_testclass.InterbankTest):
 
     def initialValues(self):
         interbank.Config.ρ = 0.4 # fire sale cost
-        self.setBank(bank=interbank.Model.banks[0], C=0.0, L=8.0, D=3.0, E=5.0)
-        self.setBank(bank=interbank.Model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
+        self.setBank(bank=self.model.banks[0], C=0.0, L=8.0, D=3.0, E=5.0)
+        self.setBank(bank=self.model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
 
-    @patch.object(interbank.Model, "doShock", InterbankTest.mockedShock)
+    @patch.object(interbank.Model, "doShock", interbank_testclass.mockedShock)
     def setUp(self):
         self.configureTest( N=2,T=1,
                             shocks=[
@@ -23,8 +24,8 @@ class Balance3TestCase(InterbankTest):
         interbank.Config.ρ = 0.3 # fire sale cost
 
     def test_values_after_execution(self):
-        self.assertBank(bank=interbank.Model.banks[0], C=0, L=0.5, D=0, E=0.5, paidloan=0, bankrupted=False)
-        self.assertBank(bank=interbank.Model.banks[1], C=10, L=20, D=20, E=10)
+        self.assertBank(bank=self.model.banks[0], C=0, L=0.5, D=0, E=0.5, paidloan=0, bankrupted=False)
+        self.assertBank(bank=self.model.banks[1], C=10, L=20, D=20, E=10)
 
 
 
