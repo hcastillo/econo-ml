@@ -11,11 +11,13 @@ import numpy as np
 import gymnasium
 from   gymnasium import spaces
 import random
-
+import interbank
 
 class InterbankPPO(gymnasium.Env):
 
     def __init__(self, columns=3, rows=3):
+
+        self.interbank = interbank.Model()
         self.columns = columns
         self.rows = rows
         self.tablero = np.zeros(9, np.uint8)

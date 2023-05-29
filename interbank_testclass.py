@@ -14,7 +14,7 @@ class InterbankTest(unittest.TestCase):
             interbank.Config.N = N
         if T:
             interbank.Config.T = T
-        interbank.Status.defineLog(log='DEBUG',script=self.id().split('.')[0])
+        interbank.Model.log.defineLog(log='DEBUG',script=self.id().split('.')[0])
         interbank.Model.initialize()
 
     def doTest(self):
@@ -22,7 +22,7 @@ class InterbankTest(unittest.TestCase):
 
     def __check_values__(self,bank,name,value):
         if value<0:
-            interbank.Status.debug("******",
+            interbank.Model.log.debug("******",
                                   f"{bank.getId()} value {name}={value} <0 is not valid: I changed it to 0")
             return 0
         else:
@@ -38,7 +38,7 @@ class InterbankTest(unittest.TestCase):
             E = L+C-D
             if E<0:
                 E = 0
-            interbank.Status.debug("******",
+            interbank.Model.log.debug("******",
                                   f"{bank.getId()}  L+C must be equal to D+E => E modified to {E:.3f}")
         bank.L = L
         bank.E = E
@@ -50,7 +50,7 @@ class InterbankTest(unittest.TestCase):
             bank.ΔD = InterbankTest.shocks[ interbank.Model.t ][whichShock][bank.id]
             if bank.D + bank.ΔD < 0:
                 bank.ΔD = bank.D + bank.ΔD if bank.D>0 else 0
-                interbank.Status.debug("******",
+                interbank.Model.log.debug("******",
                                 f"{bank.getId()} modified simulated ΔD={bank.ΔD:.3f} because we had only D={bank.D:.3f}")
             bank.D += bank.ΔD
             if bank.ΔD >= 0:
@@ -59,7 +59,7 @@ class InterbankTest(unittest.TestCase):
                     bank.s = bank.C  # lender capital to borrow
                 bank.d = 0  # it will not need to borrow
                 if bank.ΔD>0:
-                    interbank.Status.debug(whichShock,
+                    interbank.Model.log.debug(whichShock,
                              f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
 
             else:
@@ -68,14 +68,14 @@ class InterbankTest(unittest.TestCase):
                 if bank.ΔD + bank.C >= 0:
                     bank.d = 0  # it will not need to borrow
                     bank.C += bank.ΔD
-                    interbank.Status.debug(whichShock,
+                    interbank.Model.log.debug(whichShock,
                                  f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital, now C={bank.C:.3f}")
                 else:
                     bank.d = abs(bank.ΔD + bank.C)  # it will need money
-                    interbank.Status.debug(whichShock,
+                    interbank.Model.log.debug(whichShock,
                                  f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}, now C=0")
                     bank.C = 0  # we run out of capital
-            interbank.Statistics.incrementD[interbank.Model.t] += bank.ΔD
+            interbank.Model.statistics.incrementD[interbank.Model.t] += bank.ΔD
 
 
     def assertBank(self, bank: interbank.Bank, C: float=None, L: float=None, D: float=None, E: float=None,

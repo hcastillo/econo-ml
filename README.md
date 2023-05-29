@@ -19,7 +19,7 @@
 
 
 - Reinforce learning with Pytorch and Stable Baselines3:
-  - *agent_ppo.py*: agent to test using PPO
+  - *interbank_agent_ppo.py*: agent to test using PPO
   - *run_ppo.py*: run and simulate with PPO agent
-  - *agent_XXX.py* and *run_XXX*: other agents and algorithms to simulate
+  - *interbank_agent_XXX.py* and *run_XXX*: other agents and algorithms to simulate
 
