@@ -1,7 +1,10 @@
 import unittest
+
+from mock import patch
+
 import interbank
 import interbank_testclass
-from mock import patch, Mock
+
 
 # 3. bank does firesale but it is covered ok
 # -------------------

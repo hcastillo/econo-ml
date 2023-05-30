@@ -1,7 +1,13 @@
-import unittest,interbank_agent_ppo
+import unittest
+import interbank_agent_ppo
+import gymnasium
 
 
 class PPOTestCase(unittest.TestCase):
+    """
+    It tests the environment of the ReinforcementLearning algorithm
+    and also the correct type of class
+    """
 
     def test_environment(self):
         from stable_baselines3.common.env_checker import check_env

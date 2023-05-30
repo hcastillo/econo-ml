@@ -9,21 +9,21 @@ The agent uses the mathematical model implemented in interbank.py
 
 import numpy as np
 import gymnasium
-from   gymnasium import spaces
+from gymnasium import spaces
 import random
 import interbank
 
+
 class InterbankPPO(gymnasium.Env):
 
-    def __init__(self, columns=3, rows=3):
-
-        self.interbank = interbank.Model()
-        self.columns = columns
-        self.rows = rows
-        self.tablero = np.zeros(9, np.uint8)
+    environment = interbank.Model()
+    def __init__(self,**config):
+        if config:
+            self.environment.configure(config)
+        self.t = 0
         self.done = False
-        self.turno = 0
-
+        #
+        self.observation_space = spaces.Box( low=0,high=self.environment.config.N,shape=(1,),dtype=float)
         # Allowed actions will be: ŋ = [0,0.5,1]
         self.action_space = spaces.Discrete(3)
 
@@ -35,8 +35,6 @@ class InterbankPPO(gymnasium.Env):
             dtype=np.uint8)
 
     def __next_interbank_step(self):
-        colocada = 0
-        #TODO
         return self.tablero
 
     def __determine_reward(self):

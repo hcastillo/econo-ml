@@ -15,9 +15,7 @@ import typer
 import sys
 import bokeh.plotting
 import bokeh.io
-from bokeh.io import export_svg
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 class Config:
@@ -27,9 +25,9 @@ class Config:
     T: int    = 1000     # time (1000)
     N: int    = 50       # number of banks (50)
 
-    ## not used in this implementation:
-    ##ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
-    ##đ: int    = 1        # number of outgoing links allowed
+    # not used in this implementation:
+    # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
+    # đ: int    = 1        # number of outgoing links allowed
 
     seed: int = 40579    # seed for this simulation
 
@@ -70,13 +68,13 @@ class Statistics:
         self.model = model
 
     def reset(self):
-        self.bankruptcy = [0 for i in range(self.model.config.T)]
-        self.bestLender = [-1 for i in range(self.model.config.T)]
-        self.bestLenderClients = [0 for i in range(self.model.config.T)]
-        self.liquidity = [0 for i in range(self.model.config.T)]
-        self.interest = [0 for i in range(self.model.config.T)]
-        self.incrementD = [0 for i in range(self.model.config.T)]
-        self.B = [0 for i in range(self.model.config.T)]
+        self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
+        self.bestLender = np.full(self.model.config.T, -1, dtype=int)
+        self.bestLenderClients = np.zeros(self.model.config.T, dtype=int)
+        self.liquidity = np.zeros(self.model.config.T, dtype=int)
+        self.interest = np.zeros(self.model.config.T, dtype=int)
+        self.incrementD = np.zeros(self.model.config.T, dtype=int)
+        self.B = np.zeros(self.model.config.T, dtype=int)
 
     def computeBestLender(self):
         lenders = {}
@@ -103,13 +101,11 @@ class Statistics:
 
         self.interest[self.model.t] = interest
 
-
     def computeLiquidity(self):
         total = 0
         for bank in self.model.banks:
             total += bank.C
         self.liquidity[self.model.t] = total
-
 
     def finish(self):
         totalB = 0
@@ -218,14 +214,18 @@ class Statistics:
 
 
 class Log:
+    """
+    The class acts as a logger and helpers to represent the data and evol from the Model.
+    """
     logger = logging.getLogger("model")
     modules = []
     model = None
+    logLevel = "ERROR"
 
     def __init__(self, model):
         self.model = model
 
-    def __format_number__(self,number):
+    def __format_number__(self, number):
         result = f"{number:5.2f}"
         while len(result) > 5 and result[-1] == "0":
             result = result[:-1]
@@ -233,7 +233,7 @@ class Log:
             result = result[:-1]
         return result
 
-    def __get_string_debug_banks__(self,details, bank):
+    def __get_string_debug_banks__(self, details, bank):
         text = f"{bank.getId():10} C={self.__format_number__(bank.C)} L={self.__format_number__(bank.L)}"
         amount_borrowed = 0
         list_borrowers = " borrows=["
@@ -268,32 +268,31 @@ class Log:
         text += f" B={self.__format_number__(bank.B)}" if bank.B else "        "
         return text
 
-    def debugBanks(self,details: bool = True, info: str = ''):
+    def debugBanks(self, details: bool = True, info: str = ''):
         for bank in self.model.banks:
             if not info:
                 info = "-----"
             self.debug(info, self.__get_string_debug_banks__(details, bank))
 
-    def getLevel(self,option):
+    def getLevel(self, option):
         try:
             return getattr(logging, option.upper())
-        except:
+        except AttributeError:
             logging.error(f" '--log' must contain a valid logging level and {option.upper()} is not.")
             sys.exit(-1)
-            return None
 
-    def debug(self,module, text):
+    def debug(self, module, text):
         if self.modules == [] or module in self.modules:
             self.logger.debug(f"t={self.model.t:03}/{module:6} {text}")
 
-    def info(self,module, text):
+    def info(self, module, text):
         if self.modules == [] or module in self.modules:
             self.logger.info(f" t={self.model.t:03}/{module:6} {text}")
 
-    def error(self,module, text):
+    def error(self, module, text):
         self.logger.error(f"t={self.model.t:03}/{module:6} {text}")
 
-    def defineLog(self,log: str, logfile: str = '', modules: str = '', script: str = ''):
+    def defineLog(self, log: str, logfile: str = '', modules: str = '', script: str = ''):
         self.modules = modules.split(",") if modules else []
         # https://typer.tiangolo.com/
         scriptName = script if script else "%(module)s"
@@ -318,7 +317,7 @@ class Model:
         import interbank
         model = interbank.Model( )
         model.configure( param=x )
-        model.doAStepOfSimulation()
+        model.simulate_step()
         μ = model.get_current_fitness()
         model.set_policy_recommendation( ŋ=0.5 )
     """
@@ -335,17 +334,17 @@ class Model:
         self.statistics = Statistics(self)
         self.config = Config()
 
-    def configure(self,**kwargs):
-        for attribute in kwargs:
+    def configure(self, **configuration):
+        for attribute in configuration:
             if hasattr(self.config, attribute):
                 current_value = getattr(self.config, attribute)
                 if isinstance(current_value, int):
-                    setattr(self.config, attribute, int(kwargs[attribute]))
+                    setattr(self.config, attribute, int(configuration[attribute]))
                 else:
                     if isinstance(current_value, float):
-                        setattr(self.config, attribute, float(kwargs[attribute]))
+                        setattr(self.config, attribute, float(configuration[attribute]))
                     else:
-                        raise Exception(f"type of config {attribute} not allowed: {type(currentValue)}")
+                        raise Exception(f"type of config {attribute} not allowed: {type(current_value)}")
             else:
                 raise LookupError("attribute in config not found")
         self.initialize()
@@ -354,11 +353,11 @@ class Model:
         self.statistics.reset()
         random.seed(self.config.seed)
         self.banks = []
-        t = 0
+        self.t = 0
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
 
-    def doAStepOfSimulation(self):
+    def simulate_step(self):
         self.initStep()
         self.doShock("shock1")
         self.doLoans()
@@ -372,15 +371,13 @@ class Model:
         self.setupLinks()
         self.log.debugBanks()
 
-
-    def doFullSimulation(self):
+    def simulate_full(self):
         for self.t in range(self.config.T):
-            self.doAStepOfSimulation()
-
+            self.simulate_step()
 
     def finish(self):
         self.statistics.finish()
-        if not 'unittest' in sys.modules:
+        if 'unittest' not in sys.modules:
             self.statistics.export_data()
 
     def get_fitness(self):
@@ -389,10 +386,10 @@ class Model:
             sum_μ += bank.μ
         return sum_μ
 
-    def set_policy_recommendation( self,ŋ ):
+    def set_policy_recommendation(self, ŋ):
         self.ŋ = ŋ
 
-    def doShock(self,whichShock):
+    def doShock(self, whichShock):
         # (equation 2)
         for bank in self.banks:
             bank.newD = bank.D * (self.config.µ + self.config.ω * random.random())
@@ -406,7 +403,7 @@ class Model:
                 bank.d = 0  # it will not need to borrow
                 if bank.ΔD > 0:
                     self.log.debug(whichShock,
-                                 f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
+                                   f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
             else:
                 # if "shock1" then we cannot be a lender: we have lost deposits
                 if whichShock == "shock1":
@@ -415,14 +412,13 @@ class Model:
                     bank.d = 0  # it will not need to borrow
                     bank.C += bank.ΔD
                     self.log.debug(whichShock,
-                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
+                                   f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
                 else:
                     bank.d = abs(bank.ΔD + bank.C)  # it will need money
                     self.log.debug(whichShock,
-                                 f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
+                                   f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
             self.statistics.incrementD[self.t] += bank.ΔD
-
 
     def doLoans(self):
         for bank in self.banks:
@@ -439,18 +435,18 @@ class Model:
                                           f"lender.s={bank.getLender().s:.3f} but need d={bank.d:.3f}", "loans")
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.getLender().s > 0:
-                            bank.l = bank.getLender().s  # amount of loan (writed in the borrower)
+                            bank.l = bank.getLender().s  # amount of loan (wrote in the borrower)
                             bank.getLender().activeBorrowers[
-                                bank.id] = bank.getLender().s  # amount of loan (writed in the lender)
+                                bank.id] = bank.getLender().s  # amount of loan (wrote in the lender)
                             bank.getLender().C -= bank.l  # amount of loan that reduces lender capital
                             bank.getLender().s = 0
                     else:
-                        bank.l = bank.d  # amount of loan (writed in the borrower)
-                        bank.getLender().activeBorrowers[bank.id] = bank.d  # amount of loan (writed in the lender)
+                        bank.l = bank.d  # amount of loan (wrote in the borrower)
+                        bank.getLender().activeBorrowers[bank.id] = bank.d  # amount of loan (wrote in the lender)
                         bank.getLender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
                         bank.getLender().C -= bank.d  # amount of loan that reduces lender capital
                         self.log.debug("loans",
-                                     f"{bank.getId()} new loan l={bank.d:.3f} from {bank.getLender().getId()}")
+                                       f"{bank.getId()} new loan l={bank.d:.3f} from {bank.getLender().getId()}")
 
             # the shock can be covered by own capital
             else:
@@ -462,7 +458,7 @@ class Model:
                         list_borrowers += self.banks[bank_i].getId(short=True) + ","
                         amount_borrowed += bank.activeBorrowers[bank_i]
                     self.log.debug("loans", f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with " +
-                                 f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
+                                   f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
 
     def doRepayments(self):
         # first all borrowers must pay their loans:
@@ -475,8 +471,7 @@ class Model:
                     weNeedToSell = loanToReturn - bank.C
                     bank.C = 0
                     bank.paidloan = bank.doFiresalesL(weNeedToSell,
-                                                      f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
-                                                      "repay")
+                                          f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}", "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
                 else:
                     bank.C -= loanToReturn
@@ -487,10 +482,11 @@ class Model:
                     bank.getLender().C += loanToReturn  # we return the loan and it's profits
                     bank.getLender().E += loanProfits  # the profits are paid as E
                     self.log.debug("repay",
-                                 f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
-                                 f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
+                            f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
+                            f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
 
-        # now  when ΔD<0 it's time to use Capital or sell L again (now we have the loans cancelled, or the bank bankrputed):
+        # now  when ΔD<0 it's time to use Capital or sell L again
+        # (now we have the loans cancelled, or the bank bankrputed):
         for bank in self.banks:
             if bank.d > 0 and not bank.failed:
                 bank.doFiresalesL(bank.d, f"fire sales due to not enough C", "repay")
@@ -499,9 +495,8 @@ class Model:
             bank.activeBorrowers = {}
             if bank.failed:
                 bank.replaceBank()
-        self.log.debug("repay",f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and "+
+        self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
                        f"failures={self.statistics.bankruptcy[self.t]}")
-
 
     def initStep(self):
         for bank in self.banks:
@@ -516,14 +511,14 @@ class Model:
         # λ = leverage
         # h = borrower haircut
 
-        maxE = max(self.banks, key=lambda i: i.E).E
-        maxC = max(self.banks, key=lambda i: i.C).C
+        maxE = max(self.banks, key=lambda k: k.E).E
+        maxC = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
             bank.p = bank.E / maxE
             bank.λ = bank.L / bank.E
             bank.ΔD = 0
 
-        maxλ = max(self.banks, key=lambda i: i.λ).λ
+        maxλ = max(self.banks, key=lambda k: k.λ).λ
         for bank in self.banks:
             bank.h = bank.λ / maxλ
             bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
@@ -561,7 +556,7 @@ class Model:
 
                 line1 += f"{bank_i.rij[j]:.3f},"
                 line2 += f"{bank_i.c[j]:.3f},"
-            if lines != []:
+            if lines:
                 lines.append("  |" + line2[:-1] + "|   |" +
                              line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
             else:
@@ -606,7 +601,6 @@ class Model:
 class Bank:
     """
     It represents an individual bank of the network, with the logic of interaction between it and the interbank system
-
     """
     def getLender(self):
         return self.model.banks[self.lender]
@@ -630,7 +624,7 @@ class Bank:
     def newLender(self):
         # r_i0 is used the first time the bank is created:
         if self.lender is None:
-            self.rij = [self.model.config.r_i0 for i in range(self.model.config.N)]
+            self.rij = np.full(self.model.config.N, self.model.config.r_i0, dtype=float)
             self.rij[self.id] = 0
             self.r = self.model.config.r_i0
             self.μ = 0
@@ -691,15 +685,15 @@ class Bank:
             self.getLender().B += badDebt
             self.getLender().E -= badDebt
             self.getLender().C += recovered
-            self.model.log.debug(phase,f"{self.getId()} bankrupted (fire sale={recoveredFiresale:.3f},"+
-                   f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}"+
+            self.model.log.debug(phase, f"{self.getId()} bankrupted (fire sale={recoveredFiresale:.3f}," +
+                   f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}" +
                    f".ΔB={badDebt:.3f},ΔC={recovered:.3f})")
         else:
             # self.l=0 no current loan to return:
             if self.l > 0:
                 self.paidLoan = self.l  # the loan was paid, not the interest
                 self.getLender().C += self.l  # lender not recovers more than loan if it is
-                self.model.log.debug(phase,f"{self.getId()} bankrupted (lender{self.getLender().getId(short=True)}"+
+                self.model.log.debug(phase,f"{self.getId()} bankrupted (lender{self.getLender().getId(short=True)}" +
                              f".ΔB=0,ΔC={recovered:.3f}) (paidD={self.l:.3f})")
         self.D = 0
         # the loan is not paid correctly, but we remove it
@@ -713,10 +707,9 @@ class Bank:
     def doFiresalesL(self, amountToSell, reason, phase):
         costOfSell = amountToSell / self.model.config.ρ
         recoveredE = costOfSell * (1 - self.model.config.ρ)
-        ##self.C = 0
         if costOfSell > self.L:
             self.model.log.debug(phase,
-                         f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
+                    f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
             return self.__doBankruptcy__(phase)
         else:
             self.L -= costOfSell
@@ -738,10 +731,10 @@ class Bank:
                     return amountToSell
 
 
-
-# %%
-
 class Utils:
+    """
+    Auxiliary class to encapsulate the
+    """
     @staticmethod
     def runInteractive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
                        modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
@@ -758,12 +751,12 @@ class Utils:
         if n != model.config.N:
             model.config.N = n
         model.log.defineLog(log, logfile, modules)
-        Utils.run( model )
+        Utils.run(model)
 
     @staticmethod
     def run(model:Model):
         model.initialize()
-        model.doFullSimulation()
+        model.simulate_full()
         model.finish()
 
     @staticmethod
@@ -778,18 +771,17 @@ class Utils:
             return False
         return True
 
-
-
 # %%
 
+
 if Utils.isNotebook():
-    Utils.run( Model() )
+    # if we are running in a Notebook:
+    Utils.run(Model())
 else:
+    # if we are running interactively:
     if __name__ == "__main__":
         typer.run(Utils.runInteractive)
 
-
-# functions to use when it is called as a package:
-# ----
-
-
+# in other cases, if you import it, the process will be:
+#   model = Model()
+#   model.simulate_step() # t=0 -> t=1

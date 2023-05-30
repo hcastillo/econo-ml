@@ -8,7 +8,7 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         self.model.initialize()
 
         self.model.log.debugBanks()
-        self.model.doFullSimulation()
+        self.model.simulate_full()
         self.model.log.debugBanks()
 
     def test_values_after_execution(self):

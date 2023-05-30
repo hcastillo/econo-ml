@@ -20,7 +20,7 @@ class InterbankTest(unittest.TestCase):
         self.model.initialize()
 
     def doTest(self):
-        self.model.doFullSimulation()
+        self.model.simulate_full()
 
     def __check_values__(self,bank,name,value):
         if value<0:

@@ -1,7 +1,7 @@
 # econo-ml: Reinforce Learning Policy Recommendation for Interbank Network Stability
 
 - Auxiliary files:
-  - *requeriments.txt*: list of the necessary python packages
+  - *requirements.txt*: list of the necessary python packages
 
 
 - Interbank model usage:
@@ -14,7 +14,7 @@
           import interbank
           model = interbank.Model()
           model.config.configure( param=x )
-          model.doAStepOfSimulation()
+          model.simulate_step()
           μ = model.get_current_fitness()
           model.set_policy_recommendation( ŋ=0.5 )
 

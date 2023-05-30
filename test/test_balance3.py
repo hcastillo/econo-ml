@@ -1,7 +1,9 @@
 import unittest
+
+from mock import patch
+
 import interbank
 import interbank_testclass
-from mock import patch, Mock
 
 
 class Balance3TestCase(interbank_testclass.InterbankTest):

@@ -1,7 +1,9 @@
 unittest
 mock
+numpy
 bokeh
 stable-baselines3[extra]
 gymnasium
+typer
 
 
