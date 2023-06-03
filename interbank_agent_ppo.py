@@ -15,73 +15,76 @@ import interbank
 
 
 class InterbankPPO(gymnasium.Env):
+    """
+    using PPO as model, execute the interbank.Model().
+    Considerations:
+    - episodes_per_step = how many Model.t executions (Model.forward()) will be done in each step of the RL
+
+    """
+    episodes_per_step = 1
+
+    # action_space.Discrete(3) -> returns 0,1 or 2 -> we translate it to [0,0.5,1]
+    actions_translation = [0, 0.5, 1]
 
     environment = interbank.Model()
-    def __init__(self,**config):
+
+    def __init__(self, **config):
         if config:
             self.environment.configure(config)
-        self.t = 0
+        self.steps = 0
         self.done = False
-        #
-        self.observation_space = spaces.Box( low=0,high=self.environment.config.N,shape=(1,),dtype=float)
+        self.last_action = None
+        # observation = [ir,cash]
+        self.observation_space = spaces.Box(
+            low=np.array( [   0.0, 0.0]),
+            high=np.array([np.inf, 1.0]),
+            shape=(2,),
+            dtype=np.float64)
+
         # Allowed actions will be: ŋ = [0,0.5,1]
         self.action_space = spaces.Discrete(3)
 
-        # Vamos a definir el entorno
-        self.observation_space = spaces.Box(
-            low=0,
-            high=1,
-            shape=(3,),
-            dtype=np.uint8)
 
-    def __next_interbank_step(self):
-        return self.tablero
+    def define_log(self,log,logfile,modules):
+        self.environment.log.define_log(log,logfile,modules)
+    def __get_observations(self):
+        return np.array([self.environment.get_current_liquidity(),
+                         self.environment.get_current_interest_rate()])
 
-    def __determine_reward(self):
-        # TODO
-        return 0.5
-
-    def reset(self, seed=0):
+    def reset(self, seed=40579):
         """
-        Importante: the observation must be a numpy array
-        :return: (np.array)
+        Set to the initial state the Interbank.model
         """
-        self.tablero = np.zeros(9, np.uint8)
-        observation = np.zeros(3, np.uint8)
-        self.turno = 0
+        super().reset(seed=seed)
+        self.environment.initialize()
+        self.steps = 0
         self.done = False
-        return observation, dict()
+        return self.__get_observations(), dict()
 
     def step(self, action):
-        if self.tablero[action] != 0:
-            observation = self.tablero
-            self.done = True
-            reward = -1
-            info = {"Error": "Intento hacer trampa"}
-            return observation, reward, self.done, False, info
-        self.tablero[action] = 1
-        self.turno += 1
-        observation = self.tablero
-        reward = self.__determine_reward() ##TODO
-        if self.turno == 5:
-            self.done = True
+        self.environment.forward()
+        self.steps += 1
+        self.last_action = action
+        truncated = False
         info = {}
-        if self.done == False:
-            self.tablero = self.__next_interbank_step()
-            observation = self.tablero
-        return observation, reward, self.done, False, info
+        for i in range(self.episodes_per_step):
+            self.environment.set_policy_recommendation(self.actions_translation[action])
+            self.environment.forward()
+            observation = self.__get_observations()
+            reward = self.environment.get_current_fitness()
+            self.done = self.environment.t >= self.environment.config.T
+            if self.done:
+                truncated = i < self.episodes_per_step
+                info = {"Info": "Truncated"} if truncated else {"Info": "Finish (t=T)"}
+                break
+        return observation, reward, self.done, truncated, info
+
+    def close(self):
+        self.environment.finish()
 
     def render(self, mode='human'):
-        print("")
-        print("turno: " + str(self.turno))
-        for i in range(9):
-            if self.tablero[i] == 0:
-                print("   |", end="")
-            elif self.tablero[i] == 1:
-                print(" O |", end="")
-            elif self.tablero[i] == 2:
-                print(" X |", end="")
-            if (i + 1) % 3 == 0:
-                print("")
-        print("")
-
+        liquidity, interest_rate = self.__get_observations()
+        fitness = self.environment.get_current_fitness()
+        self.environment.set_policy_recommendation()
+        print(f"t={self.environment.t}: ŋ={self.last_action} fitness.μ={fitness:5.2f} " +
+              f"ƩC={liquidity:5.2f} interest=%{interest_rate:5.2}")

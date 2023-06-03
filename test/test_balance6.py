@@ -3,7 +3,7 @@ import unittest
 from mock import patch
 
 import interbank
-import interbank_testclass
+from test import interbank_testclass
 
 
 class Balance1TestCase(interbank_testclass.InterbankTest):
@@ -15,7 +15,7 @@ class Balance1TestCase(interbank_testclass.InterbankTest):
         self.setBank(bank=self.model.banks[1], C=10.0, L=15.0, D=14.0, E=11.0)
         self.setBank(bank=self.model.banks[2], C=10.0, L=15.0, D=16.0, E=9.0)
 
-    @patch.object(interbank.Model, "doShock", interbank_testclass.mockedShock)
+    @patch.object(interbank.Model, "do_shock", interbank_testclass.mockedShock)
     def setUp(self):
         self.configureTest(N=3, T=10, shocks=[
             {"shock1": [-5, 3, -3], "shock2": [0, 0, -3], },

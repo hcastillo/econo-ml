@@ -4,12 +4,12 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
     def setUp(self):
         self.model = interbank.Model()
         self.model.configure( N=5, T=10 )
-        self.model.log.defineLog('DEBUG')
+        self.model.log.define_log('DEBUG')
         self.model.initialize()
 
-        self.model.log.debugBanks()
+        self.model.log.debug_banks()
         self.model.simulate_full()
-        self.model.log.debugBanks()
+        self.model.log.debug_banks()
 
     def test_values_after_execution(self):
         self.assertEqual( self.model.banks[1].C, 30)

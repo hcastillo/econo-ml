@@ -14,7 +14,7 @@
           import interbank
           model = interbank.Model()
           model.config.configure( param=x )
-          model.simulate_step()
+          model.forward()
           μ = model.get_current_fitness()
           model.set_policy_recommendation( ŋ=0.5 )
 

@@ -7,7 +7,7 @@ Generates a simulation of an interbank network following the rules described in 
 @author: hector@bith.net
 @date:   04/2023
 """
-
+import copy
 import random
 import logging
 import math
@@ -53,14 +53,16 @@ class Config:
     E_i0: float = 15     # equity
     r_i0: float = 0.02   # initial rate
 
+    backward : bool = False # could we revert a forward() (step)
 
 class Statistics:
     bankruptcy = []
     bestLender = []
     bestLenderClients = []
     liquidity = []
-    interest = []
+    interest_rate = []
     incrementD = []
+    fitness = []
     B = []
     model = None
 
@@ -68,15 +70,16 @@ class Statistics:
         self.model = model
 
     def reset(self):
-        self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
+        self.bankruptcy = np.zeros(self.model.config.T, dtype=float)
         self.bestLender = np.full(self.model.config.T, -1, dtype=int)
         self.bestLenderClients = np.zeros(self.model.config.T, dtype=int)
-        self.liquidity = np.zeros(self.model.config.T, dtype=int)
-        self.interest = np.zeros(self.model.config.T, dtype=int)
-        self.incrementD = np.zeros(self.model.config.T, dtype=int)
-        self.B = np.zeros(self.model.config.T, dtype=int)
+        self.fitness = np.zeros(self.model.config.T, dtype=float)
+        self.interest_rate = np.zeros(self.model.config.T, dtype=float)
+        self.incrementD = np.zeros(self.model.config.T, dtype=float)
+        self.liquidity = np.zeros(self.model.config.T, dtype=float)
+        self.B = np.zeros(self.model.config.T, dtype=float)
 
-    def computeBestLender(self):
+    def compute_best_lender(self):
         lenders = {}
         for bank in self.model.banks:
             if bank.lender in lenders:
@@ -84,28 +87,28 @@ class Statistics:
             else:
                 lenders[bank.lender] = 1
         best = -1
-        bestValue = -1
+        best_value = -1
         for lender in lenders.keys():
-            if lenders[lender] > bestValue:
+            if lenders[lender] > best_value:
                 best = lender
-                bestValue = lenders[lender]
+                best_value = lenders[lender]
 
         self.bestLender[self.model.t] = best
-        self.bestLenderClients[self.model.t] = bestValue
+        self.bestLenderClients[self.model.t] = best_value
 
-    def computeInterest(self):
+    def compute_interest(self):
         interest = 0
         for bank in self.model.banks:
             interest += bank.getLoanInterest()
         interest = interest / self.model.config.N
 
-        self.interest[self.model.t] = interest
+        self.interest_rate[self.model.t] = interest
 
-    def computeLiquidity(self):
-        total = 0
-        for bank in self.model.banks:
-            total += bank.C
-        self.liquidity[self.model.t] = total
+    def compute_liquidity(self):
+        self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
+
+    def compute_fitness(self):
+        self.liquidity[self.model.t] = sum(map(lambda x: x.μ, self.model.banks))
 
     def finish(self):
         totalB = 0
@@ -151,7 +154,7 @@ class Statistics:
         yy = []
         for i in range(self.model.config.T):
             xx.append(i)
-            yy.append(self.interest[i])
+            yy.append(self.interest_rate[i])
         if Utils.isNotebook():
             p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='interest',
                                       sizing_mode="stretch_width",
@@ -268,13 +271,13 @@ class Log:
         text += f" B={self.__format_number__(bank.B)}" if bank.B else "        "
         return text
 
-    def debugBanks(self, details: bool = True, info: str = ''):
+    def debug_banks(self, details: bool = True, info: str = ''):
         for bank in self.model.banks:
             if not info:
                 info = "-----"
             self.debug(info, self.__get_string_debug_banks__(details, bank))
 
-    def getLevel(self, option):
+    def get_level(self, option):
         try:
             return getattr(logging, option.upper())
         except AttributeError:
@@ -292,12 +295,11 @@ class Log:
     def error(self, module, text):
         self.logger.error(f"t={self.model.t:03}/{module:6} {text}")
 
-    def defineLog(self, log: str, logfile: str = '', modules: str = '', script: str = ''):
+    def define_log(self, log: str, logfile: str = '', modules: str = '', script: str = ''):
         self.modules = modules.split(",") if modules else []
-        # https://typer.tiangolo.com/
         scriptName = script if script else "%(module)s"
         formatter = logging.Formatter('%(levelname)s-' + scriptName + '- %(message)s')
-        self.logLevel = self.getLevel(log.upper())
+        self.logLevel = self.get_level(log.upper())
         self.logger.setLevel(self.logLevel)
         if logfile:
             fh = logging.FileHandler(logfile, 'a', 'utf-8')
@@ -317,9 +319,20 @@ class Model:
         import interbank
         model = interbank.Model( )
         model.configure( param=x )
-        model.simulate_step()
+        model.forward()
         μ = model.get_current_fitness()
         model.set_policy_recommendation( ŋ=0.5 )
+
+    If you want to forward() and backward() step by step, you should use:
+        model.configure( backward=True )
+        # t=4
+        model.set_policy_recommendation( ŋ=0.5 )
+        model.forward()
+        result = model.get_current_fitness() # t=5
+        model.backward() # t=4 again
+
+
+
     """
     banks = []    # An array of Bank with size Model.config.N
     t: int = 0    # current value of time, t = 0..Model.config.T
@@ -333,6 +346,7 @@ class Model:
         self.log = Log(self)
         self.statistics = Statistics(self)
         self.config = Config()
+        self.banks_copy = []
 
     def configure(self, **configuration):
         for attribute in configuration:
@@ -357,39 +371,65 @@ class Model:
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
 
-    def simulate_step(self):
-        self.initStep()
-        self.doShock("shock1")
-        self.doLoans()
-        self.log.debugBanks()
-        self.doShock("shock2")
-        self.doRepayments()
-        self.log.debugBanks()
-        self.statistics.computeLiquidity()
-        self.statistics.computeBestLender()
-        self.statistics.computeInterest()
-        self.setupLinks()
-        self.log.debugBanks()
+    def forward(self):
+        self.initialize_step()
+        if self.config.backward:
+            self.banks_copy = copy.deepcopy(self.banks)
+        self.do_shock("shock1")
+        self.do_loans()
+        self.log.debug_banks()
+        self.do_shock("shock2")
+        self.do_repayments()
+        self.log.debug_banks()
+        self.statistics.compute_liquidity()
+        self.statistics.compute_best_lender()
+        self.statistics.compute_interest()
+        self.setup_links()
+        self.log.debug_banks()
+
+    def backward(self):
+        if not self.config.backward:
+            raise AttributeError('config backward=True has not been enabled')
+        else:
+            self.banks = self.banks_copy
 
     def simulate_full(self):
         for self.t in range(self.config.T):
-            self.simulate_step()
+            self.forward()
 
     def finish(self):
         self.statistics.finish()
         if 'unittest' not in sys.modules:
             self.statistics.export_data()
 
-    def get_fitness(self):
-        sum_μ = 0
-        for bank in self.banks:
-            sum_μ += bank.μ
-        return sum_μ
-
     def set_policy_recommendation(self, ŋ):
         self.ŋ = ŋ
 
-    def doShock(self, whichShock):
+    def get_current_fitness(self):
+        """
+        Determines the current μ of the model (does the sum of all μ)
+        :return:
+        float:  Ʃ banks.μ
+        """
+        return self.statistics.fitness[self.t]
+
+    def get_current_liquidity(self):
+        """
+        Returns the liquidity (the sum of the liquidity)
+        :return:
+        float:  Ʃ banks.C
+        """
+        return self.statistics.liquidity[self.t]
+
+    def get_current_interest_rate(self):
+        """
+        Returns the interest rate (the average of all banks)
+        :return:
+        float:  Ʃ banks.ir / config.N
+        """
+        return self.statistics.interest_rate[self.t]
+
+    def do_shock(self, whichShock):
         # (equation 2)
         for bank in self.banks:
             bank.newD = bank.D * (self.config.µ + self.config.ω * random.random())
@@ -420,7 +460,7 @@ class Model:
                     bank.C = 0  # we run out of capital
             self.statistics.incrementD[self.t] += bank.ΔD
 
-    def doLoans(self):
+    def do_loans(self):
         for bank in self.banks:
             # decrement in which we should borrow
             if bank.d > 0:
@@ -460,7 +500,7 @@ class Model:
                     self.log.debug("loans", f"{bank.getId()} has a total of {len(bank.activeBorrowers)} loans with " +
                                    f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
 
-    def doRepayments(self):
+    def do_repayments(self):
         # first all borrowers must pay their loans:
         for bank in self.banks:
             if bank.l > 0:
@@ -498,13 +538,13 @@ class Model:
         self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
                        f"failures={self.statistics.bankruptcy[self.t]}")
 
-    def initStep(self):
+    def initialize_step(self):
         for bank in self.banks:
             bank.B = 0
         if self.t == 0:
-            self.log.debugBanks()
+            self.log.debug_banks()
 
-    def setupLinks(self):
+    def setup_links(self):
         # (equation 5)
         # p = probability borrower not failing
         # c = lending capacity
@@ -750,7 +790,7 @@ class Utils:
             model.config.T = t
         if n != model.config.N:
             model.config.N = n
-        model.log.defineLog(log, logfile, modules)
+        model.log.define_log(log, logfile, modules)
         Utils.run(model)
 
     @staticmethod
@@ -784,4 +824,9 @@ else:
 
 # in other cases, if you import it, the process will be:
 #   model = Model()
-#   model.simulate_step() # t=0 -> t=1
+#   # step by step:
+#   model.forward() # t=0 -> t=1
+#   model.backward() : reverts the last step (when executed
+#   # all in a loop:
+#   model.simulate_full()
+
