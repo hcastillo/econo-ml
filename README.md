@@ -4,7 +4,8 @@
   - *requirements.txt*: list of the necessary python packages
 
 
-- Interbank model usage:
+## - Interbank model
+
   - *interbank.py*: use to execute standalone the Interbank simulation.
     - It accepts command line options. For instance, you can execute this:
     
@@ -23,8 +24,17 @@
   - *interbank.lml*: LabPlot2 file to plot the results of the *interbank.py*.
 
 
-- Reinforce learning with Pytorch and Stable Baselines3:
+## - RL with Stable Baselines3
   - *interbank_agent_ppo.py*: agent to test using PPO
   - *run_ppo.py*: run and simulate with PPO agent
   - *interbank_agent_XXX.py* and *run_XXX*: other agents and algorithms to simulate
+  - *models/XXXX.zip*: instances of Gymnasium.env trained to use with *run_XXXX.py*
+  - Usage:
+
+          # train first and save the model env:
+          run_ppo.py --train ppo_10000 --times 10000 --verbose
+
+          # use the trained env and generate a simulation of T=1000 with Interbank model
+          run_ppo.py --load ppo_10000 --save results_ppo.txt
+
 

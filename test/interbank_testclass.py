@@ -11,12 +11,13 @@ class InterbankTest(unittest.TestCase):
 
     def configureTest(self, shocks:list, N:int=None, T:int=None ):
         self.model = interbank.Model()
+        self.model.test = True
         InterbankTest.shocks = shocks
         if N:
-            self.model.configure( N=N )
+            self.model.configure(N=N)
         if T:
-            self.model.configure( T=T )
-        self.model.log.define_log(log='DEBUG', script=self.id().split('.')[0])
+            self.model.configure(T=T)
+        self.model.log.define_log(log='DEBUG', script_name=self.id().split('.')[0])
         self.model.initialize()
 
     def doTest(self):

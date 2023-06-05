@@ -12,54 +12,53 @@ import random
 import logging
 import math
 import typer
-import sys
 import bokeh.plotting
 import bokeh.io
 import numpy as np
+import sys
 
 
 class Config:
     """
     Configuration parameters for the interbank network
     """
-    T: int    = 1000     # time (1000)
-    N: int    = 50       # number of banks (50)
+    a:int = 5
+    T: int = 1000  # time (1000)
+    N: int = 50  # number of banks (50)
 
     # not used in this implementation:
     # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
     # đ: int    = 1        # number of outgoing links allowed
 
-    seed: int = 40579    # seed for this simulation
-
     # shocks parameters:
-    µ: float  = 0.7      # mi
-    ω: float  = 0.55     # omega
+    µ: float = 0.7  # mi
+    ω: float = 0.55  # omega
 
     # screening costs
-    Φ: float  = 0.025    # phi
-    Χ: float  = 0.015    # ji
-    
-    # liquidation cost of collateral
-    ξ: float  = 0.3      # xi
-    ρ: float  = 0.3      # ro fire sale cost
+    Φ: float = 0.025  # phi
+    Χ: float = 0.015  # ji
 
-    β: float  = 0        # intensity of breaking the connection
-    α: float  = 0.1      # below this level of E or D, we will bankrupt the bank
+    # liquidation cost of collateral
+    ξ: float = 0.3  # xi
+    ρ: float = 0.3  # ro fire sale cost
+
+    β: float = 0  # intensity of breaking the connection
+    α: float = 0.1  # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
-    L_i0: float = 120    # long term assets
-    C_i0: float = 30     # capital
-    D_i0: float = 135    # deposits
-    E_i0: float = 15     # equity
-    r_i0: float = 0.02   # initial rate
+    L_i0: float = 120  # long term assets
+    C_i0: float = 30  # capital
+    D_i0: float = 135  # deposits
+    E_i0: float = 15  # equity
+    r_i0: float = 0.02  # initial rate
 
-    backward : bool = False # could we revert a forward() (step)
 
 class Statistics:
     bankruptcy = []
     bestLender = []
     bestLenderClients = []
     liquidity = []
+    policy = []
     interest_rate = []
     incrementD = []
     fitness = []
@@ -70,13 +69,14 @@ class Statistics:
         self.model = model
 
     def reset(self):
-        self.bankruptcy = np.zeros(self.model.config.T, dtype=float)
+        self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.bestLender = np.full(self.model.config.T, -1, dtype=int)
         self.bestLenderClients = np.zeros(self.model.config.T, dtype=int)
         self.fitness = np.zeros(self.model.config.T, dtype=float)
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
+        self.policy = np.zeros(self.model.config.T, dtype=float)
         self.B = np.zeros(self.model.config.T, dtype=float)
 
     def compute_best_lender(self):
@@ -97,100 +97,93 @@ class Statistics:
         self.bestLenderClients[self.model.t] = best_value
 
     def compute_interest(self):
-        interest = 0
-        for bank in self.model.banks:
-            interest += bank.getLoanInterest()
-        interest = interest / self.model.config.N
-
-        self.interest_rate[self.model.t] = interest
+        self.interest_rate[self.model.t] = sum(map(lambda x: x.getLoanInterest(), self.model.banks)) / \
+                                           self.model.config.N
 
     def compute_liquidity(self):
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
 
     def compute_fitness(self):
-        self.liquidity[self.model.t] = sum(map(lambda x: x.μ, self.model.banks))
+        self.fitness[self.model.t] = sum(map(lambda x: x.μ, self.model.banks))
 
-    def finish(self):
-        totalB = 0
-        for bank_i in self.model.banks:
-            totalB += bank_i.B
-        self.B[self.model.t] = totalB
+    def compute_policy(self):
+        self.policy[self.model.t] = self.model.ŋ
 
-    def export_data(self):
+    def compute_bad_debt(self):
+        self.B[self.model.t] = sum(map(lambda x: x.B, self.model.banks))
+
+    def export_data(self, export_datafile=None, export_description=None):
+        if export_datafile:
+            self.save_data(export_datafile, export_description)
+
         if Utils.isNotebook():
             from bokeh.io import output_notebook
             output_notebook()
-        self.export_data_bankruptcies()
-        self.export_data_liquidity()
-        self.export_data_best_lender()
-        self.export_data_interest_rate()
+            self.plot_bankruptcies()
+            self.plot_liquidity()
+            self.plot_best_lender()
+            self.plot_interest_rate()
 
-    def export_data_bankruptcies(self):
+    def save_data(self, export_datafile=None, export_description=None):
+        if export_datafile:
+            with open(f"output/{export_datafile}", 'w', encoding="utf-8") as savefile:
+                savefile.write('# t\tpolicy\tfitness           \tC                    \tir         \t' +
+                               'bankrupts\tbestLenderID\tbestLenderClients\n')
+                if export_description:
+                    savefile.write(f"# {export_description}\n")
+                else:
+                    savefile.write(f"# {__name__} T={self.model.config.T} N={self.model.config.N}\n")
+                for i in range(self.model.config.T):
+                    savefile.write(f"{i:3}\t{self.policy[i]:3}\t{self.fitness[i]:19}\t{self.liquidity[i]:19}" +
+                                   f"\t{self.interest_rate[i]:20}\t{self.bankruptcy[i]:3}" +
+                                   f"\t{self.bestLender[i]/self.model.config.N:20}" +
+                                   f"\t{self.bestLenderClients[i]/self.model.config.N:20}\n")
+
+    def plot_bankruptcies(self):
         title = "Bankruptcies"
         xx = []
         yy = []
         for i in range(self.model.config.T):
             xx.append(i)
             yy.append(self.bankruptcy[i])
+        p = bokeh.plotting.figure(title=title, x_axis_label="Time", y_axis_label="num of bankruptcies",
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        bokeh.plotting.show(p)
+        # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ", "_").lower(), title=title)
+        # bokeh.plotting.save(p)
 
-        if Utils.isNotebook():
-            p = bokeh.plotting.figure(title=title, x_axis_label="Time", y_axis_label="num of bankruptcies",
-                                      sizing_mode="stretch_width",
-                                      height=550)
-            p.line(xx, yy, color="blue", line_width=2)
-            bokeh.plotting.show(p)
-        else:
-            with open(f"output/{title}.txt".replace(" ", "_").lower(), 'w') as f:
-                f.write('# t   numBankruptcies\n')
-                for i in range(self.model.config.T):
-                    f.write(f"{xx[i]} {yy[i]}\n")
-
-            # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ", "_").lower(), title=title)
-            # bokeh.plotting.save(p)
-
-    def export_data_interest_rate(self):
+    def plot_interest_rate(self):
         title = "Interest"
         xx = []
         yy = []
         for i in range(self.model.config.T):
             xx.append(i)
             yy.append(self.interest_rate[i])
-        if Utils.isNotebook():
-            p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='interest',
-                                      sizing_mode="stretch_width",
-                                      height=550)
-            p.line(xx, yy, color="blue", line_width=2)
-            bokeh.plotting.show(p)
-        else:
-            with open(f"output/{title}.txt".replace(" ", "_").lower(), 'w') as f:
-                f.write('# t   Interest\n')
-                for i in range(self.model.config.T):
-                    f.write(f"{xx[i]} {yy[i]}\n")
-            # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
-            # bokeh.plotting.save(p)
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='interest',
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        bokeh.plotting.show(p)
+        # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
+        # bokeh.plotting.save(p)
 
-    def export_data_liquidity(self):
+    def plot_liquidity(self):
         title = "Liquidity"
         xx = []
         yy = []
         for i in range(self.model.config.T):
             xx.append(i)
             yy.append(self.liquidity[i])
-        if Utils.isNotebook():
-            p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Ʃ liquidity',
-                                      sizing_mode="stretch_width",
-                                      height=550)
-            p.line(xx, yy, color="blue", line_width=2)
-            bokeh.plotting.show(p)
-        else:
-            with open(f"output/{title}.txt".replace(" ", "_").lower(), 'w') as f:
-                f.write('# t   Liquidity\n')
-                for i in range(self.model.config.T):
-                    f.write(f"{xx[i]} {yy[i]}\n")
-            # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
-            # bokeh.plotting.save(p)
 
-    def export_data_best_lender(self):
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Ʃ liquidity',
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        bokeh.plotting.show(p)
+
+    def plot_best_lender(self):
         title = "Best Lender"
         xx = []
         yy = []
@@ -200,20 +193,12 @@ class Statistics:
             yy.append(self.bestLender[i] / self.model.config.N)
             yy2.append(self.bestLenderClients[i] / self.model.config.N)
 
-        if Utils.isNotebook():
-            p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Best lenders',
-                                      sizing_mode="stretch_width",
-                                      height=550)
-            p.line(xx, yy, legend_label=f"{title} id", color="black", line_width=2)
-            p.line(xx, yy2, legend_label=f"{title} num clients", color="red", line_width=2, line_dash='dashed')
-            bokeh.plotting.show(p)
-        else:
-            with open(f"output/{title}.txt".replace(" ", "_").lower(), 'w') as f:
-                f.write('# t   bestLenders numClients\n')
-                for i in range(self.model.config.T):
-                    f.write(f"{xx[i]} {yy[i]} {yy2[i]}\n")
-            # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
-            # bokeh.plotting.save(p)
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Best lenders',
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, legend_label=f"{title} id", color="black", line_width=2)
+        p.line(xx, yy2, legend_label=f"{title} num clients", color="red", line_width=2, line_dash='dashed')
+        bokeh.plotting.show(p)
 
 
 class Log:
@@ -295,10 +280,9 @@ class Log:
     def error(self, module, text):
         self.logger.error(f"t={self.model.t:03}/{module:6} {text}")
 
-    def define_log(self, log: str, logfile: str = '', modules: str = '', script: str = ''):
+    def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = "%(module)s"):
         self.modules = modules.split(",") if modules else []
-        scriptName = script if script else "%(module)s"
-        formatter = logging.Formatter('%(levelname)s-' + scriptName + '- %(message)s')
+        formatter = logging.Formatter('%(levelname)s-' + script_name + '- %(message)s')
         self.logLevel = self.get_level(log.upper())
         self.logger.setLevel(self.logLevel)
         if logfile:
@@ -334,9 +318,12 @@ class Model:
 
 
     """
-    banks = []    # An array of Bank with size Model.config.N
-    t: int = 0    # current value of time, t = 0..Model.config.T
-    ŋ: float = 1  # eta : current policy recommendation currently
+    banks = []  # An array of Bank with size Model.config.N
+    t: int = 0  # current value of time, t = 0..Model.config.T
+    ŋ: float = 1  # eta : current value of policy recommendation
+    test = False  # it's true when we are inside a test
+    default_seed: int = 40579  # seed for this simulation
+    backward_enabled = False # if true, we can execute backward()
 
     log = None
     statistics = None
@@ -363,9 +350,9 @@ class Model:
                 raise LookupError("attribute in config not found")
         self.initialize()
 
-    def initialize(self):
+    def initialize(self,seed=None):
         self.statistics.reset()
-        random.seed(self.config.seed)
+        random.seed(seed if seed else self.default_seed)
         self.banks = []
         self.t = 0
         for i in range(self.config.N):
@@ -373,7 +360,7 @@ class Model:
 
     def forward(self):
         self.initialize_step()
-        if self.config.backward:
+        if self.backward_enabled:
             self.banks_copy = copy.deepcopy(self.banks)
         self.do_shock("shock1")
         self.do_loans()
@@ -384,23 +371,33 @@ class Model:
         self.statistics.compute_liquidity()
         self.statistics.compute_best_lender()
         self.statistics.compute_interest()
+        self.statistics.compute_fitness()
+        self.statistics.compute_policy()
+        self.statistics.compute_bad_debt()
         self.setup_links()
         self.log.debug_banks()
+        self.t += 1
 
     def backward(self):
-        if not self.config.backward:
-            raise AttributeError('config backward=True has not been enabled')
+        if self.backward_enabled:
+            if self.t > 0:
+                self.banks = self.banks_copy
+                self.t -= 1
+            else:
+                raise IndexError('t=0 and no backward is possible')
         else:
-            self.banks = self.banks_copy
+            raise AttributeError('enable_backward() before')
+
+    def enable_backward(self):
+        self.backward_enabled = True
 
     def simulate_full(self):
-        for self.t in range(self.config.T):
+        for i in range(self.config.T):
             self.forward()
 
-    def finish(self):
-        self.statistics.finish()
-        if 'unittest' not in sys.modules:
-            self.statistics.export_data()
+    def finish(self, export_datafile=None, export_description=None):
+        if not self.test:
+            self.statistics.export_data(export_datafile, export_description)
 
     def set_policy_recommendation(self, ŋ):
         self.ŋ = ŋ
@@ -411,7 +408,7 @@ class Model:
         :return:
         float:  Ʃ banks.μ
         """
-        return self.statistics.fitness[self.t]
+        return self.statistics.fitness[self.t - 1 if self.t > 0 else 0]
 
     def get_current_liquidity(self):
         """
@@ -419,7 +416,7 @@ class Model:
         :return:
         float:  Ʃ banks.C
         """
-        return self.statistics.liquidity[self.t]
+        return self.statistics.liquidity[self.t - 1 if self.t > 0 else 0]
 
     def get_current_interest_rate(self):
         """
@@ -427,9 +424,17 @@ class Model:
         :return:
         float:  Ʃ banks.ir / config.N
         """
-        return self.statistics.interest_rate[self.t]
+        return self.statistics.interest_rate[self.t - 1 if self.t > 0 else 0]
 
-    def do_shock(self, whichShock):
+    def get_current_bankruptcies(self):
+        """
+        Returns the number of bankruptcies in this step
+        :return:
+        int:  Ʃ failed banks
+        """
+        return self.statistics.bankruptcy[self.t - 1 if self.t > 0 else 0]
+
+    def do_shock(self, which_shock):
         # (equation 2)
         for bank in self.banks:
             bank.newD = bank.D * (self.config.µ + self.config.ω * random.random())
@@ -438,24 +443,24 @@ class Model:
             if bank.ΔD >= 0:
                 bank.C += bank.ΔD
                 # if "shock1" then we can be a lender:
-                if whichShock == "shock1":
+                if which_shock == "shock1":
                     bank.s = bank.C
                 bank.d = 0  # it will not need to borrow
                 if bank.ΔD > 0:
-                    self.log.debug(whichShock,
+                    self.log.debug(which_shock,
                                    f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
             else:
                 # if "shock1" then we cannot be a lender: we have lost deposits
-                if whichShock == "shock1":
+                if which_shock == "shock1":
                     bank.s = 0
                 if bank.ΔD + bank.C >= 0:
                     bank.d = 0  # it will not need to borrow
                     bank.C += bank.ΔD
-                    self.log.debug(whichShock,
+                    self.log.debug(which_shock,
                                    f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
                 else:
                     bank.d = abs(bank.ΔD + bank.C)  # it will need money
-                    self.log.debug(whichShock,
+                    self.log.debug(which_shock,
                                    f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
             self.statistics.incrementD[self.t] += bank.ΔD
@@ -511,7 +516,8 @@ class Model:
                     weNeedToSell = loanToReturn - bank.C
                     bank.C = 0
                     bank.paidloan = bank.doFiresalesL(weNeedToSell,
-                                          f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}", "repay")
+                                                      f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
+                                                      "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
                 else:
                     bank.C -= loanToReturn
@@ -581,11 +587,14 @@ class Model:
                     if j == bank_i.id:
                         bank_i.rij[j] = 0
                     else:
-                        bank_i.rij[j] = (self.config.Χ * bank_i.A -
-                                         self.config.Φ * self.banks[j].A -
-                                         (1 - self.banks[j].p) *
-                                         (self.config.ξ * self.banks[j].A - bank_i.c[j])) \
-                                        / (self.banks[j].p * bank_i.c[j])
+                        if self.banks[j].p == 0 or bank_i.c[j] == 0:
+                            bank_i.rij[j] = self.config.r_i0
+                        else:
+                            bank_i.rij[j] = (self.config.Χ * bank_i.A -
+                                             self.config.Φ * self.banks[j].A -
+                                             (1 - self.banks[j].p) *
+                                             (self.config.ξ * self.banks[j].A - bank_i.c[j])) \
+                                            / (self.banks[j].p * bank_i.c[j])
                         if bank_i.rij[j] < 0:
                             bank_i.rij[j] = self.config.r_i0
                 # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
@@ -642,6 +651,7 @@ class Bank:
     """
     It represents an individual bank of the network, with the logic of interaction between it and the interbank system
     """
+
     def getLender(self):
         return self.model.banks[self.lender]
 
@@ -660,6 +670,7 @@ class Bank:
         self.model = model
         self.failures = 0
         self.__assign_defaults__()
+
 
     def newLender(self):
         # r_i0 is used the first time the bank is created:
@@ -693,10 +704,10 @@ class Bank:
         self.C = self.model.config.C_i0
         self.D = self.model.config.D_i0
         self.E = self.model.config.E_i0
-        self.μ = 0    # fitness of the bank:  estimated later
-        self.l = 0    # amount of loan done:  estimated later
-        self.s = 0    # amount of loan received: estimated later
-        self.B = 0    # bad debt: estimated later
+        self.μ = 0  # fitness of the bank:  estimated later
+        self.l = 0  # amount of loan done:  estimated later
+        self.s = 0  # amount of loan received: estimated later
+        self.B = 0  # bad debt: estimated later
         self.failed = False
 
         # identity of the lender
@@ -726,30 +737,28 @@ class Bank:
             self.getLender().E -= badDebt
             self.getLender().C += recovered
             self.model.log.debug(phase, f"{self.getId()} bankrupted (fire sale={recoveredFiresale:.3f}," +
-                   f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}" +
-                   f".ΔB={badDebt:.3f},ΔC={recovered:.3f})")
+                           f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}" +
+                           f".ΔB={badDebt:.3f},ΔC={recovered:.3f})")
         else:
             # self.l=0 no current loan to return:
             if self.l > 0:
                 self.paidLoan = self.l  # the loan was paid, not the interest
                 self.getLender().C += self.l  # lender not recovers more than loan if it is
-                self.model.log.debug(phase,f"{self.getId()} bankrupted (lender{self.getLender().getId(short=True)}" +
-                             f".ΔB=0,ΔC={recovered:.3f}) (paidD={self.l:.3f})")
+                self.model.log.debug(phase, f"{self.getId()} bankrupted (lender{self.getLender().getId(short=True)}" +
+                                     f".ΔB=0,ΔC={recovered:.3f}) (paidD={self.l:.3f})")
         self.D = 0
         # the loan is not paid correctly, but we remove it
         if self.id in self.getLender().activeBorrowers:
             self.getLender().s -= self.l
             del self.getLender().activeBorrowers[self.id]
-        else:
-            # TODO . que pasa si quiebra el banco que TIENE prestamos, y no el prestado
-            pass
+
 
     def doFiresalesL(self, amountToSell, reason, phase):
         costOfSell = amountToSell / self.model.config.ρ
         recoveredE = costOfSell * (1 - self.model.config.ρ)
         if costOfSell > self.L:
             self.model.log.debug(phase,
-                    f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
+                        f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
             return self.__doBankruptcy__(phase)
         else:
             self.L -= costOfSell
@@ -757,17 +766,17 @@ class Bank:
 
             if self.L <= self.model.config.α:
                 self.model.log.debug(phase,
-                             f"{self.getId()} new L={self.L:.3f} makes bankruptcy of bank: {reason}")
+                                     f"{self.getId()} new L={self.L:.3f} makes bankruptcy of bank: {reason}")
                 return self.__doBankruptcy__(phase)
             else:
                 if self.E <= self.model.config.α:
                     self.model.log.debug(phase,
-                                 f"{self.getId()} new E={self.E:.3f} makes bankruptcy of bank: {reason}")
+                                         f"{self.getId()} new E={self.E:.3f} makes bankruptcy of bank: {reason}")
                     return self.__doBankruptcy__(phase)
                 else:
                     self.model.log.debug(phase,
-                                 f"{self.getId()} fire sale sellL={amountToSell:.3f} at cost {costOfSell:.3f} reducing"+
-                                 f"E={recoveredE:.3f}: {reason}")
+                           f"{self.getId()} fire sale sellL={amountToSell:.3f} at cost {costOfSell:.3f} reducing" +
+                           f"E={recoveredE:.3f}: {reason}")
                     return amountToSell
 
 
@@ -775,41 +784,45 @@ class Utils:
     """
     Auxiliary class to encapsulate the
     """
+
     @staticmethod
-    def runInteractive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
-                       modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
-                       logfile: str = typer.Option(None, help="File to send logs to"),
-                       n: int = typer.Option(Config.N, help=f"Number of banks"),
-                       t: int = typer.Option(Config.T, help=f"Time repetitions")):
+    def run_interactive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
+                        modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
+                        logfile: str = typer.Option(None, help="File to send logs to"),
+                        save: str = typer.Option(None, help=f"Saves the output of this execution"),
+                        n: int = typer.Option(Config.N, help=f"Number of banks"),
+                        t: int = typer.Option(Config.T, help=f"Time repetitions")):
         """
             Run interactively the model
         """
-
         model = Model()
         if t != model.config.T:
             model.config.T = t
         if n != model.config.N:
             model.config.N = n
         model.log.define_log(log, logfile, modules)
-        Utils.run(model)
+        Utils.run(model, save)
 
     @staticmethod
-    def run(model:Model):
+    def run(model: Model, save=None):
         model.initialize()
         model.simulate_full()
-        model.finish()
+        description = sys.argv[0]
+        if save:
+            for attr in dir(model.config):
+                value = getattr(model.config, attr)
+                if isinstance(value, int) or isinstance(value, float):
+                    description += f" {attr}={value}"
+
+        model.finish(export_datafile=save, export_description=description)
 
     @staticmethod
     def isNotebook():
         try:
-            from IPython import get_ipython
-            if 'IPKernelApp' not in get_ipython().config:  # pragma: no cover
-                return False
-        except ImportError:
+            __IPYTHON__
+            return True
+        except NameError:
             return False
-        except AttributeError:
-            return False
-        return True
 
 # %%
 
@@ -820,13 +833,13 @@ if Utils.isNotebook():
 else:
     # if we are running interactively:
     if __name__ == "__main__":
-        typer.run(Utils.runInteractive)
+        typer.run(Utils.run_interactive)
 
 # in other cases, if you import it, the process will be:
 #   model = Model()
 #   # step by step:
+#   model.enable_backward()
 #   model.forward() # t=0 -> t=1
 #   model.backward() : reverts the last step (when executed
 #   # all in a loop:
 #   model.simulate_full()
-

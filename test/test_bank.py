@@ -5,6 +5,7 @@ import interbank
 class BankTestCase(unittest.TestCase):
     def setUp(self):
         self.model = interbank.Model()
+        self.model.test = True
         self.model.configure(N=10)
 
     def test_new_lender(self):

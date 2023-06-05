@@ -5,10 +5,12 @@ import interbank
 class BankTestCase(unittest.TestCase):
     def setUp(self):
         self.model = interbank.Model()
-        self.model.configure(N=10, backward=True)
+        self.model.test = True
+        self.model.configure(N=10)
         self.model.initialize()
+        self.model.enable_backward()
         self.model.forward()
-        self.model.log.define_log(log='DEBUG', script=self.id().split('.')[0])
+        self.model.log.define_log(log='DEBUG', script_name=self.id().split('.')[0])
 
     def test_backwards(self):
         before_C = []

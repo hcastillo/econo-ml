@@ -1,27 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Runs the RL PPO to estimate the policy recommendation training (--training)
-or predicts the next steps using the previous saved training (--predict)
-
+Runs the Interbank model using montecarlo to determine the precision of RL model
 @author: hector@bith.net
-@date:   05/2023
+
+@date:   06/2023
 """
 
 from stable_baselines3 import PPO
 from stable_baselines3.ppo.policies import MlpPolicy
-from stable_baselines3.common.evaluation import evaluate_policy
 import interbank_agent_ppo
 import interbank
 import typer
 import time
 import sys
-
-# we run STEPS_BEFORE_TRAINING times the Interbank.model() before train
-STEPS_BEFORE_TRAINING: int = 5
-
-# we train the number of times the tuple we have and using a different seed each time
-SEEDS_FOR_TRAINING: tuple = (1979, 1880, 1234, 6125, 1234)
-OUTPUT_PPO_TRAINING: str = "output/ppo.log"
 
 
 def training(verbose, times, env):
@@ -32,8 +23,7 @@ def training(verbose, times, env):
         env.reset(seed)
         for j in range(STEPS_BEFORE_TRAINING):
             env.environment.forward()
-        model.learn(total_timesteps=times, reset_num_timesteps=False,
-                    tb_log_name=OUTPUT_PPO_TRAINING, progress_bar=verbose)
+        model.learn(total_timesteps=times, progress_bar=verbose)
         env.close()
     # PPO(MlpPolicy, env, verbose=int(verbose), device="cuda") > it doesn't perform better
     return model
@@ -71,12 +61,9 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
 
     if train:
         t1 = time.time()
-        model = training(verbose, times, env)
+        training(verbose, times, env).save(f"models/{train}")
         if verbose:
-            print(f"-- total time of execution of training: {time.time()-t1:.2f} secs")
-        model.save(f"models/{train}")
-        mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)
-        print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
+            print(f"-- total time of execution: {time.time()-t1:.2f} secs")
     else:
         if load:
             model = PPO.load(f"models/{load}")
@@ -84,7 +71,10 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         else:
             model = training(verbose, times, env)
             run(model, env)
-
+    # Evaluate the trained agent
+    #mean_reward, std_reward = evaluate_policy(model, eval_env, n_eval_episodes=10, deterministic=True)
+    #https://colab.research.google.com/github/Stable-Baselines-Team/rl-colab-notebooks/blob/sb3/saving_loading_dqn.ipynb#scrollTo=ygl_gVmV_QP7
+    #print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 
 if __name__ == "__main__":
     typer.run(run_interactive)
