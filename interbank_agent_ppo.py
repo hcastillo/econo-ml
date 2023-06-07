@@ -6,7 +6,6 @@ The agent uses the mathematical model implemented in interbank.py
 @author: hector@bith.net
 @date:   05/2023
 """
-import gym
 import numpy as np
 import gymnasium
 from gymnasium import spaces
@@ -17,9 +16,6 @@ class InterbankPPO(gymnasium.Env):
     """
     using PPO as model, execute the interbank.Model().
     """
-
-    # action_space.Discrete(3) -> returns 0,1 or 2 -> we translate it to [0,0.5,1]
-    actions_translation = [0, 0.5, 1]
 
     environment = interbank.Model()
 
@@ -43,7 +39,7 @@ class InterbankPPO(gymnasium.Env):
         self.action_space = spaces.Discrete(3)
 
     def get_last_action(self):
-        return self.actions_translation[self.last_action]
+        return self.last_action
 
     def define_savefile(self, export_datafile=None, export_description=None):
         self.export_description = export_description
@@ -68,9 +64,9 @@ class InterbankPPO(gymnasium.Env):
 
     def step(self, action):
         self.steps += 1
-        self.last_action = action
 
-        self.environment.set_policy_recommendation(self.actions_translation[action])
+        self.environment.set_policy_recommendation(action)
+        self.last_action = self.environment.ŋ
         self.environment.forward()
         observation = self.__get_observations()
         reward = self.environment.get_current_fitness()
@@ -82,7 +78,7 @@ class InterbankPPO(gymnasium.Env):
     def close(self):
         self.environment.finish(self.export_datafile, self.export_description)
 
-    def render(self, mode='human', liquidity=None, ir=None ):
+    def render(self, mode='human', liquidity=None, ir=None):
         if not liquidity:
             liquidity, ir = self.__get_observations()
         fitness = self.environment.get_current_fitness()

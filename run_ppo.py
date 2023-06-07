@@ -21,7 +21,7 @@ STEPS_BEFORE_TRAINING: int = 5
 
 # we train the number of times the tuple we have and using a different seed each time
 SEEDS_FOR_TRAINING: tuple = (1979, 1880, 1234, 6125, 1234)
-OUTPUT_PPO_TRAINING: str = "output/ppo.log"
+OUTPUT_PPO_TRAINING: str = "ppo.log"
 
 
 def training(verbose, times, env):
@@ -33,7 +33,7 @@ def training(verbose, times, env):
         for j in range(STEPS_BEFORE_TRAINING):
             env.environment.forward()
         model.learn(total_timesteps=times, reset_num_timesteps=False,
-                    tb_log_name=OUTPUT_PPO_TRAINING, progress_bar=verbose)
+                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING), progress_bar=verbose)
         env.close()
     # PPO(MlpPolicy, env, verbose=int(verbose), device="cuda") > it doesn't perform better
     return model
@@ -79,7 +79,7 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
     else:
         if load:
-            model = PPO.load(f"models/{load}")
+            model = PPO.load(f"models/{load}" if load.find('models')==-1 else load)
             run(model, env)
         else:
             model = training(verbose, times, env)

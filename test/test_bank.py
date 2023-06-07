@@ -11,7 +11,7 @@ class BankTestCase(unittest.TestCase):
     def test_new_lender(self):
         for i in range(10):
             current = self.model.banks[i].lender
-            new = self.model.banks[i].newLender()
+            new = self.model.banks[i].new_lender()
             self.assertNotEqual(current, self.model.banks[i].getId(),
-                                f"newLender() of {i} is not the same bank that borrows")
-            self.assertNotEqual(new, current, f"newLender() of {i} is not the previous")
+                                f"new_lender() of {i} is not the same bank that borrows")
+            self.assertNotEqual(new, current, f"new_lender() of {i} is not the previous")

@@ -52,6 +52,14 @@ class Config:
     E_i0: float = 15  # equity
     r_i0: float = 0.02  # initial rate
 
+    def __str__(self):
+        description = sys.argv[0]
+        for attr in dir(self):
+            value = getattr(self, attr)
+            if isinstance(value, int) or isinstance(value, float):
+                description += f" {attr}={value}"
+        return description
+
 
 class Statistics:
     bankruptcy = []
@@ -124,9 +132,13 @@ class Statistics:
             self.plot_best_lender()
             self.plot_interest_rate()
 
+    @staticmethod
+    def get_export_path(filename):
+        return filename if filename.find('output') == 0 else f"output/{filename}"
+
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
-            with open(f"output/{export_datafile}", 'w', encoding="utf-8") as savefile:
+            with open(Statistics.get_export_path(export_datafile), 'w', encoding="utf-8") as savefile:
                 savefile.write('# t\tpolicy\tfitness           \tC                    \tir         \t' +
                                'bankrupts\tbestLenderID\tbestLenderClients\n')
                 if export_description:
@@ -138,6 +150,24 @@ class Statistics:
                                    f"\t{self.interest_rate[i]:20}\t{self.bankruptcy[i]:3}" +
                                    f"\t{self.bestLender[i]/self.model.config.N:20}" +
                                    f"\t{self.bestLenderClients[i]/self.model.config.N:20}\n")
+
+    def get_data(self):
+        return (
+            np.array(self.policy),
+            np.array(self.fitness),
+            np.array(self.liquidity),
+            np.array(self.interest_rate),
+            np.array(self.bankruptcy),
+            np.array(self.bestLender),
+            np.array(self.bestLenderClients))
+
+    DATA_POLICY = 0
+    DATA_FITNESS = 1
+    DATA_LIQUIDITY = 2
+    DATA_IR = 3
+    DATA_BANKRUPTCY = 4
+    DATA_BESTLENDER = 5
+    DATA_BESTLENDER_CLIENTS = 6
 
     def plot_bankruptcies(self):
         title = "Bankruptcies"
@@ -151,8 +181,6 @@ class Statistics:
                                   height=550)
         p.line(xx, yy, color="blue", line_width=2)
         bokeh.plotting.show(p)
-        # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ", "_").lower(), title=title)
-        # bokeh.plotting.save(p)
 
     def plot_interest_rate(self):
         title = "Interest"
@@ -166,7 +194,8 @@ class Statistics:
                                   height=550)
         p.line(xx, yy, color="blue", line_width=2)
         bokeh.plotting.show(p)
-        # bokeh.plotting.output_file(filename=f"output/{title}.html".replace(" ","_").lower(), title=title)
+        # bokeh.plotting.output_file(filename=Statistics.get_export_path(f"{title}.html".replace(" ", "_").lower()),
+        #                            title=title)
         # bokeh.plotting.save(p)
 
     def plot_liquidity(self):
@@ -306,6 +335,8 @@ class Model:
         model.forward()
         μ = model.get_current_fitness()
         model.set_policy_recommendation( ŋ=0.5 )
+    or
+        model.set_policy_recommendation( 1 ) --> equal to n=0.5, because values are int 0,1,2 ---> float 0,0.5,1
 
     If you want to forward() and backward() step by step, you should use:
         model.configure( backward=True )
@@ -329,10 +360,12 @@ class Model:
     statistics = None
     config = None
 
-    def __init__(self):
+    def __init__(self, **configuration):
         self.log = Log(self)
         self.statistics = Statistics(self)
         self.config = Config()
+        if configuration:
+            self.configure(**configuration)
         self.banks_copy = []
 
     def configure(self, **configuration):
@@ -399,7 +432,10 @@ class Model:
         if not self.test:
             self.statistics.export_data(export_datafile, export_description)
 
-    def set_policy_recommendation(self, ŋ):
+    def set_policy_recommendation(self, n: int = None, ŋ: float = None):
+        actions_translation = [0.0, 0.5, 1.0]
+        if n is not None and ŋ is None:
+            ŋ = actions_translation[n]
         self.ŋ = ŋ
 
     def get_current_fitness(self):
@@ -632,7 +668,7 @@ class Model:
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)
         for bank in self.banks:
-            possible_lender = bank.newLender()
+            possible_lender = bank.new_lender()
             possible_lender_μ = self.banks[possible_lender].μ
             current_lender_μ = bank.getLender().μ
             bank.P = 1 / (1 + math.exp(-self.config.β * (possible_lender_μ - current_lender_μ)))
@@ -671,8 +707,7 @@ class Bank:
         self.failures = 0
         self.__assign_defaults__()
 
-
-    def newLender(self):
+    def new_lender(self):
         # r_i0 is used the first time the bank is created:
         if self.lender is None:
             self.rij = np.full(self.model.config.N, self.model.config.r_i0, dtype=float)
@@ -712,7 +747,7 @@ class Bank:
 
         # identity of the lender
         self.lender = None
-        self.lender = self.newLender()
+        self.lender = self.new_lender()
 
         self.activeBorrowers = {}
 
@@ -814,7 +849,7 @@ class Utils:
                 if isinstance(value, int) or isinstance(value, float):
                     description += f" {attr}={value}"
 
-        model.finish(export_datafile=save, export_description=description)
+        model.finish(export_datafile=save, export_description=str(model.config))
 
     @staticmethod
     def isNotebook():
