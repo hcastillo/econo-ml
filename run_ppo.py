@@ -20,7 +20,7 @@ import sys
 STEPS_BEFORE_TRAINING: int = 5
 
 # we train the number of times the tuple we have and using a different seed each time
-SEEDS_FOR_TRAINING: tuple = (1979, 1880, 1234, 6125, 1234)
+SEEDS_FOR_TRAINING: tuple = (1979,) #, 1880, 1234, 6125, 1234)
 OUTPUT_PPO_TRAINING: str = "ppo.log"
 
 
@@ -39,7 +39,7 @@ def training(verbose, times, env):
     return model
 
 
-def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.InterbankPPO() ):
+def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.InterbankPPO(), verbose: bool = False):
     done = False
     observations, _ = env.reset()
     while not done:
@@ -79,11 +79,10 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
     else:
         if load:
-            model = PPO.load(f"models/{load}" if load.find('models')==-1 else load)
-            run(model, env)
+            model = PPO.load(f"models/{load}" if load.find('models') == -1 else load)
         else:
             model = training(verbose, times, env)
-            run(model, env)
+        run(model, env, verbose=verbose)
 
 
 if __name__ == "__main__":

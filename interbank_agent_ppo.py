@@ -22,6 +22,14 @@ class InterbankPPO(gymnasium.Env):
     export_datafile = None
     export_description = None
 
+    max_fitness = 0
+    current_liquidity = 0
+    current_ir = 0
+    current_fitness = 0
+    previous_fitness = 0
+    previous_liquidity = 0
+    current_reward = 0
+
     def __init__(self, **config):
         if config:
             self.environment.configure(**config)
@@ -49,8 +57,9 @@ class InterbankPPO(gymnasium.Env):
         self.environment.log.define_log(log, logfile, modules, script_name)
 
     def __get_observations(self):
-        return np.array([self.environment.get_current_liquidity(),
-                         self.environment.get_current_interest_rate()])
+        self.current_ir = self.environment.get_current_interest_rate()
+        self.current_liquidity = self.environment.get_current_liquidity()
+        return np.array([self.current_liquidity,self.current_ir])
 
     def reset(self, seed=None):
         """
@@ -64,24 +73,38 @@ class InterbankPPO(gymnasium.Env):
 
     def step(self, action):
         self.steps += 1
+        self.previous_fitness = self.current_fitness
+        self.previous_liquidity = self.current_liquidity
 
         self.environment.set_policy_recommendation(action)
         self.last_action = self.environment.ŋ
         self.environment.forward()
         observation = self.__get_observations()
-        reward = self.environment.get_current_fitness()
-        self.done = self.environment.t >= self.environment.config.T
+        self.current_fitness = self.environment.get_current_fitness()
+        if self.current_fitness > self.max_fitness:
+            self.max_fitness = self.current_fitness
 
+        # -+2 points if fitness is better
+        # -+1 point if liquidity is better
+        self.current_reward = 2
+        if self.current_liquidity > self.previous_liquidity:
+            self.current_reward += 2
+        else:
+            if self.current_liquidity < self.previous_liquidity:
+                self.current_reward -= 2
+        self.done = self.environment.t >= self.environment.config.T
         # truncated= False, info={"Info": "Truncated"}
-        return observation, reward, self.done, False, {}
+        return observation, self.current_reward, self.done, False, {}
 
     def close(self):
         self.environment.finish(self.export_datafile, self.export_description)
 
-    def render(self, mode='human', liquidity=None, ir=None):
+    def render(self, mode='human', liquidity=None, ir=None, reward=None):
         if not liquidity:
             liquidity, ir = self.__get_observations()
+        if not reward:
+            reward = self.current_reward
         fitness = self.environment.get_current_fitness()
-        print(f"{type(self).__name__} t={self.environment.t - 1:3}: ŋ={self.get_last_action():3} Ʃμ={fitness:5.2f} " +
-              f"ƩC={liquidity:10.2f} avg ir=%{ir:5.2}")
+        print(f"{type(self).__name__} t={self.environment.t - 1:3}: ŋ={self.get_last_action():3} avg.μ={fitness:5.2f} " +
+              f"ƩC={liquidity:10.2f} avg.ir=%{ir:5.2} reward={reward}")
 

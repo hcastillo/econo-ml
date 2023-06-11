@@ -112,7 +112,7 @@ class Statistics:
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
 
     def compute_fitness(self):
-        self.fitness[self.model.t] = sum(map(lambda x: x.μ, self.model.banks))
+        self.fitness[self.model.t] = sum(map(lambda x: x.μ, self.model.banks)) / self.model.config.N
 
     def compute_policy(self):
         self.policy[self.model.t] = self.model.ŋ
@@ -134,7 +134,8 @@ class Statistics:
 
     @staticmethod
     def get_export_path(filename):
-        return filename if filename.find('output') == 0 else f"output/{filename}"
+        filename = filename if filename.startswith('output') else f"output/{filename}"
+        return filename if filename.endswith('.txt') else f"{filename}.txt"
 
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
@@ -353,7 +354,7 @@ class Model:
     t: int = 0  # current value of time, t = 0..Model.config.T
     ŋ: float = 1  # eta : current value of policy recommendation
     test = False  # it's true when we are inside a test
-    default_seed: int = 40579  # seed for this simulation
+    default_seed: int = 20579  # seed for this simulation
     backward_enabled = False # if true, we can execute backward()
 
     log = None
