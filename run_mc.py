@@ -85,8 +85,8 @@ class Montecarlo:
         self.save_column(filename, "fitness", interbank.Statistics.DATA_FITNESS)
         self.save_column(filename, "liquidity", interbank.Statistics.DATA_LIQUIDITY)
         self.save_column(filename, "bankruptcy", interbank.Statistics.DATA_BANKRUPTCY)
-        self.save_column(filename, "best_lender", interbank.Statistics.DATA_BESTLENDER)
-        self.save_column(filename, "best_clients", interbank.Statistics.DATA_BESTLENDER_CLIENTS)
+        self.save_column(filename, "best_lender", interbank.Statistics.DATA_BEST_LENDER)
+        self.save_column(filename, "best_clients", interbank.Statistics.DATA_BEST_LENDER_CLIENTS)
         self.save_column(filename, "credit_channels", interbank.Statistics.DATA_CREDIT_CHANNELS)
         self.save_summary(filename)
 

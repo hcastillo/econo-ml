@@ -143,7 +143,8 @@ class Statistics:
 
     @staticmethod
     def get_export_path(filename):
-        filename = filename if filename.startswith( self.OUTPUT_DIRECTORY ) else f"{self.OUTPUT_DIRECTORY}/{filename}"
+        if not filename.startswith(Statistics.OUTPUT_DIRECTORY):
+            filename = f"{Statistics.OUTPUT_DIRECTORY}/{filename}"
         return filename if filename.endswith('.txt') else f"{filename}.txt"
 
     def save_data(self, export_datafile=None, export_description=None):
@@ -178,8 +179,8 @@ class Statistics:
     DATA_LIQUIDITY = 2
     DATA_IR = 3
     DATA_BANKRUPTCY = 4
-    DATA_BESTLENDER = 5
-    DATA_BESTLENDER_CLIENTS = 6
+    DATA_BEST_LENDER = 5
+    DATA_BEST_LENDER_CLIENTS = 6
     DATA_CREDIT_CHANNELS = 7
 
     def plot_bankruptcies(self):

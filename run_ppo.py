@@ -15,6 +15,7 @@ import interbank
 import typer
 import time
 import sys
+import os
 
 # we run STEPS_BEFORE_TRAINING times the Interbank.model() before train
 STEPS_BEFORE_TRAINING: int = 5
