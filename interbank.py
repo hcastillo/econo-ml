@@ -22,9 +22,8 @@ class Config:
     """
     Configuration parameters for the interbank network
     """
-    a:int = 5
     T: int = 1000  # time (1000)
-    N: int = 50  # number of banks (50)
+    N: int = 50    # number of banks (50)
 
     # not used in this implementation:
     # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
@@ -42,7 +41,7 @@ class Config:
     ξ: float = 0.3  # xi
     ρ: float = 0.3  # ro fire sale cost
 
-    β: float = 0  # intensity of breaking the connection
+    β: float = 5    # intensity of breaking the connection
     α: float = 0.1  # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
@@ -74,8 +73,13 @@ class Statistics:
     B = []
     model = None
 
+    OUTPUT_DIRECTORY = "output"
+
     def __init__(self, model):
         self.model = model
+        import os
+        if not os.path.isdir(self.OUTPUT_DIRECTORY):
+            os.mkdir(self.OUTPUT_DIRECTORY)
 
     def reset(self):
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
@@ -129,7 +133,7 @@ class Statistics:
             self.save_liquidity(export_datafile)
             self.save_credit_channels(export_datafile)
 
-        if Utils.isNotebook():
+        if Utils.is_notebook():
             from bokeh.io import output_notebook
             output_notebook()
             self.plot_bankruptcies()
@@ -139,7 +143,7 @@ class Statistics:
 
     @staticmethod
     def get_export_path(filename):
-        filename = filename if filename.startswith('output') else f"output/{filename}"
+        filename = filename if filename.startswith( self.OUTPUT_DIRECTORY ) else f"{self.OUTPUT_DIRECTORY}/{filename}"
         return filename if filename.endswith('.txt') else f"{filename}.txt"
 
     def save_data(self, export_datafile=None, export_description=None):
@@ -279,7 +283,8 @@ class Log:
     def __init__(self, model):
         self.model = model
 
-    def __format_number__(self, number):
+    @staticmethod
+    def __format_number__(number):
         result = f"{number:5.2f}"
         while len(result) > 5 and result[-1] == "0":
             result = result[:-1]
@@ -288,28 +293,28 @@ class Log:
         return result
 
     def __get_string_debug_banks__(self, details, bank):
-        text = f"{bank.getId():10} C={self.__format_number__(bank.C)} L={self.__format_number__(bank.L)}"
+        text = f"{bank.getId():10} C={Log.__format_number__(bank.C)} L={Log.__format_number__(bank.L)}"
         amount_borrowed = 0
         list_borrowers = " borrows=["
         for bank_i in bank.activeBorrowers:
             list_borrowers += self.model.banks[bank_i].getId(short=True) + ","
             amount_borrowed += bank.activeBorrowers[bank_i]
         if amount_borrowed:
-            text += f" l={self.__format_number__(amount_borrowed)}"
+            text += f" l={Log.__format_number__(amount_borrowed)}"
             list_borrowers = list_borrowers[:-1] + "]"
         else:
             text += "        "
             list_borrowers = ""
-        text += f" | D={self.__format_number__(bank.D)} E={self.__format_number__(bank.E)}"
+        text += f" | D={Log.__format_number__(bank.D)} E={Log.__format_number__(bank.E)}"
         if details and hasattr(bank, 'd') and bank.d and bank.l:
-            text += f" l={self.__format_number__(bank.d)}"
+            text += f" l={Log.__format_number__(bank.d)}"
         else:
             text += "        "
         if details and hasattr(bank, 's') and bank.s:
-            text += f" s={self.__format_number__(bank.s)}"
+            text += f" s={Log.__format_number__(bank.s)}"
         else:
             if details and hasattr(bank, 'd') and bank.d:
-                text += f" d={self.__format_number__(bank.d)}"
+                text += f" d={Log.__format_number__(bank.d)}"
             else:
                 text += "        "
         if bank.failed:
@@ -319,16 +324,17 @@ class Log:
                 text += f" lender{bank.getLender().getId(short=True)},r={bank.getLoanInterest():.2f}%"
             else:
                 text += list_borrowers
-        text += f" B={self.__format_number__(bank.B)}" if bank.B else "        "
+        text += f" B={Log.__format_number__(bank.B)}" if bank.B else "        "
         return text
 
     def debug_banks(self, details: bool = True, info: str = ''):
         for bank in self.model.banks:
             if not info:
                 info = "-----"
-            self.debug(info, self.__get_string_debug_banks__(details, bank))
+            self.info(info, self.__get_string_debug_banks__(details, bank))
 
-    def get_level(self, option):
+    @staticmethod
+    def get_level(option):
         try:
             return getattr(logging, option.upper())
         except AttributeError:
@@ -349,7 +355,7 @@ class Log:
     def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = "%(module)s"):
         self.modules = modules.split(",") if modules else []
         formatter = logging.Formatter('%(levelname)s-' + script_name + '- %(message)s')
-        self.logLevel = self.get_level(log.upper())
+        self.logLevel = Log.get_level(log.upper())
         self.logger.setLevel(self.logLevel)
         if logfile:
             fh = logging.FileHandler(logfile, 'a', 'utf-8')
@@ -392,6 +398,7 @@ class Model:
     test = False  # it's true when we are inside a test
     default_seed: int = 20579  # seed for this simulation
     backward_enabled = False # if true, we can execute backward()
+    policy_changes = 0
 
     log = None
     statistics = None
@@ -425,6 +432,7 @@ class Model:
         random.seed(seed if seed else self.default_seed)
         self.banks = []
         self.t = 0
+        self.policy_changes = 0
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
 
@@ -468,12 +476,24 @@ class Model:
     def finish(self, export_datafile=None, export_description=None):
         if not self.test:
             self.statistics.export_data(export_datafile, export_description)
+        summary = f"Finish: model T={self.config.T}  N={self.config.N}"
+        if not self.__policy_recommendation_changed__():
+            summary += f" ŋ={self.ŋ}"
+        else:
+            summary += " ŋ variate during simulation"
+        self.log.info("*****", summary)
 
     def set_policy_recommendation(self, n: int = None, ŋ: float = None):
         actions_translation = [0.0, 0.5, 1.0]
         if n is not None and ŋ is None:
             ŋ = actions_translation[n]
+        if self.ŋ != ŋ:
+            self.log.debug("*****", f"ŋ changed to {ŋ}")
+            self.policy_changes += 1
         self.ŋ = ŋ
+
+    def __policy_recommendation_changed__(self):
+        return self.policy_changes > 1
 
     def get_current_fitness(self):
         """
@@ -710,7 +730,7 @@ class Model:
             bank.μ = self.ŋ * (bank.C / maxC) + (1 - self.ŋ) * (minr / bank.r)
             loginfo += f"{bank.getId(short=True)}:{bank.μ:.3f},"
             loginfo1 += f"{bank.getId(short=True)}:{bank.r:.3f},"
-        if self.config.N < 10:
+        if self.config.N <= 10:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
         # we can now break old links and set up new lenders, using probability P
@@ -874,7 +894,7 @@ class Utils:
                         logfile: str = typer.Option(None, help="File to send logs to"),
                         save: str = typer.Option(None, help=f"Saves the output of this execution"),
                         n: int = typer.Option(Config.N, help=f"Number of banks"),
-                        eta: int = typer.Option(Model.ŋ, help=f"Policy recommendation"),
+                        eta: float = typer.Option(Model.ŋ, help=f"Policy recommendation"),
                         t: int = typer.Option(Config.T, help=f"Time repetitions")):
         """
             Run interactively the model
@@ -903,7 +923,7 @@ class Utils:
         model.finish(export_datafile=save, export_description=str(model.config))
 
     @staticmethod
-    def isNotebook():
+    def is_notebook():
         try:
             __IPYTHON__
             return True
@@ -913,7 +933,7 @@ class Utils:
 # %%
 
 
-if Utils.isNotebook():
+if Utils.is_notebook():
     # if we are running in a Notebook:
     Utils.run(Model())
 else:

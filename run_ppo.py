@@ -20,8 +20,9 @@ import sys
 STEPS_BEFORE_TRAINING: int = 5
 
 # we train the number of times the tuple we have and using a different seed each time
-SEEDS_FOR_TRAINING: tuple = (1979,) #, 1880, 1234, 6125, 1234)
+SEEDS_FOR_TRAINING: tuple = (1979, 1880, 1234, 6125, 1234)
 OUTPUT_PPO_TRAINING: str = "ppo.log"
+MODELS_DIRECTORY = "models"
 
 
 def training(verbose, times, env):
@@ -74,16 +75,18 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         model = training(verbose, times, env)
         if verbose:
             print(f"-- total time of execution of training: {time.time()-t1:.2f} secs")
-        model.save(f"models/{train}")
+        model.save(f"{MODELS_DIRECTORY}/{train}")
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)
         print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
     else:
         if load:
-            model = PPO.load(f"models/{load}" if load.find('models') == -1 else load)
+            model = PPO.load(f"{MODELS_DIRECTORY}/{load}" if not load.startswith(MODELS_DIRECTORY) else load)
         else:
             model = training(verbose, times, env)
         run(model, env, verbose=verbose)
 
 
 if __name__ == "__main__":
+    if not os.path.isdir(MODELS_DIRECTORY):
+        os.mkdir(MODELS_DIRECTORY)
     typer.run(run_interactive)
