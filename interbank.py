@@ -63,8 +63,9 @@ class Config:
 
 class Statistics:
     bankruptcy = []
-    bestLender = []
-    bestLenderClients = []
+    best_lender = []
+    best_lender_clients = []
+    credit_channels = []
     liquidity = []
     policy = []
     interest_rate = []
@@ -78,8 +79,9 @@ class Statistics:
 
     def reset(self):
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
-        self.bestLender = np.full(self.model.config.T, -1, dtype=int)
-        self.bestLenderClients = np.zeros(self.model.config.T, dtype=int)
+        self.best_lender = np.full(self.model.config.T, -1, dtype=int)
+        self.best_lender_clients = np.zeros(self.model.config.T, dtype=int)
+        self.credit_channels = np.zeros(self.model.config.T, dtype=int)
         self.fitness = np.zeros(self.model.config.T, dtype=float)
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
@@ -87,7 +89,7 @@ class Statistics:
         self.policy = np.zeros(self.model.config.T, dtype=float)
         self.B = np.zeros(self.model.config.T, dtype=float)
 
-    def compute_best_lender(self):
+    def compute_credit_channels_and_best_lender(self):
         lenders = {}
         for bank in self.model.banks:
             if bank.lender in lenders:
@@ -101,8 +103,9 @@ class Statistics:
                 best = lender
                 best_value = lenders[lender]
 
-        self.bestLender[self.model.t] = best
-        self.bestLenderClients[self.model.t] = best_value
+        self.best_lender[self.model.t] = best
+        self.best_lender_clients[self.model.t] = best_value
+        # self.credit_channels is updated directly in the moment the credit channel is set up during Model.do_loans()
 
     def compute_interest(self):
         self.interest_rate[self.model.t] = sum(map(lambda x: x.getLoanInterest(), self.model.banks)) / \
@@ -123,6 +126,8 @@ class Statistics:
     def export_data(self, export_datafile=None, export_description=None):
         if export_datafile:
             self.save_data(export_datafile, export_description)
+            self.save_liquidity(export_datafile)
+            self.save_credit_channels(export_datafile)
 
         if Utils.isNotebook():
             from bokeh.io import output_notebook
@@ -141,7 +146,7 @@ class Statistics:
         if export_datafile:
             with open(Statistics.get_export_path(export_datafile), 'w', encoding="utf-8") as savefile:
                 savefile.write('# t\tpolicy\tfitness           \tC                    \tir         \t' +
-                               'bankrupts\tbestLenderID\tbestLenderClients\n')
+                               'bankrupts\tbestLenderID\tbestLenderClients\tcreditChannels\n')
                 if export_description:
                     savefile.write(f"# {export_description}\n")
                 else:
@@ -149,8 +154,9 @@ class Statistics:
                 for i in range(self.model.config.T):
                     savefile.write(f"{i:3}\t{self.policy[i]:3}\t{self.fitness[i]:19}\t{self.liquidity[i]:19}" +
                                    f"\t{self.interest_rate[i]:20}\t{self.bankruptcy[i]:3}" +
-                                   f"\t{self.bestLender[i]/self.model.config.N:20}" +
-                                   f"\t{self.bestLenderClients[i]/self.model.config.N:20}\n")
+                                   f"\t{self.best_lender[i] / self.model.config.N:20}" +
+                                   f"\t{self.best_lender_clients[i] / self.model.config.N:20}" +
+                                   f"\t{self.credit_channels[i]:3}\n")
 
     def get_data(self):
         return (
@@ -159,8 +165,9 @@ class Statistics:
             np.array(self.liquidity),
             np.array(self.interest_rate),
             np.array(self.bankruptcy),
-            np.array(self.bestLender),
-            np.array(self.bestLenderClients))
+            np.array(self.best_lender),
+            np.array(self.best_lender_clients),
+            np.array(self.credit_channels))
 
     DATA_POLICY = 0
     DATA_FITNESS = 1
@@ -169,6 +176,7 @@ class Statistics:
     DATA_BANKRUPTCY = 4
     DATA_BESTLENDER = 5
     DATA_BESTLENDER_CLIENTS = 6
+    DATA_CREDIT_CHANNELS = 7
 
     def plot_bankruptcies(self):
         title = "Bankruptcies"
@@ -195,11 +203,20 @@ class Statistics:
                                   height=550)
         p.line(xx, yy, color="blue", line_width=2)
         bokeh.plotting.show(p)
-        # bokeh.plotting.output_file(filename=Statistics.get_export_path(f"{title}.html".replace(" ", "_").lower()),
-        #                            title=title)
-        # bokeh.plotting.save(p)
 
-    def plot_liquidity(self):
+    def save_liquidity(self,export_datafile):
+        p = self.plot_liquidity(no_draw_but_return=True)
+        bokeh.plotting.output_file(Statistics.get_export_path(export_datafile).replace(".txt", "_liquidity.html"),
+                                   title="Liquidity")
+        bokeh.plotting.save(p)
+
+    def save_credit_channels(self,export_datafile):
+        p = self.plot_credit_channels(no_draw_but_return=True)
+        bokeh.plotting.output_file(Statistics.get_export_path(export_datafile).replace(".txt", "_credit_channels.html"),
+                                   title="Liquidity")
+        bokeh.plotting.save(p)
+
+    def plot_liquidity(self, no_draw_but_return: bool = False):
         title = "Liquidity"
         xx = []
         yy = []
@@ -211,7 +228,26 @@ class Statistics:
                                   sizing_mode="stretch_width",
                                   height=550)
         p.line(xx, yy, color="blue", line_width=2)
-        bokeh.plotting.show(p)
+        if no_draw_but_return:
+            return p
+        else:
+            bokeh.plotting.show(p)
+
+    def plot_credit_channels(self, no_draw_but_return: bool = False):
+        title = "Credit Channels"
+        xx = []
+        yy = []
+        for i in range(self.model.config.T):
+            xx.append(i)
+            yy.append(self.credit_channels[i])
+        p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Credit channels',
+                                  sizing_mode="stretch_width",
+                                  height=550)
+        p.line(xx, yy, color="blue", line_width=2)
+        if no_draw_but_return:
+            return p
+        else:
+            bokeh.plotting.show(p)
 
     def plot_best_lender(self):
         title = "Best Lender"
@@ -220,8 +256,8 @@ class Statistics:
         yy2 = []
         for i in range(self.model.config.T):
             xx.append(i)
-            yy.append(self.bestLender[i] / self.model.config.N)
-            yy2.append(self.bestLenderClients[i] / self.model.config.N)
+            yy.append(self.best_lender[i] / self.model.config.N)
+            yy2.append(self.best_lender_clients[i] / self.model.config.N)
 
         p = bokeh.plotting.figure(title=title, x_axis_label='Time', y_axis_label='Best lenders',
                                   sizing_mode="stretch_width",
@@ -403,7 +439,7 @@ class Model:
         self.do_repayments()
         self.log.debug_banks()
         self.statistics.compute_liquidity()
-        self.statistics.compute_best_lender()
+        self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_interest()
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
@@ -446,6 +482,15 @@ class Model:
         float:  Ʃ banks.μ
         """
         return self.statistics.fitness[self.t - 1 if self.t > 0 else 0]
+
+    def get_current_credit_channels(self):
+        """
+        Determines the number of credits channels USED (each bank has a possible lender, but only if
+        it needs it borrows money. This number represents how many banks have set up a credit with a lender
+        :return:
+        int
+        """
+        return self.statistics.credit_channels[self.t - 1 if self.t > 0 else 0]
 
     def get_current_liquidity(self):
         """
@@ -518,12 +563,14 @@ class Model:
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.getLender().s > 0:
                             bank.l = bank.getLender().s  # amount of loan (wrote in the borrower)
+                            self.statistics.credit_channels[ self.t ] += 1
                             bank.getLender().activeBorrowers[
                                 bank.id] = bank.getLender().s  # amount of loan (wrote in the lender)
                             bank.getLender().C -= bank.l  # amount of loan that reduces lender capital
                             bank.getLender().s = 0
                     else:
                         bank.l = bank.d  # amount of loan (wrote in the borrower)
+                        self.statistics.credit_channels[self.t] += 1
                         bank.getLender().activeBorrowers[bank.id] = bank.d  # amount of loan (wrote in the lender)
                         bank.getLender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
                         bank.getLender().C -= bank.d  # amount of loan that reduces lender capital
@@ -553,8 +600,8 @@ class Model:
                     weNeedToSell = loanToReturn - bank.C
                     bank.C = 0
                     bank.paidloan = bank.doFiresalesL(weNeedToSell,
-                                                      f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
-                                                      "repay")
+                                                    f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
+                                                    "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
                 else:
                     bank.C -= loanToReturn
@@ -827,6 +874,7 @@ class Utils:
                         logfile: str = typer.Option(None, help="File to send logs to"),
                         save: str = typer.Option(None, help=f"Saves the output of this execution"),
                         n: int = typer.Option(Config.N, help=f"Number of banks"),
+                        eta: int = typer.Option(Model.ŋ, help=f"Policy recommendation"),
                         t: int = typer.Option(Config.T, help=f"Time repetitions")):
         """
             Run interactively the model
@@ -836,6 +884,8 @@ class Utils:
             model.config.T = t
         if n != model.config.N:
             model.config.N = n
+        if eta != model.ŋ:
+            model.ŋ = eta
         model.log.define_log(log, logfile, modules)
         Utils.run(model, save)
 

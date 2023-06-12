@@ -15,121 +15,8 @@ import tqdm
 
 NUM_SIMULATIONS = 50
 
-class Metropolis:
-    def metropolis_hastings( self, likelihood, proposal_distribution, initial_state,
-            num_samples, stepsize=0.5, burnin=0.2):
-        """ Compute the Markov Chain Monte Carlo
-            https://exowanderer.medium.com/metropolis-hastings-mcmc-from-scratch-in-python-c21e53c485b7
-        Args:
-            likelihood (function): a function handle to compute the likelihood
-            proposal_distribution (function): a function handle to compute the
-              next proposal state
-            initial_state (list): The initial conditions to start the chain
-            num_samples (integer): The number of samples to compte,
-              or length of the chain
-            burnin (float): a float value from 0 to 1.
-              The percentage of chain considered to be the burnin length
 
-        Returns:
-            samples (list): The Markov Chain,
-              samples from the posterior distribution
-        """
-        samples = []
-
-        # The number of samples in the burn in phase
-        idx_burnin = int(burnin * num_samples)
-
-        # Set the current state to the initial state
-        curr_state = initial_state
-        curr_likeli = self.likelihood(curr_state)
-
-        for i in range(num_samples):
-            # The proposal distribution sampling and comparison
-            #   occur within the mcmc_updater routine
-            curr_state, curr_likeli = self.mcmc_updater(
-                curr_state=curr_state,
-                curr_likeli=curr_likeli,
-                likelihood=likelihood,
-                proposal_distribution=proposal_distribution
-            )
-
-            # Append the current state to the list of samples
-            if i >= idx_burnin:
-                # Only append after the burnin to avoid including
-                #   parts of the chain that are prior-dominated
-                samples.append(curr_state)
-        return samples
-
-    def mcmc_updater(self, curr_state, curr_likeli,
-                     likelihood, proposal_distribution):
-        """ Propose a new state and compare the likelihoods
-
-        Given the current state (initially random),
-          current likelihood, the likelihood function, and
-          the transition (proposal) distribution, `mcmc_updater` generates
-          a new proposal, evaluate its likelihood, compares that to the current
-          likelihood with a uniformly samples threshold,
-        then it returns new or current state in the MCMC chain.
-
-        Args:
-            curr_state (float): the current parameter/state value
-            curr_likeli (float): the current likelihood estimate
-            likelihood (function): a function handle to compute the likelihood
-            proposal_distribution (function): a function handle to compute the
-              next proposal state
-
-        Returns:
-            (tuple): either the current state or the new state
-              and its corresponding likelihood
-        """
-        # Generate a proposal state using the proposal distribution
-        # Proposal state == new guess state to be compared to current
-        proposal_state = proposal_distribution(curr_state)
-
-        # Calculate the acceptance criterion
-        prop_likeli = likelihood(proposal_state)
-        accept_crit = prop_likeli / curr_likeli
-
-        # Generate a random number between 0 and 1
-        accept_threshold = np.random.uniform(0, 1)
-
-        # If the acceptance criterion is greater than the random number,
-        # accept the proposal state as the current state
-        if accept_crit > accept_threshold:
-            return proposal_state, prop_likeli
-
-        # Else
-        return curr_state, curr_likeli
-
-    def likelihood(self, x):
-        # Standard Normal Distribution
-        # An underlying assumption of linear regression is that the residuals
-        # are Gaussian Normal Distributed; often, Standard Normal distributed
-        return np.exp(-x ** 2 / 2) / np.sqrt(2 * np.pi)
-
-    def proposal_distribution(self, x, stepsize=0.5):
-        # Select the proposed state (new guess) from a Gaussian distribution
-        #  centered at the current state, within a Guassian of width `stepsize`
-        return np.random.normal(x, stepsize)
-
-
-    def run(self):
-        np.random.seed(42)
-        initial_state = 0  # Trivial case, starting at the mode of the likelihood
-        num_samples = int(20)
-        burnin = 0.2
-
-        samples = self.metropolis_hastings(
-            self.likelihood,
-            self.proposal_distribution,
-            initial_state,
-            num_samples,
-            burnin=burnin
-        )
-        print(samples)
-
-
-class MonteCarlo:
+class Montecarlo:
     """
     Create self.simulations of Interbank.model, using Montecarlo MCMC
     """
@@ -200,7 +87,9 @@ class MonteCarlo:
         self.save_column(filename, "bankruptcy", interbank.Statistics.DATA_BANKRUPTCY)
         self.save_column(filename, "best_lender", interbank.Statistics.DATA_BESTLENDER)
         self.save_column(filename, "best_clients", interbank.Statistics.DATA_BESTLENDER_CLIENTS)
+        self.save_column(filename, "credit_channels", interbank.Statistics.DATA_CREDIT_CHANNELS)
         self.save_summary(filename)
+
 
 def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of Interbank model"),
                     modules: str = typer.Option(None, help=f"Log only this modules (Interbank model)"),
@@ -212,12 +101,12 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
     """
         Run interactively the model
     """
-    global simulation, environment
     environment = interbank.Model(T=t, N=n)
     environment.log.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
-    simulation = MonteCarlo(environment, simulations=simulations)
+    simulation = Montecarlo(environ=environment, simulations=simulations)
     simulation.run()
     simulation.save(save)
+
 
 if __name__ == "__main__":
     typer.run(run_interactive)

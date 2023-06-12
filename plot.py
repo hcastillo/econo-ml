@@ -44,7 +44,7 @@ def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.Inter
     observations, _ = env.reset()
     while not done:
         action, _states = model.predict(observations)
-        observations, reward, done, truncated, info = env.step(action)
+        (_fitness, _ir, _credit_channels), reward, done, truncated, info = env.step(action)
         env.render()
     env.close()
 
