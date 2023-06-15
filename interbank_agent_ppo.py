@@ -7,12 +7,13 @@ The agent uses the mathematical model implemented in interbank.py
 @date:   05/2023
 """
 import numpy as np
-import gymnasium
-from gymnasium import spaces
+#import gymnasium
+# from gymnasium import spaces
+import gym
 import interbank
 
 
-class InterbankPPO(gymnasium.Env):
+class InterbankPPO(gym.Env):
     """
     using PPO as model, execute the interbank.Model().
     """
@@ -38,15 +39,15 @@ class InterbankPPO(gymnasium.Env):
         self.done = False
         self.last_action = None
         # observation = [fitness,ir,credit_channels]
-        self.observation_space = spaces.Box(
+        self.observation_space = gym.spaces.Box(
             low=np.array([0.0, 0.0, 0.0]),
             high=np.array([1.0, 1.0, self.environment.config.N]),
             shape=(3,),
             dtype=np.float64)
 
         # Allowed actions will be: ŋ = [0,0.5,1]
-        self.action_space = spaces.Discrete(3)
-        gymnasium.Env.__init__(self)
+        self.action_space = gym.spaces.discrete.Discrete(3) # spaces.Discrete(3)
+        gym.Env.__init__(self)
 
     def get_last_action(self):
         return self.last_action
@@ -74,7 +75,7 @@ class InterbankPPO(gymnasium.Env):
         self.environment.initialize(seed)
         self.steps = 0
         self.done = False
-        return self.__get_observations(), {}
+        return self.__get_observations()
 
     def step(self, action):
         self.steps += 1
@@ -104,7 +105,7 @@ class InterbankPPO(gymnasium.Env):
 
         self.done = self.environment.t >= self.environment.config.T
         # truncated= False, info={"Info": "Truncated"}
-        return observation, self.current_reward, self.done, False, {}
+        return observation, self.current_reward, self.done, {}
 
     def close(self):
         self.environment.finish(self.export_datafile, self.export_description)

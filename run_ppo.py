@@ -35,7 +35,7 @@ def training(verbose, times, env):
         for j in range(STEPS_BEFORE_TRAINING):
             env.environment.forward()
         model.learn(total_timesteps=times, reset_num_timesteps=False,
-                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING), progress_bar=verbose)
+                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING) )
         env.close()
     # PPO(MlpPolicy, env, verbose=int(verbose), device="cuda") > it doesn't perform better
     return model
@@ -43,10 +43,10 @@ def training(verbose, times, env):
 
 def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.InterbankPPO(), verbose: bool = False):
     done = False
-    observations, _ = env.reset()
+    observations = env.reset()
     while not done:
         action, _states = model.predict(observations)
-        observations, reward, done, truncated, info = env.step(action)
+        observations, reward, done, info = env.step(action)
         env.render()
     env.close()
 
@@ -76,7 +76,7 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         model = training(verbose, times, env)
         if verbose:
             print(f"-- total time of execution of training: {time.time()-t1:.2f} secs")
-        model.save(f"{MODELS_DIRECTORY}/{train}")
+        model.save(f"{MODELS_DIRECTORY}/{train}" if not train.startswith(MODELS_DIRECTORY) else train)
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)
         print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
     else:

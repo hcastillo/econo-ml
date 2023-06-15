@@ -103,7 +103,7 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
     """
     environment = interbank.Model(T=t, N=n)
     environment.log.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
-    simulation = Montecarlo(environ=environment, simulations=simulations)
+    simulation = Montecarlo(environment=environment, simulations=simulations)
     simulation.run()
     simulation.save(save)
 
