@@ -43,10 +43,10 @@ def training(verbose, times, env):
 
 def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.InterbankPPO(), verbose: bool = False):
     done = False
-    observations = env.reset()
+    observations, _info = env.reset()
     while not done:
         action, _states = model.predict(observations)
-        observations, reward, done, info = env.step(action)
+        observations, reward, done, _truncated, _info = env.step(action)
         env.render()
     env.close()
 

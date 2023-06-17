@@ -86,7 +86,7 @@ def run_interactive(what: str = typer.Option(str, help=f"What to plot (all)"),
     """
     plot = Plot()
 
-    if load and column and save:
+    if load and column is not None and save:
         print(plot.load_data(load), "lines loaded from", load)
         plot.plot(column, save, format == 'svg')
     else:
