@@ -16,14 +16,15 @@ import bokeh.plotting
 import bokeh.io
 import numpy as np
 import sys
-
+import networkx as nx
+import matplotlib.pyplot as plt
 
 class Config:
     """
     Configuration parameters for the interbank network
     """
     T: int = 1000  # time (1000)
-    N: int = 50    # number of banks (50)
+    N: int = 50  # number of banks (50)
 
     # not used in this implementation:
     # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
@@ -41,7 +42,7 @@ class Config:
     ξ: float = 0.3  # xi
     ρ: float = 0.3  # ro fire sale cost
 
-    β: float = 5    # intensity of breaking the connection
+    β: float = 5  # intensity of breaking the connection
     α: float = 0.1  # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
@@ -72,6 +73,7 @@ class Statistics:
     fitness = []
     B = []
     model = None
+    graphs = {}
 
     OUTPUT_DIRECTORY = "output"
 
@@ -141,6 +143,22 @@ class Statistics:
             self.plot_best_lender()
             self.plot_interest_rate()
 
+    def get_graph(self, t):
+        """
+        Extracts from the model the graph that corresponds to the network in this instant
+        """
+        self.graphs[t] = nx.DiGraph(directed=True)
+        for bank in self.model.banks:
+            self.graphs[t].add_edge(bank.id, bank.lender)
+
+    def save_graph(self,filename):
+        for t in self.graphs:
+            graph = self.graphs[t]
+            plt.clf()
+            pos = nx.spring_layout(graph)
+            nx.draw(graph, pos, with_labels=False, arrowstyle='->')
+            plt.savefig(filename.replace('.txt', f"_{t}.png"))
+
     @staticmethod
     def get_export_path(filename):
         if not filename.startswith(Statistics.OUTPUT_DIRECTORY):
@@ -162,7 +180,7 @@ class Statistics:
                                    f"\t{self.best_lender[i] / self.model.config.N:20}" +
                                    f"\t{self.best_lender_clients[i] / self.model.config.N:20}" +
                                    f"\t{self.credit_channels[i]:3}\n")
-
+            self.save_graph(Statistics.get_export_path(export_datafile))
     def get_data(self):
         return (
             np.array(self.policy),
@@ -209,13 +227,13 @@ class Statistics:
         p.line(xx, yy, color="blue", line_width=2)
         bokeh.plotting.show(p)
 
-    def save_liquidity(self,export_datafile):
+    def save_liquidity(self, export_datafile):
         p = self.plot_liquidity(no_draw_but_return=True)
         bokeh.plotting.output_file(Statistics.get_export_path(export_datafile).replace(".txt", "_liquidity.html"),
                                    title="Liquidity")
         bokeh.plotting.save(p)
 
-    def save_credit_channels(self,export_datafile):
+    def save_credit_channels(self, export_datafile):
         p = self.plot_credit_channels(no_draw_but_return=True)
         bokeh.plotting.output_file(Statistics.get_export_path(export_datafile).replace(".txt", "_credit_channels.html"),
                                    title="Liquidity")
@@ -398,7 +416,7 @@ class Model:
     ŋ: float = 1  # eta : current value of policy recommendation
     test = False  # it's true when we are inside a test
     default_seed: int = 20579  # seed for this simulation
-    backward_enabled = False # if true, we can execute backward()
+    backward_enabled = False  # if true, we can execute backward()
     policy_changes = 0
 
     log = None
@@ -428,7 +446,7 @@ class Model:
                 raise LookupError("attribute in config not found")
         self.initialize()
 
-    def initialize(self,seed=None):
+    def initialize(self, seed=Model.default_seed):
         self.statistics.reset()
         random.seed(seed if seed else self.default_seed)
         self.banks = []
@@ -470,8 +488,10 @@ class Model:
     def enable_backward(self):
         self.backward_enabled = True
 
-    def simulate_full(self):
-        for i in range(self.config.T):
+    def simulate_full(self, save_graph_instants=None):
+        for t in range(self.config.T):
+            if t in save_graph_instants:
+                self.statistics.get_graph(t)
             self.forward()
 
     def finish(self, export_datafile=None, export_description=None):
@@ -529,6 +549,38 @@ class Model:
         """
         return self.statistics.interest_rate[self.t - 1 if self.t > 0 else 0]
 
+    def get_current_interest_rate_info(self):
+        """
+        Returns a tuple with  : max ir, min_ir and avg
+        :return:
+        (float,float,float)
+        """
+        max_ir = 0
+        min_ir = 1e6
+        for bank in self.banks:
+            bank_ir = bank.getLoanInterest()
+            if max_ir < bank_ir:
+                max_ir = bank_ir
+            if min_ir > bank_ir:
+                min_ir = bank_ir
+        return max_ir, min_ir, self.get_current_interest_rate()
+
+    def get_current_liquidity_info(self):
+        """
+        Returns a tuple with  : max C, min C and avg C
+        :return:
+        (float,float,float)
+        """
+        max_c = 0
+        min_c = 1e6
+        for bank in self.banks:
+            bank_c = bank.C
+            if max_c < bank_c:
+                max_c = bank_c
+            if min_c > bank_c:
+                min_c = bank_c
+        return max_c, min_c, self.get_current_liquidity()
+
     def get_current_bankruptcies(self):
         """
         Returns the number of bankruptcies in this step
@@ -584,7 +636,7 @@ class Model:
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.getLender().s > 0:
                             bank.l = bank.getLender().s  # amount of loan (wrote in the borrower)
-                            self.statistics.credit_channels[ self.t ] += 1
+                            self.statistics.credit_channels[self.t] += 1
                             bank.getLender().activeBorrowers[
                                 bank.id] = bank.getLender().s  # amount of loan (wrote in the lender)
                             bank.getLender().C -= bank.l  # amount of loan that reduces lender capital
@@ -621,8 +673,8 @@ class Model:
                     weNeedToSell = loanToReturn - bank.C
                     bank.C = 0
                     bank.paidloan = bank.doFiresalesL(weNeedToSell,
-                                                    f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
-                                                    "repay")
+                                                      f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
+                                                      "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
                 else:
                     bank.C -= loanToReturn
@@ -633,8 +685,8 @@ class Model:
                     bank.getLender().C += loanToReturn  # we return the loan and it's profits
                     bank.getLender().E += loanProfits  # the profits are paid as E
                     self.log.debug("repay",
-                            f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
-                            f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
+                                   f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
+                                   f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
 
         # now  when ΔD<0 it's time to use Capital or sell L again
         # (now we have the loans cancelled, or the bank bankrputed):
@@ -744,7 +796,7 @@ class Model:
 
             if bank.P >= 0.5:
                 self.log.debug("links",
-                             f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}")
+                               f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}")
                 bank.lender = possible_lender
             else:
                 self.log.debug("links", f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}")
@@ -841,8 +893,8 @@ class Bank:
             self.getLender().E -= badDebt
             self.getLender().C += recovered
             self.model.log.debug(phase, f"{self.getId()} bankrupted (fire sale={recoveredFiresale:.3f}," +
-                           f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}" +
-                           f".ΔB={badDebt:.3f},ΔC={recovered:.3f})")
+                                 f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}" +
+                                 f".ΔB={badDebt:.3f},ΔC={recovered:.3f})")
         else:
             # self.l=0 no current loan to return:
             if self.l > 0:
@@ -856,13 +908,12 @@ class Bank:
             self.getLender().s -= self.l
             del self.getLender().activeBorrowers[self.id]
 
-
     def doFiresalesL(self, amountToSell, reason, phase):
         costOfSell = amountToSell / self.model.config.ρ
         recoveredE = costOfSell * (1 - self.model.config.ρ)
         if costOfSell > self.L:
             self.model.log.debug(phase,
-                        f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
+                                 f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
             return self.__doBankruptcy__(phase)
         else:
             self.L -= costOfSell
@@ -879,8 +930,8 @@ class Bank:
                     return self.__doBankruptcy__(phase)
                 else:
                     self.model.log.debug(phase,
-                           f"{self.getId()} fire sale sellL={amountToSell:.3f} at cost {costOfSell:.3f} reducing" +
-                           f"E={recoveredE:.3f}: {reason}")
+                                         f"{self.getId()} fire sale sellL={amountToSell:.3f} at cost {costOfSell:.3f} reducing" +
+                                         f"E={recoveredE:.3f}: {reason}")
                     return amountToSell
 
 
@@ -889,17 +940,32 @@ class Utils:
     Auxiliary class to encapsulate the
     """
 
+
+    @staticmethod
+    def __extract_t_values_from_arg__(param):
+        if param is None:
+            return None
+        else:
+            t = []
+            for str_t in param.split(","):
+                t.append(int(str_t))
+                if t[-1] > Config.T or t[-1] < 0:
+                    raise ValueError(f"{t[-1]} greater than Config.T or below 0")
+            return t
+
     @staticmethod
     def run_interactive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
                         modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
                         logfile: str = typer.Option(None, help="File to send logs to"),
                         save: str = typer.Option(None, help=f"Saves the output of this execution"),
+                        graph: str = typer.Option(None, help=f"List of t in which save the network config"),
                         n: int = typer.Option(Config.N, help=f"Number of banks"),
                         eta: float = typer.Option(Model.ŋ, help=f"Policy recommendation"),
                         t: int = typer.Option(Config.T, help=f"Time repetitions")):
         """
             Run interactively the model
         """
+        global model
         model = Model()
         if t != model.config.T:
             model.config.T = t
@@ -908,12 +974,13 @@ class Utils:
         if eta != model.ŋ:
             model.ŋ = eta
         model.log.define_log(log, logfile, modules)
-        Utils.run(model, save)
+        Utils.run(model, save, Utils.__extract_t_values_from_arg__(graph))
+
 
     @staticmethod
-    def run(model: Model, save=None):
+    def run(model: Model, save=None, save_graph_instants=None):
         model.initialize()
-        model.simulate_full()
+        model.simulate_full(save_graph_instants)
         description = sys.argv[0]
         if save:
             for attr in dir(model.config):
@@ -930,6 +997,7 @@ class Utils:
             return True
         except NameError:
             return False
+
 
 # %%
 

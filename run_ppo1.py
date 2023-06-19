@@ -10,7 +10,7 @@ or predicts the next steps using the previous saved training (--predict)
 from stable_baselines3 import PPO
 from stable_baselines3.ppo.policies import MlpPolicy
 from stable_baselines3.common.evaluation import evaluate_policy
-import interbank_agent_ppo
+import interbank_agent_ppo1
 import interbank
 import typer
 import time
@@ -28,20 +28,20 @@ MODELS_DIRECTORY = "models"
 
 def training(verbose, times, env, logs):
     if not env:
-        env = interbank_agent_ppo.InterbankPPO()
+        env = interbank_agent_ppo1.InterbankPPO()
     model = PPO(MlpPolicy, env, verbose=int(verbose), tensorboard_log=logs)
     for seed in SEEDS_FOR_TRAINING:
         env.reset(seed)
         for j in range(STEPS_BEFORE_TRAINING):
             env.environment.forward()
         model.learn(total_timesteps=times, reset_num_timesteps=False,
-                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING) )
+                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING))
         env.close()
     # PPO(MlpPolicy, env, verbose=int(verbose), device="cuda") > it doesn't perform better
     return model
 
 
-def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.InterbankPPO(), verbose: bool = False):
+def run(model, env: interbank_agent_ppo1.InterbankPPO = interbank_agent_ppo1.InterbankPPO(), verbose: bool = False):
     done = False
     observations, _info = env.reset()
     while not done:
@@ -65,7 +65,7 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
     """
         Run interactively the model
     """
-    env = interbank_agent_ppo.InterbankPPO(T=t, N=n)
+    env = interbank_agent_ppo1.InterbankPPO(T=t, N=n)
     if not os.path.isdir(logs):
         os.mkdir(logs)
     env.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
