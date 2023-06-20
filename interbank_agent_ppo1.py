@@ -40,8 +40,8 @@ class InterbankPPO(gym.Env):
             shape=(6,),
             dtype=np.float64)
 
-        # Allowed actions will be: ŋ = [0,0.5,1]
-        self.action_space = gym.spaces.discrete.Discrete(3)  # spaces.Discrete(3)
+        # Allowed actions will be: ŋ = [0,1]
+        self.action_space = gym.spaces.discrete.Discrete(2)  # spaces.Discrete(3)
         gym.Env.__init__(self)
 
     def get_last_action(self):
@@ -52,7 +52,6 @@ class InterbankPPO(gym.Env):
         self.export_datafile = export_datafile
 
     def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = ''):
-        self.environment.log
         self.environment.log.define_log(log, logfile, modules, script_name)
 
     def __get_observations(self):
@@ -61,12 +60,13 @@ class InterbankPPO(gym.Env):
         self.current_liquidity = self.environment.get_current_liquidity_info()
         return np.array(self.current_liquidity + self.current_ir)
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options=None, dont_seed=False):
         """
         Set to the initial state the Interbank.Model
         """
         super().reset(seed=seed)
-        self.environment.initialize(seed)
+        self.environment.initialize(seed=seed,dont_seed=dont_seed)
+        self.environment.limit_to_two_policies()
         self.steps = 0
         self.done = False
         return self.__get_observations(), {}

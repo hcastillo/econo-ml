@@ -10,8 +10,8 @@ import interbank
 import numpy as np
 import typer
 import sys
-import random
 import tqdm
+from scipy.stats import bernoulli
 
 NUM_SIMULATIONS = 50
 
@@ -30,22 +30,23 @@ class Montecarlo:
         if simulations:
             self.simulations=simulations
 
-    def do_one_simulation(self):
+    def do_one_simulation(self,iteration):
         """
         Set to the initial state the Interbank.Model and run a new simulation, using each time a different policy
         recommendation
         """
-        self.environment.initialize()
+        self.environment.initialize(dont_seed=(iteration>1))
+        X = bernoulli(0.5)
+        policies = X.rvs(self.environment.config.T)
         for i in range(self.environment.config.T):
-            self.environment.set_policy_recommendation(random.randint(0,2))
+            self.environment.set_policy_recommendation(policies[i])
             self.environment.forward()
         self.environment.finish()
         return self.environment.statistics.get_data()
 
     def run(self):
-        srd = np.random.randn(self.simulations)
         for i in tqdm.tqdm(range(self.simulations), total=self.simulations, desc="mc"):
-            self.data.append(self.do_one_simulation(abs(int(srd[i]*10000))))
+            self.data.append(self.do_one_simulation())
 
     def save_column(self, prefix, name, column):
         filename = interbank.Statistics.get_export_path(f"{prefix}_{name}.txt")

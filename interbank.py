@@ -423,6 +423,8 @@ class Model:
     statistics = None
     config = None
 
+    policy_actions_translation = [0.0, 0.5, 1.0]
+    
     def __init__(self, **configuration):
         self.log = Log(self)
         self.statistics = Statistics(self)
@@ -446,9 +448,10 @@ class Model:
                 raise LookupError("attribute in config not found")
         self.initialize()
 
-    def initialize(self, seed=Model.default_seed):
+    def initialize(self, seed=None, dont_seed=False):
         self.statistics.reset()
-        random.seed(seed if seed else self.default_seed)
+        if not dont_seed:
+            random.seed(seed if seed else self.default_seed)
         self.banks = []
         self.t = 0
         self.policy_changes = 0
@@ -505,13 +508,15 @@ class Model:
         self.log.info("*****", summary)
 
     def set_policy_recommendation(self, n: int = None, ŋ: float = None):
-        actions_translation = [0.0, 0.5, 1.0]
         if n is not None and ŋ is None:
-            ŋ = actions_translation[n]
+            ŋ = self.policy_actions_translation[n]
         if self.ŋ != ŋ:
             self.log.debug("*****", f"ŋ changed to {ŋ}")
             self.policy_changes += 1
         self.ŋ = ŋ
+        
+    def limit_to_two_policies(self):
+        self.policy_actions_translation = [0.0,1.0]
 
     def __policy_recommendation_changed__(self):
         return self.policy_changes > 1
