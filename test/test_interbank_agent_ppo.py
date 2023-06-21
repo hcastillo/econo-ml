@@ -1,6 +1,6 @@
 import unittest
 import interbank_agent_ppo
-import gymnasium
+import gym
 
 
 class PPOTestCase(unittest.TestCase):
@@ -13,7 +13,7 @@ class PPOTestCase(unittest.TestCase):
         from stable_baselines3.common.env_checker import check_env
         env = interbank_agent_ppo.InterbankPPO()
         check_env(env)
-        self.assertIsInstance(env, gymnasium.Env)
+        self.assertIsInstance(env, gym.Env)
 
 
 if __name__ == '__main__':

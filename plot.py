@@ -15,7 +15,7 @@ import os
 class Plot:
     data = []
     data1 = []
-    stats = interbank.Statistics( interbank.Model() )
+    stats = interbank.Statistics(interbank.Model())
     attributes = {}
     description = ""
     description1 = ""
@@ -45,7 +45,7 @@ class Plot:
                     print(f"avoided comment line in {datafile}")
         return i
 
-    def plot(self, column, save, file_format, tmin, extra=False):
+    def plot(self, column, save, file_format, t_min, extra=False):
         destination = self.stats.get_export_path(save).replace(".txt", "." + file_format)
         if len(self.data) == 0:
             print("no data loaded to create a plot")
@@ -70,7 +70,7 @@ class Plot:
                     data_min=value
                 data_total += value
                 t=int(line[0])
-                if t>tmin:
+                if t>t_min:
                     xx.append(t)
                     yy.append(value)
             plt.clf()
@@ -89,7 +89,7 @@ class Plot:
                         data1_min = value
                     data1_total += value
                     t = int(line[0])
-                    if t > tmin:
+                    if t > t_min:
                         yy1.append(value)
                 #plt.plot(xx, yy, 'k-', xx, yy1, 'k:')
                 plt.figure(figsize=(12, 8))
@@ -112,8 +112,10 @@ class Plot:
             print(f"{i:3} {self.attributes[i]}")
 
 
-def run_interactive(what: str = typer.Option(str, help=f"What to plot (all)"),
-                    column: int = typer.Option(None, help=f"Plot column number X"),
+@app.command()
+def what():
+
+def run_interactive(column: int = typer.Option(None, help=f"Plot column number X"),
                     save: str = typer.Option(None, help=f"Saves the graph"),
                     extension: str = typer.Option("svg", help=f"Saves as svg/pdf/jpg/png"),
                     tmin: int = typer.Option(0, help=f"Min value for time"),
@@ -136,5 +138,8 @@ def run_interactive(what: str = typer.Option(str, help=f"What to plot (all)"),
             print("bad usage: check --help")
 
 
+app = typer.Typer()
+app
 if __name__ == "__main__":
     typer.run(run_interactive)
+

@@ -8,6 +8,7 @@ Generates a simulation of an interbank network following the rules described in 
 @date:   04/2023
 """
 import copy
+import enum
 import random
 import logging
 import math
@@ -42,14 +43,15 @@ class Config:
     ξ: float = 0.3  # xi
     ρ: float = 0.3  # ro fire sale cost
 
-    β: float = 5  # intensity of breaking the connection
+    β: float = 5    # intensity of breaking the connection
     α: float = 0.1  # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
-    L_i0: float = 120  # long term assets
-    C_i0: float = 30  # capital
-    D_i0: float = 135  # deposits
-    E_i0: float = 15  # equity
+    # L + C + (R) = D + E
+    L_i0: float = 120   # long term assets
+    C_i0: float = 30    # capital
+    D_i0: float = 135   # deposits
+    E_i0: float = 15    # equity
     r_i0: float = 0.02  # initial rate
 
     def __str__(self):
@@ -59,6 +61,19 @@ class Config:
             if isinstance(value, int) or isinstance(value, float):
                 description += f" {attr}={value}"
         return description
+
+
+class DataColumns(enum.Enum):
+    POLICY = 0
+    FITNESS = 1
+    LIQUIDITY = 2
+    IR = 3
+    BANKRUPTCY = 4
+    BEST_LENDER = 5
+    BEST_NUM_CLIENTS = 6
+    CREDIT_CHANNELS = 7
+    RATIONING = 8
+    LEVERAGE = 9
 
 
 class Statistics:
@@ -71,6 +86,8 @@ class Statistics:
     interest_rate = []
     incrementD = []
     fitness = []
+    rationing = []
+    leverage = []
     B = []
     model = None
     graphs = {}
@@ -92,6 +109,8 @@ class Statistics:
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
+        self.rationing = np.zeros(self.model.config.T, dtype=float)
+        self.leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
         self.B = np.zeros(self.model.config.T, dtype=float)
 
@@ -129,6 +148,12 @@ class Statistics:
     def compute_bad_debt(self):
         self.B[self.model.t] = sum(map(lambda x: x.B, self.model.banks))
 
+    def compute_rationing(self):
+        self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
+
+    def compute_leverage(self):
+        self.leverage[self.model.t] = sum(map(lambda x: (x.E / x.L), self.model.banks)) / self.model.config.N
+
     def export_data(self, export_datafile=None, export_description=None):
         if export_datafile:
             self.save_data(export_datafile, export_description)
@@ -156,7 +181,8 @@ class Statistics:
             graph = self.graphs[t]
             plt.clf()
             pos = nx.spring_layout(graph)
-            nx.draw(graph, pos, with_labels=False, arrowstyle='->')
+            #pos = nx.spiral_layout(graph)
+            nx.draw(graph, pos, with_labels=True, arrowstyle='->')
             plt.savefig(filename.replace('.txt', f"_{t}.png"))
 
     @staticmethod
@@ -173,14 +199,19 @@ class Statistics:
                 if export_description:
                     savefile.write(f"# {export_description}\n")
                 else:
+
                     savefile.write(f"# {__name__} T={self.model.config.T} N={self.model.config.N}\n")
                 for i in range(self.model.config.T):
                     savefile.write(f"{i:3}\t{self.policy[i]:3}\t{self.fitness[i]:19}\t{self.liquidity[i]:19}" +
                                    f"\t{self.interest_rate[i]:20}\t{self.bankruptcy[i]:3}" +
                                    f"\t{self.best_lender[i] / self.model.config.N:20}" +
                                    f"\t{self.best_lender_clients[i] / self.model.config.N:20}" +
-                                   f"\t{self.credit_channels[i]:3}\n")
+                                   f"\t{self.credit_channels[i]:3}" +
+                                   f"\t{self.rationing[i]:20}" +
+                                   f"\t{self.leverage[i]:20}" +
+                                   "\n")
             self.save_graph(Statistics.get_export_path(export_datafile))
+
     def get_data(self):
         return (
             np.array(self.policy),
@@ -190,16 +221,9 @@ class Statistics:
             np.array(self.bankruptcy),
             np.array(self.best_lender),
             np.array(self.best_lender_clients),
-            np.array(self.credit_channels))
-
-    DATA_POLICY = 0
-    DATA_FITNESS = 1
-    DATA_LIQUIDITY = 2
-    DATA_IR = 3
-    DATA_BANKRUPTCY = 4
-    DATA_BEST_LENDER = 5
-    DATA_BEST_LENDER_CLIENTS = 6
-    DATA_CREDIT_CHANNELS = 7
+            np.array(self.credit_channels),
+            np.array(self.rationing),
+            np.array(self.leverage))
 
     def plot_bankruptcies(self):
         title = "Bankruptcies"
@@ -377,6 +401,8 @@ class Log:
         self.logLevel = Log.get_level(log.upper())
         self.logger.setLevel(self.logLevel)
         if logfile:
+            if not logfile.startswith(Statistics.OUTPUT_DIRECTORY):
+                logfile = f"{Statistics.OUTPUT_DIRECTORY}/{logfile}"
             fh = logging.FileHandler(logfile, 'a', 'utf-8')
             fh.setLevel(self.logLevel)
             fh.setFormatter(formatter)
@@ -474,6 +500,8 @@ class Model:
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
         self.statistics.compute_bad_debt()
+        self.statistics.compute_leverage()
+        self.statistics.compute_rationing()
         self.setup_links()
         self.log.debug_banks()
         self.t += 1
@@ -493,7 +521,7 @@ class Model:
 
     def simulate_full(self, save_graph_instants=None):
         for t in range(self.config.T):
-            if t in save_graph_instants:
+            if save_graph_instants is not None and t in save_graph_instants:
                 self.statistics.get_graph(t)
             self.forward()
 
@@ -632,12 +660,14 @@ class Model:
                 if bank.getLender().d > 0:
                     # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
                     bank.doFiresalesL(bank.d, f"lender {bank.getLender().getId(short=True)} has no money", "loans")
+                    bank.rationing = bank.d
                     bank.l = 0
                 else:
                     # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
                     if bank.d > bank.getLender().s:
                         bank.doFiresalesL(bank.d - bank.getLender().s,
                                           f"lender.s={bank.getLender().s:.3f} but need d={bank.d:.3f}", "loans")
+                        bank.rationing = bank.d - bank.getLender().s
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.getLender().s > 0:
                             bank.l = bank.getLender().s  # amount of loan (wrote in the borrower)
@@ -671,27 +701,27 @@ class Model:
         # first all borrowers must pay their loans:
         for bank in self.banks:
             if bank.l > 0:
-                loanProfits = bank.getLoanInterest() * bank.l
-                loanToReturn = bank.l + loanProfits
+                loan_profits = bank.getLoanInterest() * bank.l
+                loan_to_return = bank.l + loan_profits
                 # (equation 3)
-                if loanToReturn > bank.C:
-                    weNeedToSell = loanToReturn - bank.C
+                if loan_to_return > bank.C:
+                    we_need_to_sell = loan_to_return - bank.C
                     bank.C = 0
-                    bank.paidloan = bank.doFiresalesL(weNeedToSell,
-                                                      f"to return loan and interest {loanToReturn:.3f} > C={bank.C:.3f}",
+                    bank.paidloan = bank.doFiresalesL(we_need_to_sell,
+                                                      f"to return loan and interest {loan_to_return:.3f} > C={bank.C:.3f}",
                                                       "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
                 else:
-                    bank.C -= loanToReturn
-                    bank.E -= loanProfits
+                    bank.C -= loan_to_return
+                    bank.E -= loan_profits
                     bank.paidloan = bank.l
                     bank.l = 0
                     bank.getLender().s -= bank.l  # we reduce the  's' => the lender could have more loans
-                    bank.getLender().C += loanToReturn  # we return the loan and it's profits
-                    bank.getLender().E += loanProfits  # the profits are paid as E
+                    bank.getLender().C += loan_to_return  # we return the loan and it's profits
+                    bank.getLender().E += loan_profits  # the profits are paid as E
                     self.log.debug("repay",
-                                   f"{bank.getId()} pays loan {loanToReturn:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
-                                   f" {bank.getLender().getId()} (ΔE={loanProfits:.3f},ΔC={bank.l:.3f})")
+                                   f"{bank.getId()} pays loan {loan_to_return:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
+                                   f" {bank.getLender().getId()} (ΔE={loan_profits:.3f},ΔC={bank.l:.3f})")
 
         # now  when ΔD<0 it's time to use Capital or sell L again
         # (now we have the loans cancelled, or the bank bankrputed):
@@ -709,6 +739,7 @@ class Model:
     def initialize_step(self):
         for bank in self.banks:
             bank.B = 0
+            bank.rationing = 0
         if self.t == 0:
             self.log.debug_banks()
 
@@ -716,8 +747,7 @@ class Model:
         # (equation 5)
         # p = probability borrower not failing
         # c = lending capacity
-        # λ = leverage
-        # h = borrower haircut
+        # h = borrower haircut (leverage of bank respect to the maximum)
 
         maxE = max(self.banks, key=lambda k: k.E).E
         maxC = max(self.banks, key=lambda k: k.C).C
@@ -831,6 +861,7 @@ class Bank:
         self.id = new_id
         self.model = model
         self.failures = 0
+        self.rationing = 0
         self.__assign_defaults__()
 
     def new_lender(self):
@@ -884,8 +915,8 @@ class Bank:
     def __doBankruptcy__(self, phase):
         self.failed = True
         self.model.statistics.bankruptcy[self.model.t] += 1
-        recoveredFiresale = self.L * self.model.config.ρ  # we firesale what we have
-        recovered = recoveredFiresale - self.D  # we should pay D to clients
+        recovered_in_fire_sales = self.L * self.model.config.ρ  # we firesale what we have
+        recovered = recovered_in_fire_sales - self.D  # we should pay D to clients
         if recovered < 0:
             recovered = 0
         if recovered > self.l:
@@ -897,7 +928,7 @@ class Bank:
             self.getLender().B += badDebt
             self.getLender().E -= badDebt
             self.getLender().C += recovered
-            self.model.log.debug(phase, f"{self.getId()} bankrupted (fire sale={recoveredFiresale:.3f}," +
+            self.model.log.debug(phase, f"{self.getId()} bankrupted (fire sale={recovered_in_fire_sales:.3f}," +
                                  f"recovers={recovered:.3f},paidD={self.D:.3f})(lender{self.getLender().getId(short=True)}" +
                                  f".ΔB={badDebt:.3f},ΔC={recovered:.3f})")
         else:

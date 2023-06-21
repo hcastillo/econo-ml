@@ -10,8 +10,8 @@ import interbank
 import numpy as np
 import typer
 import sys
-import random
 import tqdm
+from scipy.stats import bernoulli
 
 NUM_SIMULATIONS = 50
 
@@ -28,29 +28,28 @@ class Montecarlo:
         self.data = []
         self.summary = {}
         if simulations:
-            self.simulations=simulations
+            self.simulations = simulations
 
-    def do_one_simulation(self, seed=None):
+    def do_one_simulation(self, iteration):
         """
         Set to the initial state the Interbank.Model and run a new simulation, using each time a different policy
         recommendation
         """
-        self.environment.initialize(seed=seed)
-        random.seed(seed+1e2)
+        self.environment.initialize(dont_seed=(iteration > 1))
+        bernoulli_policy = bernoulli(0.5)
+        policies = bernoulli_policy.rvs(self.environment.config.T)
         for i in range(self.environment.config.T):
-            self.environment.set_policy_recommendation(random.randint(0,2))
+            self.environment.set_policy_recommendation(policies[i])
             self.environment.forward()
         self.environment.finish()
         return self.environment.statistics.get_data()
 
     def run(self):
-        srd = np.random.randn(self.simulations)
-        for i in tqdm.tqdm(range(self.simulations), total=self.simulations, desc="mc"):
-            self.data.append(self.do_one_simulation(abs(int(srd[i]*10000))))
+        for i in tqdm.tqdm(range(self.simulations), total=self.simulations):
+            self.data.append(self.do_one_simulation(i))
 
     def save_column(self, prefix, name, column):
         filename = interbank.Statistics.get_export_path(f"{prefix}_{name}.txt")
-        print(filename)
         total = np.zeros(self.simulations, dtype=float)
         with open(filename, 'w', encoding="utf-8") as savefile:
             head = "# t"
@@ -58,6 +57,7 @@ class Montecarlo:
                 head += f"\t{i:18}#"
             head += f"\n# {name}\n"
             savefile.write(head)
+
             for j in range(self.environment.config.T):
                 line = f"{j:3}"
                 for i in range(self.simulations):
@@ -80,14 +80,8 @@ class Montecarlo:
                 savefile.write(line + "\n")
 
     def save(self, filename):
-        self.save_column(filename, "policy", interbank.Statistics.DATA_POLICY)
-        self.save_column(filename, "ir", interbank.Statistics.DATA_IR)
-        self.save_column(filename, "fitness", interbank.Statistics.DATA_FITNESS)
-        self.save_column(filename, "liquidity", interbank.Statistics.DATA_LIQUIDITY)
-        self.save_column(filename, "bankruptcy", interbank.Statistics.DATA_BANKRUPTCY)
-        self.save_column(filename, "best_lender", interbank.Statistics.DATA_BEST_LENDER)
-        self.save_column(filename, "best_clients", interbank.Statistics.DATA_BEST_LENDER_CLIENTS)
-        self.save_column(filename, "credit_channels", interbank.Statistics.DATA_CREDIT_CHANNELS)
+        for column in interbank.DataColumns:
+            self.save_column(filename, column.name.lower(), column.value)
         self.save_summary(filename)
 
 

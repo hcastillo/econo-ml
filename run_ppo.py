@@ -15,6 +15,7 @@ import interbank
 import typer
 import time
 import sys
+import run_mc
 import os
 
 # we run STEPS_BEFORE_TRAINING times the Interbank.model() before train
@@ -25,30 +26,53 @@ SEEDS_FOR_TRAINING: tuple = (1979, 1880, 1234, 6125, 1234)
 OUTPUT_PPO_TRAINING: str = "ppo.log"
 MODELS_DIRECTORY = "models"
 
+# same as MC model repetitions, to compare
+NUM_SIMULATIONS = 50
+
+
+class PPOSimulation(run_mc.Montecarlo):
+    """
+    Create self.simulations of Interbank.model, using PPO model
+    """
+    simulations = NUM_SIMULATIONS
+
+    def __init__(self, model, env, simulations: int = None):
+        self.env = env
+        self.environment = self.env.environment
+        self.model = model
+        self.data = []
+        self.summary = {}
+        if simulations:
+            self.simulations = simulations
+
+    def do_one_simulation(self, iteration):
+        """
+        Set to the initial state the Interbank.Model and run a new simulation, using the recommendation suggested
+        by the model
+        """
+        done = False
+        observations, _info = self.env.reset(dont_seed=(iteration > 1))
+        while not done:
+            action, _states = self.model.predict(observations)
+            observations, reward, done, _truncated, _info = self.env.step(action)
+            if self.simulations == 1:
+                self.env.render()
+        self.env.close()
+        return self.env.environment.statistics.get_data()
+
 
 def training(verbose, times, env, logs):
     if not env:
         env = interbank_agent_ppo.InterbankPPO()
     model = PPO(MlpPolicy, env, verbose=int(verbose), tensorboard_log=logs)
     for seed in SEEDS_FOR_TRAINING:
-        env.reset(seed)
+        env.reset(seed=seed)
         for j in range(STEPS_BEFORE_TRAINING):
             env.environment.forward()
         model.learn(total_timesteps=times, reset_num_timesteps=False,
-                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING) )
+                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_PPO_TRAINING))
         env.close()
-    # PPO(MlpPolicy, env, verbose=int(verbose), device="cuda") > it doesn't perform better
     return model
-
-
-def run(model, env: interbank_agent_ppo.InterbankPPO = interbank_agent_ppo.InterbankPPO(), verbose: bool = False):
-    done = False
-    observations, _info = env.reset()
-    while not done:
-        action, _states = model.predict(observations)
-        observations, reward, done, _truncated, _info = env.step(action)
-        env.render()
-    env.close()
 
 
 def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of Interbank model"),
@@ -56,9 +80,9 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
                     logfile: str = typer.Option(None, help="File to send logs to (Interbank model)"),
                     n: int = typer.Option(interbank.Config.N, help=f"Number of banks in Interbank model"),
                     t: int = typer.Option(interbank.Config.T, help=f"Time repetitions of Interbank model"),
-                    times: int = typer.Option(interbank.Config.T, help=f"Training model running times"),
-                    verbose: bool = typer.Option(False, help="Verbosity of RL model"),
+                    simulations: int = typer.Option(NUM_SIMULATIONS, help=f"Number of MonteCarlo simulations"),
                     save: str = typer.Option(None, help=f"Saves the output of this execution"),
+                    verbose: bool = typer.Option(False, help="Verbosity of RL model"),
                     train: str = typer.Option(None, help=f"Trains the model and saves it this file"),
                     load: str = typer.Option(None, help=f"Loads the trained model and runs it"),
                     logs: str = typer.Option("logs", help=f"Log dir for Tensorboard")):
@@ -66,28 +90,33 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         Run interactively the model
     """
     env = interbank_agent_ppo.InterbankPPO(T=t, N=n)
+    env.environment.log.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
     if not os.path.isdir(logs):
         os.mkdir(logs)
-    env.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
-    if save:
-        description = f"{type(env).__name__} T={env.environment.config.T}" + \
-                      f"N={env.environment.config.N} env={load if load else '-'}"
-        env.define_savefile(save, description)
+    description = f"{type(env).__name__} T={env.environment.config.T}" + \
+                  f"N={env.environment.config.N} env={load if load else '-'}"
 
+    # train ------------------------
     if train:
         t1 = time.time()
-        model = training(verbose, times, env, logs)
+        model = training(verbose, t, env, logs)
+        env.define_savefile(save, description)
         if verbose:
-            print(f"-- total time of execution of training: {time.time()-t1:.2f} secs")
+            print(f"-- total time of execution of training: {time.time() - t1:.2f} secs")
         model.save(f"{MODELS_DIRECTORY}/{train}" if not train.startswith(MODELS_DIRECTORY) else train)
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)
         print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
+    # run -------------------------
     else:
         if load:
             model = PPO.load(f"{MODELS_DIRECTORY}/{load}" if not load.startswith(MODELS_DIRECTORY) else load)
         else:
-            model = training(verbose, times, env)
-        run(model, env, verbose=verbose)
+            model = training(verbose, t, env)
+        if simulations == 1:
+            env.define_savefile(save, description)
+        simulation = PPOSimulation(model, env, simulations=simulations)
+        simulation.run()
+        simulation.save(save)
 
 
 if __name__ == "__main__":
