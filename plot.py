@@ -14,69 +14,76 @@ import os
 
 class Plot:
     data = []
-    data1 = []
-    stats = interbank.Statistics(interbank.Model())
-    attributes = {}
-    description = ""
-    description1 = ""
+    tmin = 0
+    tmax = 0
 
-    def __init__(self):
-        for attribute in dir(self.stats):
-            if isinstance(getattr(self.stats, attribute), int):
-                value = getattr(self.stats, attribute)
-                attribute = attribute.replace("DATA_", "")
-                self.attributes[value] = attribute
-
-    def load_data(self, datafile, extra=False):
-        i = 0
-        if extra:
-            self.description1 = datafile
-        else:
-            self.description = datafile
-        with open(interbank.Statistics.get_export_path(datafile), 'r', encoding="utf-8") as loadfile:
+    def load_data(self, datafiles, tmin):
+        if tmin:
+            self.tmin = tmin
+        tmax = 0
+        for datafile in datafiles.split(","):
+          self.data.append([])
+          lines = 0
+          ignored = 0        
+          with open(interbank.Statistics.get_export_path(datafile), 'r', encoding="utf-8") as loadfile:
             for line in loadfile.readlines():
                 if not line.strip().startswith("#"):
-                    if extra:
-                        self.data1.append(line.split("\t"))
+                    elements = line.split("\t")
+                    t = int(elements[0]
+                    if t>=tmin:
+                        self.data[-1].append(elements)
+                        lines += 1
                     else:
-                        self.data.append(line.split("\t"))
-                    i += 1
+                        ignored += 1
+                    if t>tmax:
+                        tmax=t
                 else:
-                    print(f"avoided comment line in {datafile}")
-        return i
+                    ignored += 1
+          print f"{ignored} lines in {datafile}, {lines} incorporated"
+          self.tmax = tmax
+        return lines
 
-    def plot(self, column, save, file_format, t_min, extra=False):
-        destination = self.stats.get_export_path(save).replace(".txt", "." + file_format)
+    def plot(self, column, save, file_format, t_min, y2):
+        destination = interbank.Statistics.get_export_path(save).replace(".txt", "." + file_format)
         if len(self.data) == 0:
             print("no data loaded to create a plot")
             return False
-        if column >= len(self.attributes):
+        if column not in iter(interbank.DataColumns) or 
+           ( y2 not is None and y2 not in iter(interbank.DataColumns):
             print("column not valid. use --what all to view valid column numbers")
             return False
         else:
-            description = self.attributes[column].lower()
+            description = interbank.DataColumns.get_name(column)
+            if y2 not is None:
+                description_y2 = interbank.DataColumns.get_name(y2)                
             data_max = 0.0
             data_min = 1e8
             data_total = 0
             i = 0
-            xx = []
-            yy = []
-            for line in self.data:
-                value = float(line[column+1])
-                i += 1
+            x = []
+            y = []
+            y2= []
+            for data in self.data:
+              y.append([])
+              y2.append([])
+              for values in data:
+                value = float(values[column])
+                y[-1].append(value)
                 if data_max<value:
                     data_max=value
                 if data_min>value:
                     data_min=value
+                if y2 not is None:
+                    value2 = float(values[y2])
+                    y2[-1].append(value2)                    
                 data_total += value
-                t=int(line[0])
-                if t>t_min:
-                    xx.append(t)
-                    yy.append(value)
+                if i==0:
+                    t=int(values[0])
+                    x.append(t)
             plt.clf()
             plt.xlabel("t")
             plt.title(description)
-            if extra:
+            if y2 not is None:
                 data1_max = 0.0
                 data1_min = 1e8
                 data1_total = 0
@@ -106,40 +113,32 @@ class Plot:
             return True
 
     def what(self):
-        list_attrs = list(self.attributes.keys())
-        list_attrs.sort()
-        for i in list_attrs:
-            print(f"{i:3} {self.attributes[i]}")
+        print("this is what you can plot from interbank output files (use --help):")
+        for column in interbank.DataColumns:
+            print(f"\t{column.value}: {column.name}")
 
-
-@app.command()
-def what():
 
 def run_interactive(column: int = typer.Option(None, help=f"Plot column number X"),
-                    save: str = typer.Option(None, help=f"Saves the graph"),
+                    save: str = typer.Option(None, help=f"Saves the plot"),
                     extension: str = typer.Option("svg", help=f"Saves as svg/pdf/jpg/png"),
                     tmin: int = typer.Option(0, help=f"Min value for time"),
-                    load: str = typer.Option(None, help=f"Loads the file with the data"),
-                    load1: str = typer.Option(None, help=f"Loads extra file for a second y values")):
+                    load: str = typer.Option(None, help=f"Loads the file(s) with the data (sep by comma)"),
+                    y2: int = typer.Option(None, help=f"Loads this other column from files to plot in y2")):
     """
         Run the Plot class
     """
-    plot = Plot()
-
-    if load and column is not None and save:
-        print(plot.load_data(load), "lines loaded from", load)
-        if load1:
-            print(plot.load_data(load1, extra=True), "lines loaded from", load1)
-        plot.plot(column, save, extension, tmin, extra=(not load1 is None))
+    plot = Plot()    
+    if column is None:
+        plot.what()
     else:
-        if what:
-            plot.what()
+        if load and save:
+            print(plot.load_data(load,tmin), "lines loaded from ", load)
+            plot.plot(column, save, extension, y2)
         else:
             print("bad usage: check --help")
 
 
 app = typer.Typer()
-app
 if __name__ == "__main__":
     typer.run(run_interactive)
 

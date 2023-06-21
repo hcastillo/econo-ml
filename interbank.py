@@ -63,7 +63,7 @@ class Config:
         return description
 
 
-class DataColumns(enum.Enum):
+class DataColumns(enum.IntEnum):
     POLICY = 0
     FITNESS = 1
     LIQUIDITY = 2
@@ -73,7 +73,13 @@ class DataColumns(enum.Enum):
     BEST_NUM_CLIENTS = 6
     CREDIT_CHANNELS = 7
     RATIONING = 8
-    LEVERAGE = 9
+    LEVERAGE = 9    
+    def get_name(i):
+        for j in DataColumns:
+            if j.value==i:
+                return j.name
+        return None
+    
 
 
 class Statistics:
