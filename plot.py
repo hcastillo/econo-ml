@@ -14,12 +14,11 @@ import os
 
 class Plot:
     data = []
-    colors_and_styles= [ 'b-','g-','r-','b+' ]
+    colors_and_styles = ['b-', 'g-', 'r-', 'b+']
     tmin = 0
     tmax = 0
-    
-    
-    def get_color(self,i):
+
+    def get_color(self, i):
         return self.colors_and_styles[i % len(self.colors_and_styles)]
 
     def load_data(self, datafiles, tmin):
@@ -27,25 +26,25 @@ class Plot:
             self.tmin = tmin
         tmax = 0
         for datafile in datafiles.split(","):
-          self.data.append([])
-          lines = 0
-          ignored = 0        
-          with open(interbank.Statistics.get_export_path(datafile), 'r', encoding="utf-8") as loadfile:
-            for line in loadfile.readlines():
-                if not line.strip().startswith("#"):
-                    elements = line.split("\t")
-                    t = int(elements[0])
-                    if t>=tmin:
-                        self.data[-1].append(elements)
-                        lines += 1
+            self.data.append([])
+            lines = 0
+            ignored = 0
+            with open(interbank.Statistics.get_export_path(datafile), 'r', encoding="utf-8") as loadfile:
+                for line in loadfile.readlines():
+                    if not line.strip().startswith("#"):
+                        elements = line.split("\t")
+                        t = int(elements[0])
+                        if t >= tmin:
+                            self.data[-1].append(elements)
+                            lines += 1
+                        else:
+                            ignored += 1
+                        if t > tmax:
+                            tmax = t
                     else:
                         ignored += 1
-                    if t>tmax:
-                        tmax=t
-                else:
-                    ignored += 1
-          print(f"{ignored} lines in {datafile}, {lines} incorporated")
-          self.tmax = tmax
+            print(f"{ignored} lines in {datafile}, {lines} incorporated")
+            self.tmax = tmax
         return lines
 
     def plot(self, column, save, file_format, t_min, column2, description):
@@ -54,57 +53,57 @@ class Plot:
             print("no data loaded to create a plot")
             return False
         if column not in iter(interbank.DataColumns) or \
-           ( not column2 is None and column2 not in iter(interbank.DataColumns)):
+                (not column2 is None and column2 not in iter(interbank.DataColumns)):
             print("column not valid. use --what all to view valid column numbers")
             return False
         else:
             if description is None:
                 description = interbank.DataColumns.get_name(column)
             if not column2 is None:
-                description  += "-"+interbank.DataColumns.get_name(column2)                
+                description += "-" + interbank.DataColumns.get_name(column2)
             data_max = 0.0
             data_min = 1e8
             data_total = 0
             i = 0
             x = []
             y = []
-            y2= []
+            y2 = []
             for data in self.data:
-              y.append([])
-              y2.append([])
-              for values in data:
-                value = float(values[column])
-                y[-1].append(value)
-                if data_max<value:
-                    data_max=value
-                if data_min>value:
-                    data_min=value
-                if not column2 is None:
-                    value2 = float(values[column2])
-                    y2[-1].append(value2)                    
-                data_total += value
-                if i==0: # we guess that X=x1..xn is same in the rest of series
-                    t=int(values[0])
-                    x.append(t)
-              i+=1
+                y.append([])
+                y2.append([])
+                for values in data:
+                    value = float(values[column])
+                    y[-1].append(value)
+                    if data_max < value:
+                        data_max = value
+                    if data_min > value:
+                        data_min = value
+                    if not column2 is None:
+                        value2 = float(values[column2])
+                        y2[-1].append(value2)
+                    data_total += value
+                    if i == 0:  # we guess that X=x1..xn is same in the rest of series
+                        t = int(values[0])
+                        x.append(t)
+                i += 1
             plt.clf()
             plt.xlabel("t")
             plt.title(description)
             plt.figure(figsize=(12, 8))
-            if not column2 is None: 
-                fig,ax1=plt.subplots()
+            if not column2 is None:
+                fig, ax1 = plt.subplots()
                 ax1.set_xlabel("t")
                 ax2 = ax1.twinx()
-            
+
             for i in range(len(self.data)):
                 if column2 is None:
-                    label=interbank.DataColumns.get_name(column)+f"# {i}" if i>1 else ""
-                    plt.plot(x, y[i], self.get_color(i),label=label)
+                    label = interbank.DataColumns.get_name(column) + f"# {i}" if i > 1 else ""
+                    plt.plot(x, y[i], self.get_color(i), label=label)
                 else:
-                    label1=interbank.DataColumns.get_name(column)+f" #{i}" if i>1 else ""
-                    label2=interbank.DataColumns.get_name(column2)+f" #{i}" if i>1 else ""
-                    ax1.plot(x, y[i], self.get_color(i),label=label1)
-                    ax2.plot(x, y[i], self.get_color(i),label=label2)
+                    label1 = interbank.DataColumns.get_name(column) + f" #{i}" if i > 1 else ""
+                    label2 = interbank.DataColumns.get_name(column2) + f" #{i}" if i > 1 else ""
+                    ax1.plot(x, y[i], self.get_color(i), label=label1)
+                    ax2.plot(x, y[i], self.get_color(i), label=label2)
             plt.savefig(destination)
             print("plot saved in ", destination)
 
@@ -123,12 +122,12 @@ def run_interactive(column: int = typer.Option(None, help=f"Plot column number X
     """
         Run the Plot class
     """
-    plot = Plot()    
+    plot = Plot()
     if column is None:
         plot.what()
     else:
         if load and save:
-            plot.load_data(load,tmin)
+            plot.load_data(load, tmin)
             plot.plot(column, save, extension, tmin, y2, None)
         else:
             print("bad usage: check --help")
@@ -137,4 +136,3 @@ def run_interactive(column: int = typer.Option(None, help=f"Plot column number X
 app = typer.Typer()
 if __name__ == "__main__":
     typer.run(run_interactive)
-
