@@ -77,7 +77,7 @@ class DataColumns(enum.IntEnum):
     def get_name(i):
         for j in DataColumns:
             if j.value==i:
-                return j.name
+                return j.name.replace("_"," ").lower()
         return None
     
 
