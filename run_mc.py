@@ -45,6 +45,7 @@ class Montecarlo:
         return self.environment.statistics.get_data()
 
     def run(self):
+        self.environment.limit_to_two_policies()
         for i in tqdm.tqdm(range(self.simulations), total=self.simulations):
             self.data.append(self.do_one_simulation(i))
 
