@@ -10,13 +10,15 @@ import matplotlib.pyplot as plt
 import interbank
 import typer
 import numpy as np
+import math
 
 class Plot:
     t = []
     legend = []
-    max = []
-    min = []
-    avg = []
+    stdev = []
+    confidence_interval = []
+    z_confidence_interval= 1.96
+    mean = []
     colors = ['black', 'red', 'green', 'blue', 'purple']
     fills = ['gray', 'mistyrose', 'honeydew', 'lavender', 'plum']
 
@@ -36,9 +38,10 @@ class Plot:
     def load_data(self, n, datafiles):
         for datafile in datafiles.split(","):
             t = []
-            min_value = []
-            max_value = []
-            avg_value = []
+            confidence_interval = []
+            mean = []
+            stdev = []
+            confidence_interval = []
             self.legend.append(datafile.replace("_fitness", "").upper())
             lines = 0
             ignored = 0
@@ -49,18 +52,19 @@ class Plot:
                         if line_strings[0]!="0":
                             elements = Plot.convert_to_array_of_numbers(line_strings[1:], n)
                             t.append(int(line_strings[0]))
-                            max_value.append(elements.max())
-                            min_value.append(elements.min())
-                            avg_value.append(elements.mean())
+                            mean.append(elements.mean())
+                            stdev.append(elements.std())
+                            confidence_interval.append(
+                               self.z_confidence_interval*stdev[-1] / math.sqrt(elements.size))
                             lines += 1
                         else:
                             ignored += 1
                     else:
                         ignored += 1
-            self.max.append(np.array(max_value))
-            self.min.append(np.array(min_value))
+            self.mean.append(np.array(mean))
+            self.confidence_interval.append(np.array(confidence_interval))
+            self.stdev.append(np.array(stdev))
             self.t.append(np.array(t))
-            self.avg.append(np.array(avg_value))
             print(f"{ignored} lines in {datafile}, {lines} incorporated")
 
     def plot(self, save, file_format):
@@ -72,11 +76,13 @@ class Plot:
         else:
             plt.clf()
             fig, ax = plt.subplots(figsize=(12, 8))
-            for i in range(len(self.avg)):
-                ax.fill_between(self.t[i], self.min[i], self.max[i], where=(self.min[i] < self.max[i]),
+            for i in range(len(self.mean)):
+                min_fill = self.mean[i]-self.confidence_interval[i]
+                max_fill = self.mean[i]+self.confidence_interval[i]
+                ax.fill_between(self.t[i], min_fill, max_fill,
+                                where=(min_fill < max_fill),
                                 color=self.get_fill(i), alpha=0.80)
-                ax.plot(self.t[i], self.avg[i], color=self.get_color(i), label=self.legend[i])
-
+                ax.plot(self.t[i], self.mean[i], color=self.get_color(i), label=self.legend[i])
             plt.xlabel("t")
             plt.ylabel("Ʃ μ")
             plt.legend()
