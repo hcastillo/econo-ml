@@ -19,6 +19,8 @@ import numpy as np
 import sys
 import networkx as nx
 import matplotlib.pyplot as plt
+from pdb import set_trace
+
 
 class Config:
     """
@@ -451,6 +453,12 @@ class Model:
     backward_enabled = False  # if true, we can execute backward()
     policy_changes = 0
 
+    # if not None, we will debug at this instant i, entering in interactive mode
+    debug = None
+
+    # if not None, it should be a list of t in which we generate a graph with lenders, as i.e., [0,800]
+    save_graphs = None
+
     log = None
     statistics = None
     config = None
@@ -480,10 +488,12 @@ class Model:
                 raise LookupError("attribute in config not found")
         self.initialize()
 
-    def initialize(self, seed=None, dont_seed=False):
+    def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None):
         self.statistics.reset()
         if not dont_seed:
             random.seed(seed if seed else self.default_seed)
+        if save_graphs_instants:
+            self.save_graphs = save_graphs_instants
         self.banks = []
         self.t = 0
         self.policy_changes = 0
@@ -510,6 +520,11 @@ class Model:
         self.statistics.compute_rationing()
         self.setup_links()
         self.log.debug_banks()
+        if self.save_graphs is not None and self.t in self.save_graphs:
+            self.statistics.get_graph(self.t)
+            print("hola")
+        if self.debug and self.t == self.debug:
+            set_trace()
         self.t += 1
 
     def backward(self):
@@ -522,13 +537,14 @@ class Model:
         else:
             raise AttributeError('enable_backward() before')
 
+    def do_debug(self, debug):
+        self.debug = debug
+
     def enable_backward(self):
         self.backward_enabled = True
 
     def simulate_full(self, save_graph_instants=None):
         for t in range(self.config.T):
-            if save_graph_instants is not None and t in save_graph_instants:
-                self.statistics.get_graph(t)
             self.forward()
 
     def finish(self, export_datafile=None, export_description=None):
@@ -1002,34 +1018,35 @@ class Utils:
                         save: str = typer.Option(None, help=f"Saves the output of this execution"),
                         graph: str = typer.Option(None, help=f"List of t in which save the network config"),
                         n: int = typer.Option(Config.N, help=f"Number of banks"),
+                        debug: int = typer.Option(None, help="Stop and enter in debug mode after at this time"),
                         eta: float = typer.Option(Model.ŋ, help=f"Policy recommendation"),
                         t: int = typer.Option(Config.T, help=f"Time repetitions")):
         """
             Run interactively the model
         """
         global model
-        model = Model()
         if t != model.config.T:
             model.config.T = t
         if n != model.config.N:
             model.config.N = n
         if eta != model.ŋ:
             model.ŋ = eta
+        if debug:
+            model.do_debug(debug)
         model.log.define_log(log, logfile, modules)
-        Utils.run(model, save, Utils.__extract_t_values_from_arg__(graph))
-
+        Utils.run(save, Utils.__extract_t_values_from_arg__(graph))
 
     @staticmethod
-    def run(model: Model, save=None, save_graph_instants=None):
-        model.initialize()
-        model.simulate_full(save_graph_instants)
+    def run(save=None, save_graph_instants=None):
+        global model
+        model.initialize(save_graphs_instants=save_graph_instants)
+        model.simulate_full()
         description = sys.argv[0]
         if save:
             for attr in dir(model.config):
                 value = getattr(model.config, attr)
                 if isinstance(value, int) or isinstance(value, float):
                     description += f" {attr}={value}"
-
         model.finish(export_datafile=save, export_description=str(model.config))
 
     @staticmethod
@@ -1042,11 +1059,15 @@ class Utils:
 
 
 # %%
+def get_lenders():
+   for i in model.banks:
+      print(i.id,i.lender)
 
 
+model = Model()
 if Utils.is_notebook():
     # if we are running in a Notebook:
-    Utils.run(Model())
+    Utils.run()
 else:
     # if we are running interactively:
     if __name__ == "__main__":
