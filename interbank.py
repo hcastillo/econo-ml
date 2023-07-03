@@ -79,10 +79,9 @@ class DataColumns(enum.IntEnum):
     def get_name(i):
         for j in DataColumns:
             if j.value==i:
-                return j.name.replace("_"," ").lower()
+                return j.name.replace("_", " ").lower()
         return None
     
-
 
 class Statistics:
     bankruptcy = []
@@ -148,6 +147,7 @@ class Statistics:
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
 
     def compute_fitness(self):
+        print(self.model.t)
         self.fitness[self.model.t] = sum(map(lambda x: x.μ, self.model.banks)) / self.model.config.N
 
     def compute_policy(self):
@@ -183,15 +183,13 @@ class Statistics:
         self.graphs[t] = nx.DiGraph(directed=True)
         for bank in self.model.banks:
             self.graphs[t].add_edge(bank.id, bank.lender)
+        plt.clf()
+        pos = nx.spring_layout(self.graphs[t])
+        # pos = nx.spiral_layout(graph)
+        nx.draw(self.graphs[t], pos, with_labels=True, arrowstyle='->')
+        filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
+        plt.savefig(Statistics.get_export_path(filename).replace('.txt', f"_{t}.png"))
 
-    def save_graph(self,filename):
-        for t in self.graphs:
-            graph = self.graphs[t]
-            plt.clf()
-            pos = nx.spring_layout(graph)
-            #pos = nx.spiral_layout(graph)
-            nx.draw(graph, pos, with_labels=True, arrowstyle='->')
-            plt.savefig(filename.replace('.txt', f"_{t}.png"))
 
     @staticmethod
     def get_export_path(filename):
@@ -218,7 +216,6 @@ class Statistics:
                                    f"\t{self.rationing[i]:20}" +
                                    f"\t{self.leverage[i]:20}" +
                                    "\n")
-            self.save_graph(Statistics.get_export_path(export_datafile))
 
     def get_data(self):
         return (
@@ -462,6 +459,8 @@ class Model:
     log = None
     statistics = None
     config = None
+    export_datafile = None
+    export_description = None
 
     policy_actions_translation = [0.0, 0.5, 1.0]
     
@@ -488,15 +487,17 @@ class Model:
                 raise LookupError("attribute in config not found")
         self.initialize()
 
-    def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None):
+    def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None,
+                   export_datafile=None, export_description=None ):
         self.statistics.reset()
         if not dont_seed:
             random.seed(seed if seed else self.default_seed)
-        if save_graphs_instants:
-            self.save_graphs = save_graphs_instants
+        self.save_graphs = save_graphs_instants
         self.banks = []
         self.t = 0
         self.policy_changes = 0
+        self.export_datafile = export_datafile
+        self.export_description = str(self.config) if export_description is None else export_description
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
 
@@ -522,9 +523,9 @@ class Model:
         self.log.debug_banks()
         if self.save_graphs is not None and self.t in self.save_graphs:
             self.statistics.get_graph(self.t)
-            print("hola")
         if self.debug and self.t == self.debug:
-            set_trace()
+            import code
+            code.interact(local=locals())
         self.t += 1
 
     def backward(self):
@@ -543,13 +544,13 @@ class Model:
     def enable_backward(self):
         self.backward_enabled = True
 
-    def simulate_full(self, save_graph_instants=None):
+    def simulate_full(self):
         for t in range(self.config.T):
             self.forward()
 
-    def finish(self, export_datafile=None, export_description=None):
+    def finish(self):
         if not self.test:
-            self.statistics.export_data(export_datafile, export_description)
+            self.statistics.export_data(self.export_datafile, self.export_description)
         summary = f"Finish: model T={self.config.T}  N={self.config.N}"
         if not self.__policy_recommendation_changed__():
             summary += f" ŋ={self.ŋ}"
@@ -1039,15 +1040,9 @@ class Utils:
     @staticmethod
     def run(save=None, save_graph_instants=None):
         global model
-        model.initialize(save_graphs_instants=save_graph_instants)
+        model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants)
         model.simulate_full()
-        description = sys.argv[0]
-        if save:
-            for attr in dir(model.config):
-                value = getattr(model.config, attr)
-                if isinstance(value, int) or isinstance(value, float):
-                    description += f" {attr}={value}"
-        model.finish(export_datafile=save, export_description=str(model.config))
+        model.finish()
 
     @staticmethod
     def is_notebook():
