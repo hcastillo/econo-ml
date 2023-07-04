@@ -34,7 +34,7 @@ class PPOSimulation(run_mc.Montecarlo):
     """
     Create self.simulations of Interbank.model, using PPO model
     """
-    simulations = NUM_SIMULATIONS
+    simulations = NUM_SIMULATIONS    
 
     def __init__(self, model, env, simulations: int = None):
         self.env = env
@@ -59,6 +59,12 @@ class PPOSimulation(run_mc.Montecarlo):
                 self.env.render()
         self.env.close()
         return self.env.environment.statistics.get_data()
+    
+    @staticmethod
+    def get_models_path(filename):
+        if not filename.startswith(MODELS_DIRECTORY):
+            filename = f"{MODELS_DIRECTORY}/{filename}"
+        return filename if filename.endswith('.zip') else f"{filename}.zip"
 
 
 def training(verbose, times, env, logs):
@@ -103,13 +109,13 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
         env.define_savefile(save, description)
         if verbose:
             print(f"-- total time of execution of training: {time.time() - t1:.2f} secs")
-        model.save(f"{MODELS_DIRECTORY}/{train}" if not train.startswith(MODELS_DIRECTORY) else train)
+        model.save(PPOSimulation.get_models_path(train))
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, deterministic=True)
         print(f"-- mean_reward={mean_reward:.2f} +/- {std_reward}")
     # run -------------------------
     else:
         if load:
-            model = PPO.load(f"{MODELS_DIRECTORY}/{load}" if not load.startswith(MODELS_DIRECTORY) else load)
+            model = PPO.load(PPOSimulation.get_models_path(load))
         else:
             model = training(verbose, t, env)
         if simulations == 1:

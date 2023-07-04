@@ -63,7 +63,9 @@ class InterbankPPO(gym.Env):
         Set to the initial state the Interbank.Model
         """
         super().reset(seed=seed)
-        self.environment.initialize(seed=seed,dont_seed=dont_seed)
+        self.environment.initialize(seed=seed,dont_seed=dont_seed,
+                                    export_datafile=self.export_datafile,
+                                    export_description=self.export_description)
         self.environment.limit_to_two_policies()
         self.steps = 0
         self.done = False
@@ -80,7 +82,7 @@ class InterbankPPO(gym.Env):
         return observation, self.current_fitness, self.done, False, {}
 
     def close(self):
-        self.environment.finish(self.export_datafile, self.export_description)
+        self.environment.finish()
 
     def render(self, mode='human'):
         print(f"{type(self).__name__} t={self.environment.t - 1:3}: ŋ={self.get_last_action():3} " +

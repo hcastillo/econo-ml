@@ -147,7 +147,6 @@ class Statistics:
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
 
     def compute_fitness(self):
-        print(self.model.t)
         self.fitness[self.model.t] = sum(map(lambda x: x.μ, self.model.banks)) / self.model.config.N
 
     def compute_policy(self):
@@ -1054,9 +1053,6 @@ class Utils:
 
 
 # %%
-def get_lenders():
-   for i in model.banks:
-      print(i.id,i.lender)
 
 
 model = Model()
