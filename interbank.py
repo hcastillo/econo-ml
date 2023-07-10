@@ -19,7 +19,6 @@ import numpy as np
 import sys
 import networkx as nx
 import matplotlib.pyplot as plt
-from pdb import set_trace
 
 
 class Config:
@@ -557,16 +556,21 @@ class Model:
             summary += " ŋ variate during simulation"
         self.log.info("*****", summary)
 
-    def set_policy_recommendation(self, n: int = None, ŋ: float = None):
+    def set_policy_recommendation(self, n: int = None, ŋ: float = None, ŋ1: float = None):
+        if ŋ1 is not None:
+            n = round(ŋ1)
         if n is not None and ŋ is None:
-            ŋ = self.policy_actions_translation[n]
+            if type(n) is int:
+                ŋ = self.policy_actions_translation[n]
+            else:
+                ŋ = float(n)
         if self.ŋ != ŋ:
             self.log.debug("*****", f"ŋ changed to {ŋ}")
             self.policy_changes += 1
         self.ŋ = ŋ
         
     def limit_to_two_policies(self):
-        self.policy_actions_translation = [0.0,1.0]
+        self.policy_actions_translation = [0.0, 1.0]
 
     def __policy_recommendation_changed__(self):
         return self.policy_changes > 1

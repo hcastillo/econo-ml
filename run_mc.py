@@ -24,7 +24,7 @@ class Montecarlo:
     simulations = NUM_SIMULATIONS
 
     def __init__(self, environment, simulations: int = None):
-        self.environment = environment
+        self.interbank_model = environment
         self.data = []
         self.summary = {}
         if simulations:
@@ -35,17 +35,17 @@ class Montecarlo:
         Set to the initial state the Interbank.Model and run a new simulation, using each time a different policy
         recommendation
         """
-        self.environment.initialize(dont_seed=(iteration > 1))
+        self.interbank_model.initialize(dont_seed=(iteration > 1))
         bernoulli_policy = bernoulli(0.5)
-        policies = bernoulli_policy.rvs(self.environment.config.T)
-        for i in range(self.environment.config.T):
-            self.environment.set_policy_recommendation(policies[i])
-            self.environment.forward()
-        self.environment.finish()
-        return self.environment.statistics.get_data()
+        policies = bernoulli_policy.rvs(self.interbank_model.config.T)
+        for i in range(self.interbank_model.config.T):
+            self.interbank_model.set_policy_recommendation(policies[i])
+            self.interbank_model.forward()
+        self.interbank_model.finish()
+        return self.interbank_model.statistics.get_data()
 
     def run(self):
-        self.environment.limit_to_two_policies()
+        self.interbank_model.limit_to_two_policies()
         for i in tqdm.tqdm(range(self.simulations), total=self.simulations):
             self.data.append(self.do_one_simulation(i))
 
@@ -59,7 +59,7 @@ class Montecarlo:
             head += f"\n# {name}\n"
             savefile.write(head)
 
-            for j in range(self.environment.config.T):
+            for j in range(self.interbank_model.config.T):
                 line = f"{j:3}"
                 for i in range(self.simulations):
                     line += f"\t{self.data[i][column][j]:19}"
