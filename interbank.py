@@ -981,6 +981,7 @@ class Bank:
             self.L -= costOfSell
             self.E -= recoveredE
 
+
             if self.L <= self.model.config.α:
                 self.model.log.debug(phase,
                                      f"{self.getId()} new L={self.L:.3f} makes bankruptcy of bank: {reason}")

@@ -10,7 +10,7 @@ or predicts the next steps using the previous saved training (--predict)
 from stable_baselines3 import TD3
 from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 
-from interbank_agent1 import InterbankAgent
+from interbank_agent import InterbankAgent
 import numpy as np
 import interbank
 import typer
@@ -69,7 +69,7 @@ def training(verbose, times, env, logs):
     if not env:
         env = InterbankAgent()
     n_actions = env.action_space.shape[-1]
-    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.05 * np.ones(n_actions))
+    action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=0.05 * np.ones(n_actions))
     model = TD3("MlpPolicy", env, action_noise=action_noise, verbose=int(verbose), tensorboard_log=logs)
     for seed in SEEDS_FOR_TRAINING:
         env.reset(seed=seed)

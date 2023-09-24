@@ -7,6 +7,9 @@ python run_ppo.py --load ppo --verbose --save ppo
 
 python run_mc.py --save mc
 
+python run_mc.py --fixed-eta 0 --save eta0 
+
+
 python plot.py --column 2 --load ppo1 --save ppo1t
 #  0 POLICY
 #  1 FITNESS

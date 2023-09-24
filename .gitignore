@@ -1,6 +1,7 @@
 .ipynb_checkpoints/
 __pycache__/
 alessio/
+logs/
 ppo/*
 .idea/*
 *.txt

@@ -23,10 +23,11 @@ class Montecarlo:
 
     simulations = NUM_SIMULATIONS
 
-    def __init__(self, environment, simulations: int = None):
+    def __init__(self, environment, simulations: int = None, fixed_eta: int = None):
         self.interbank_model = environment
         self.data = []
         self.summary = {}
+        self.fixed_eta = fixed_eta
         if simulations:
             self.simulations = simulations
 
@@ -36,10 +37,14 @@ class Montecarlo:
         recommendation
         """
         self.interbank_model.initialize(dont_seed=(iteration > 1))
-        bernoulli_policy = bernoulli(0.5)
-        policies = bernoulli_policy.rvs(self.interbank_model.config.T)
+        if self.fixed_eta is not None:
+            self.interbank_model.set_policy_recommendation(self.fixed_eta)
+        else:
+            bernoulli_policy = bernoulli(0.5)
+            policies = bernoulli_policy.rvs(self.interbank_model.config.T)
         for i in range(self.interbank_model.config.T):
-            self.interbank_model.set_policy_recommendation(policies[i])
+            if self.fixed_eta is None:
+                self.interbank_model.set_policy_recommendation(policies[i])
             self.interbank_model.forward()
         self.interbank_model.finish()
         return self.interbank_model.statistics.get_data()
@@ -92,13 +97,14 @@ def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of
                     n: int = typer.Option(interbank.Config.N, help=f"Number of banks in Interbank model"),
                     t: int = typer.Option(interbank.Config.T, help=f"Time repetitions of Interbank model"),
                     simulations: int = typer.Option(NUM_SIMULATIONS, help=f"Number of MonteCarlo simulations"),
+                    fixed_eta: int = typer.Option(None, help=f"Fix the eta ŋ to this value (0,1)"),
                     save: str = typer.Option(None, help=f"Saves the output of this execution")):
     """
         Run interactively the model
     """
     environment = interbank.Model(T=t, N=n)
     environment.log.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
-    simulation = Montecarlo(environment=environment, simulations=simulations)
+    simulation = Montecarlo(environment=environment, simulations=simulations, fixed_eta=fixed_eta)
     simulation.run()
     simulation.save(save)
 
