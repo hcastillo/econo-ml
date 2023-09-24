@@ -32,8 +32,7 @@ class Config:
         self.d = 100  # location cost
         self.e = 0.1  # sensivity
         self.β = 0.02  # beta
-        self.σ = 0.0  # R&D
-        self.sigma_values = [0.0, 0.04]
+        self.σ = 0.0  # R&D sigma
         self.k = 1  # capital intensity
         self.η = 0.25  # market regime (0.25 = monopoly ; 0.0001 = perfect competition)
         self.b = 1
@@ -760,7 +759,7 @@ def graph_aggregate_output(show=True):
     plt.ylabel("log K")  # asse delle y denominata log K
     plt.xlabel("t")  # asse delle x denominata t
     plt.title("Logarithm of aggregate output")
-    plt.show() if show else plt.savefig("aggregate_output.svg")
+    plt.show() if show else plt.savefig(f"aggregate_output_sigma{Config.σ}.svg")
 
 
 def graph_profits(show=True):
@@ -1001,6 +1000,7 @@ parser.add_argument("--saveall", type=str, help="Save all firms data (big file: 
 parser.add_argument("--restoreall", type=str, help="Restore all firms data (big file: and enters interactive mode)")
 parser.add_argument("--save", type=str, help="Save the state (file will be overwritten)")
 parser.add_argument("--restore", type=str, help="Restore the state (and enters interactive mode)")
+parser.add_argument("--sigma", type=float, help="Value for sigma in the model (default=%s" % Config.δ)
 
 args = parser.parse_args()  # esegue il parsing degli argomenti da riga di comando, restituendo un oggetto args che contiene i valori dei flag e delle opzioni specificate dall'utente
 
@@ -1018,22 +1018,25 @@ if args.restoreall or args.restore:  # Se è stato specificato l'argomento --res
     else:
         restore(args.restore, False)
 else:  # Se non sono stati specificati gli argomenti --restoreall o --restore, viene chiamata la funzione doSimulation per eseguire la simulazione principale
-    for sigma in Config.sigma_values:
+    if args.sigma:
+        Config.δ = args.sigma
+    doSimulation(args.debug)
+    if Status.numFailuresGlobal > 0:  # Se Status.numFailuresGlobal è maggiore di zero, viene stampato un messaggio sul numero totale di fallimenti
+        Statistics.log("[total failures in all times = %s " % Status.numFailuresGlobal)
+    else:
+        Statistics.log("[no failures]")  # altrimenti dice "no failures"
+    if args.save:  # Se è stato specificato l'argomento --save, viene chiamata la funzione save per salvare lo stato in un file
+        save(args.save, False)
+    if args.saveall:  # Se è stato specificato l'argomento --saveall, viene chiamata la funzione save per salvare tutti i dati delle imprese in un file
+        save(args.saveall, True)
+    if args.graph:  # Se è stato specificato l'argomento --graph, viene chiamata la funzione show_graph per visualizzare il grafico corrispondente
+        show_graph(True)
+    if args.savegraph:  # Se è stato specificato l'argomento --savegraph, viene chiamata la funzione show_graph per salvare il grafico in un file
+        show_graph(False)
+    
+for sigma in Config.sigma_values:
         Config.σ = sigma
-        doSimulation(args.debug)
-
-        if Status.numFailuresGlobal > 0:  # Se Status.numFailuresGlobal è maggiore di zero, viene stampato un messaggio sul numero totale di fallimenti
-            Statistics.log("[total failures in all times = %s " % Status.numFailuresGlobal)
-        else:
-            Statistics.log("[no failures]")  # altrimenti dice "no failures"
-        if args.save:  # Se è stato specificato l'argomento --save, viene chiamata la funzione save per salvare lo stato in un file
-            save(args.save, False)
-        if args.saveall:  # Se è stato specificato l'argomento --saveall, viene chiamata la funzione save per salvare tutti i dati delle imprese in un file
-            save(args.saveall, True)
-        if args.graph:  # Se è stato specificato l'argomento --graph, viene chiamata la funzione show_graph per visualizzare il grafico corrispondente
-            show_graph(True)
-        if args.savegraph:  # Se è stato specificato l'argomento --savegraph, viene chiamata la funzione show_graph per salvare il grafico in un file
-            show_graph(False)
+       
 
 
 def comparison_of_K(show=True):
