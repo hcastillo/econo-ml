@@ -1000,8 +1000,8 @@ parser.add_argument("--saveall", type=str, help="Save all firms data (big file: 
 parser.add_argument("--restoreall", type=str, help="Restore all firms data (big file: and enters interactive mode)")
 parser.add_argument("--save", type=str, help="Save the state (file will be overwritten)")
 parser.add_argument("--restore", type=str, help="Restore the state (and enters interactive mode)")
-parser.add_argument("--sigma", type=float, help="Value for sigma in the model (default=%s" % Config.δ)
-
+#parser.add_argument("--sigma", type=float, help="Value for sigma in the model (default=%s" % Config.σ)
+parser.add_argument("--sigma", type=float, nargs="+", help="Values for sigma in the model")
 args = parser.parse_args()  # esegue il parsing degli argomenti da riga di comando, restituendo un oggetto args che contiene i valori dei flag e delle opzioni specificate dall'utente
 
 if args.sizeparam:  # Se l'argomento --sizeparam è stato specificato, viene aggiornato il valore di Config.Ñ con il valore fornito dall'utente
@@ -1019,8 +1019,10 @@ if args.restoreall or args.restore:  # Se è stato specificato l'argomento --res
         restore(args.restore, False)
 else:  # Se non sono stati specificati gli argomenti --restoreall o --restore, viene chiamata la funzione doSimulation per eseguire la simulazione principale
     if args.sigma:
-        Config.δ = args.sigma
-    doSimulation(args.debug)
+        for sigma_value in args.sigma:
+            Config.σ = sigma_value
+
+            doSimulation(args.debug)
     if Status.numFailuresGlobal > 0:  # Se Status.numFailuresGlobal è maggiore di zero, viene stampato un messaggio sul numero totale di fallimenti
         Statistics.log("[total failures in all times = %s " % Status.numFailuresGlobal)
     else:
@@ -1033,17 +1035,14 @@ else:  # Se non sono stati specificati gli argomenti --restoreall o --restore, v
         show_graph(True)
     if args.savegraph:  # Se è stato specificato l'argomento --savegraph, viene chiamata la funzione show_graph per salvare il grafico in un file
         show_graph(False)
-    
-for sigma in Config.sigma_values:
-        Config.σ = sigma
-       
 
 
 def comparison_of_K(show=True):
+    print("This is the list of output K")
     print(Statistics.outputK)
     plt.clf()
 
-    for sigma_index, sigma in enumerate(Config.sigma_values):
+    for sigma_index, sigma in enumerate(args.sigma):
         xx1 = []
         yy = []
         for i in range(150, Config.T):
@@ -1059,14 +1058,14 @@ def comparison_of_K(show=True):
     plt.show() if show else plt.savefig("aggregate_output.svg")
 
 def comparison_of_K_boxplot(show=True):
-    print(Statistics.outputK)
+    #print(Statistics.outputK)
     plt.clf()
 
     # Estrae le serie di dati da Statistics.outputK a partire dal tempo 150
     data = [[math.log(y) for y in x[150:]] for x in Statistics.outputK]
 
     # Traccia il boxplot
-    plt.boxplot(data, labels=[f'Sigma={sigma}' for sigma in Config.sigma_values])
+    plt.boxplot(data, labels=[f'Sigma={sigma}' for sigma in args.sigma])
 
     plt.ylabel("log K")
     plt.xlabel("Sigma Values")
@@ -1075,10 +1074,11 @@ def comparison_of_K_boxplot(show=True):
     plt.show() if show else plt.savefig("aggregate_output_boxplot_comparison.svg")
 
 def comparison_of_profits_of_companies(show=True):
+    print("This is the list of the profits")
     print(Statistics.profits)
     plt.clf()
 
-    for sigma_index, sigma in enumerate(Config.sigma_values):
+    for sigma_index, sigma in enumerate(args.sigma):
         xx1 = []
         yy = []
         for i in range(150, Config.T):
@@ -1099,10 +1099,11 @@ def comparison_of_phis(show=True):
     # print(f"Length of Statistics.phis: {len(Statistics.phis)}")
     # for i in range(len(Status.firms)):
     # print([x/len(Status.firms) for x in Statistics.phis[i]])
+    print("This is the list of phis")
     print(f"{Statistics.phis}")
     plt.clf()
 
-    for sigma_index, sigma in enumerate(Config.sigma_values):
+    for sigma_index, sigma in enumerate(args.sigma):
         xx1 = []
         yy = []
         for i in range(0, Config.T):
@@ -1125,11 +1126,11 @@ def comparison_of_phis_boxplot(show=True):
     # print(f"Length of Statistics.phis: {len(Statistics.phis)}")
     # for i in range(len(Status.firms)):
     # print([x/len(Status.firms) for x in Statistics.phis[i]])
-    print(f"{Statistics.phis}")
+    #print(f"{Statistics.phis}")
     plt.clf()
 
     data = [[math.log(y) for y in x[150:]] for x in Statistics.phis]
-    plt.boxplot(data, labels=[f'Sigma={sigma}' for sigma in Config.sigma_values])
+    plt.boxplot(data, labels=[f'Sigma={sigma}' for sigma in args.sigma])
     plt.ylabel("log K")
     plt.xlabel("Sigma Values")
     plt.title("Boxplot of Logarithm of Phis")
@@ -1137,10 +1138,11 @@ def comparison_of_phis_boxplot(show=True):
     plt.show() if show else plt.savefig("aggregate_output_boxplot_comparison.svg")
 
 def comparison_of_Y(show=True):
+    print("This is the list of output Y")
     print(Statistics.outputY)
     plt.clf()
 
-    for sigma_index, sigma in enumerate(Config.sigma_values):
+    for sigma_index, sigma in enumerate(args.sigma):
         xx1 = []
         yy = []
         for i in range(150, Config.T):
@@ -1157,14 +1159,14 @@ def comparison_of_Y(show=True):
 
 
 def comparison_of_boxplotY(show=True):
-    print(Statistics.outputK)
+    #print(Statistics.outputY)
     plt.clf()
 
     # Estrae le serie di dati da Statistics.outputK a partire dal tempo 150
     data = [[math.log(y) for y in x[150:]] for x in Statistics.outputY]
 
     # Traccia il boxplot
-    plt.boxplot(data, labels=[f'Sigma={sigma}' for sigma in Config.sigma_values])
+    plt.boxplot(data, labels=[f'Sigma={sigma}' for sigma in args.sigma])
 
     plt.ylabel("log K")
     plt.xlabel("Sigma Values")
