@@ -80,50 +80,58 @@ def training(verbose, times, env, logs):
         env.close()
     return model
 
-
-def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of Interbank model"),
-                    modules: str = typer.Option(None, help=f"Log only this modules (Interbank model)"),
-                    logfile: str = typer.Option(None, help="File to send logs to (Interbank model)"),
-                    n: int = typer.Option(interbank.Config.N, help=f"Number of banks in Interbank model"),
-                    t: int = typer.Option(interbank.Config.T, help=f"Time repetitions of Interbank model"),
-                    simulations: int = typer.Option(NUM_SIMULATIONS, help=f"Number of MonteCarlo simulations"),
-                    save: str = typer.Option(None, help=f"Saves the output of this execution"),
-                    verbose: bool = typer.Option(False, help="Verbosity of RL model"),
-                    train: str = typer.Option(None, help=f"Trains the model and saves it this file"),
-                    load: str = typer.Option(None, help=f"Loads the trained model and runs it"),
-                    logs: str = typer.Option("logs", help=f"Log dir for Tensorboard")):
+def run_interactive():
     """
         Run interactively the model
     """
-    env = InterbankAgent(T=t, N=n)
-    env.interbank_model.log.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
-    if not os.path.isdir(logs):
-        os.mkdir(logs)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log", default='ERROR', help="Log level messages of Interbank model")
+    parser.add_argument("--modules", default=None, help=f"Log only this modules (Interbank model)")
+    parser.add_argument("--logfile", default=None, help="File to send logs to (Interbank model)")
+    parser.add_argument("--n", type=int, default=interbank.Config.N,
+                        help=f"Number of banks in Interbank model")
+    parser.add_argument("--t", type=int, default=interbank.Config.T,
+                        help=f"Time repetitions of Interbank model")
+    parser.add_argument("--simulations", type=int, default=NUM_SIMULATIONS,
+                        help=f"Number of MC simulations")
+    parser.add_argument("--save", default=None, help=f"Saves the output of this execution")
+    parser.add_argument("--verbose", default=False, help="Verbosity of RL model",
+                        action=argparse.BooleanOptionalAction)
+    parser.add_argument("--train", default=None, help=f"Trains the model and saves it this file")
+    parser.add_argument("--load", default=None, help=f"Loads the trained model and runs it")
+    parser.add_argument("--logs", default="logs", help=f"Log dir for Tensorboard")
+    args = parser.parse_args()
+    env = InterbankAgent(T=args.t, N=args.n)
+    env.interbank_model.log.define_log(log=args.log, logfile=args.logfile,
+                                       modules=args.modules, script_name=sys.argv[0])
+    if not os.path.isdir(args.logs):
+        os.mkdir(args.logs)
     description = f"{type(env).__name__} T={env.interbank_model.config.T}" + \
-                  f"N={env.interbank_model.config.N} env={load if load else '-'}"
+                  f"N={env.interbank_model.config.N} env={args.load if args.load else '-'}"
 
     # train ------------------------
-    if train:
+    if args.train:
         t1 = time.time()
-        model = training(verbose, t, env, logs)
-        env.define_savefile(save, description)
-        if verbose:
+        model = training(args.verbose, args.t, env, args.logs)
+        env.define_savefile(args.save, description)
+        if args.verbose:
             print(f"-- total time of execution of training: {time.time() - t1:.2f} secs")
-        model.save(f"{MODELS_DIRECTORY}/{train}" if not train.startswith(MODELS_DIRECTORY) else train)
+        model.save(f"{MODELS_DIRECTORY}/{args.train}" if not args.train.startswith(MODELS_DIRECTORY) else args.train)
     # run -------------------------
     else:
-        if load:
-            model = TD3.load(f"{MODELS_DIRECTORY}/{load}" if not load.startswith(MODELS_DIRECTORY) else load)
+        if args.load:
+            model = TD3.load(f"{MODELS_DIRECTORY}/{args.load}"
+                             if not args.load.startswith(MODELS_DIRECTORY) else args.load)
         else:
-            model = training(verbose, t, env, logs)
-        if simulations == 1:
-            env.define_savefile(save, description)
-        simulation = TD3Simulation(model, env, simulations=simulations)
+            model = training(args.verbose, args.t, env, args.logs)
+        if args.simulations == 1:
+            env.define_savefile(args.save, description)
+        simulation = TD3Simulation(model, env, simulations=args.simulations)
         simulation.run()
-        simulation.save(save)
+        simulation.save(args.save)
 
 
 if __name__ == "__main__":
     if not os.path.isdir(MODELS_DIRECTORY):
         os.mkdir(MODELS_DIRECTORY)
-    typer.run(run_interactive)
+    run_interactive()

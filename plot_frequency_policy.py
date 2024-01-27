@@ -8,7 +8,7 @@ Plots pag21 top frequency of policy recommendation comparing mc.txt to ppo.txt
 
 import matplotlib.pyplot as plt
 import interbank
-import typer
+import argparse
 import numpy as np
 
 class Plot:
@@ -70,21 +70,24 @@ class Plot:
             print("plot saved in ", destination)
 
 
-def run_interactive(save: str = typer.Option("freq_ppo_mc", help=f"Saves the plot"),
-                    extension: str = typer.Option("svg", help=f"Saves as svg/pdf/jpg/png"),
-                    load: str = typer.Option("ppo_policy,mc_policy",
-                                             help=f"Loads the file(s) with the data (sep by comma)")):
+def run_interactive():
     """
         Run the Plot class
     """
     plot = Plot()
-    if load and save:
-        plot.load_data(load)
-        plot.plot(save, extension)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save", default="cum_fitness1", help=f"Saves the plot")
+    parser.add_argument("--extension", default='svg', help="Saves as svg/pdf/jpg/png")
+    parser.add_argument("--load", default='ppo_policy,mc_policy',
+                        help="Loads the file(s) with the data (sep by comma)")
+    args = parser.parse_args()
+    if args.load and args.save:
+        plot.load_data(args.load)
+        plot.plot(args.save, args.extension)
     else:
         print("bad usage: check --load mc,ppo --save freq_mc_ppo")
 
 
-app = typer.Typer()
 if __name__ == "__main__":
-    typer.run(run_interactive)
+    run_interactive()
+

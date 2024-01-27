@@ -8,7 +8,7 @@ Runs the Interbank model using montecarlo to determine the precision of RL model
 
 import interbank
 import numpy as np
-import typer
+import argparse
 import sys
 import tqdm
 from scipy.stats import bernoulli
@@ -91,23 +91,30 @@ class Montecarlo:
         self.save_summary(filename)
 
 
-def run_interactive(log: str = typer.Option('ERROR', help="Log level messages of Interbank model"),
-                    modules: str = typer.Option(None, help=f"Log only this modules (Interbank model)"),
-                    logfile: str = typer.Option(None, help="File to send logs to (Interbank model)"),
-                    n: int = typer.Option(interbank.Config.N, help=f"Number of banks in Interbank model"),
-                    t: int = typer.Option(interbank.Config.T, help=f"Time repetitions of Interbank model"),
-                    simulations: int = typer.Option(NUM_SIMULATIONS, help=f"Number of MonteCarlo simulations"),
-                    fixed_eta: int = typer.Option(None, help=f"Fix the eta ŋ to this value (0,1)"),
-                    save: str = typer.Option(None, help=f"Saves the output of this execution")):
+def run_interactive():
     """
         Run interactively the model
     """
-    environment = interbank.Model(T=t, N=n)
-    environment.log.define_log(log=log, logfile=logfile, modules=modules, script_name=sys.argv[0])
-    simulation = Montecarlo(environment=environment, simulations=simulations, fixed_eta=fixed_eta)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--log", default='ERROR', help="Log level messages of Interbank model")
+    parser.add_argument("--modules", default=None, help=f"Log only this modules (Interbank model)")
+    parser.add_argument("--logfile", default=None, help="File to send logs to (Interbank model)")
+    parser.add_argument("--n", type=int, default=interbank.Config.N,
+                        help=f"Number of banks in Interbank model")
+    parser.add_argument("--t", type=int, default=interbank.Config.T,
+                        help=f"Time repetitions of Interbank model")
+    parser.add_argument("--simulations", type=int, default=NUM_SIMULATIONS,
+                        help=f"Number of MonteCarlo simulations")
+    parser.add_argument("--fixed_eta", type=int, default=None, help="Fix the eta ŋ to this value (0,1)")
+    parser.add_argument("--save", default=None, help=f"Saves the output of this execution")
+    args = parser.parse_args()
+
+    environment = interbank.Model(T=args.t, N=args.n)
+    environment.log.define_log(log=args.log, logfile=args.logfile, modules=args.modules, script_name=sys.argv[0])
+    simulation = Montecarlo(environment=environment, simulations=args.simulations, fixed_eta=args.fixed_eta)
     simulation.run()
-    simulation.save(save)
+    simulation.save(args.save)
 
 
 if __name__ == "__main__":
-    typer.run(run_interactive)
+    run_interactive()

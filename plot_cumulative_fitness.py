@@ -8,10 +8,10 @@ Plots pag21 top frequency of policy recommendation comparing mc.txt to ppo.txt
 
 import matplotlib.pyplot as plt
 import interbank
-import typer
 import numpy as np
 import pandas as pd
 import math
+import argparse
 
 
 class Plot:
@@ -111,24 +111,26 @@ class Plot:
             print("plot saved in ", destination)
 
 
-def run_interactive(save: str = typer.Option("cum_fitness1", help=f"Saves the plot"),
-                    n: int = typer.Option(50, help="Number of banks"),
-                    extension: str = typer.Option("svg", help=f"Saves as svg/pdf/jpg/png"),
-                    type: str = typer.Option("sma", help="sma or ewma (moving average) or none (raw data)"),
-                    load: str = typer.Option("ppo_fitness,mc_fitness",
-                                             help=f"Loads the file(s) with the data (sep by comma)")):
+def run_interactive():
     """
         Run the Plot class
     """
     global plot
     plot = Plot()
-    if load and save:
-        plot.load_data(n, load)
-        plot.plot(save, extension, type)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save", default="cum_fitness1", help=f"Saves the plot")
+    parser.add_argument("--n", type=int, default=50, help=f"Number of banks")
+    parser.add_argument("--extension", default='svg', help="Saves as svg/pdf/jpg/png")
+    parser.add_argument("--type", default='sma', help=f"sma or ewma (moving average) or none (raw data)")
+    parser.add_argument("--load", default='ppo_fitness,mc_fitness',
+                        help="Loads the file(s) with the data (sep by comma)")
+    args = parser.parse_args()
+    if args.load and args.save:
+        plot.load_data(args.n, args.load)
+        plot.plot(args.save, args.extension, type)
     else:
         print("bad usage: check --load mc,ppo --save freq_mc_ppo")
 
 
-app = typer.Typer()
 if __name__ == "__main__":
-    typer.run(run_interactive)
+    run_interactive()

@@ -12,7 +12,7 @@ import enum
 import random
 import logging
 import math
-import typer
+import argparse
 import bokeh.plotting
 import bokeh.io
 import numpy as np
@@ -166,7 +166,7 @@ class Statistics:
             self.save_liquidity(export_datafile)
             self.save_credit_channels(export_datafile)
 
-        if Utils.is_notebook():
+        if Utils.is_notebook() or Utils.is_spyder():
             from bokeh.io import output_notebook
             output_notebook()
             self.plot_bankruptcies()
@@ -1017,29 +1017,35 @@ class Utils:
             return t
 
     @staticmethod
-    def run_interactive(log: str = typer.Option('ERROR', help="Log level messages (ERROR,DEBUG,INFO...)"),
-                        modules: str = typer.Option(None, help=f"Log only this modules (separated by ,)"),
-                        logfile: str = typer.Option(None, help="File to send logs to"),
-                        save: str = typer.Option(None, help=f"Saves the output of this execution"),
-                        graph: str = typer.Option(None, help=f"List of t in which save the network config"),
-                        n: int = typer.Option(Config.N, help=f"Number of banks"),
-                        debug: int = typer.Option(None, help="Stop and enter in debug mode after at this time"),
-                        eta: float = typer.Option(Model.ŋ, help=f"Policy recommendation"),
-                        t: int = typer.Option(Config.T, help=f"Time repetitions")):
+    def run_interactive():
         """
             Run interactively the model
         """
         global model
-        if t != model.config.T:
-            model.config.T = t
-        if n != model.config.N:
-            model.config.N = n
-        if eta != model.ŋ:
-            model.ŋ = eta
-        if debug:
-            model.do_debug(debug)
-        model.log.define_log(log, logfile, modules)
-        Utils.run(save, Utils.__extract_t_values_from_arg__(graph))
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--log", default='ERROR', help="Log level messages (ERROR,DEBUG,INFO...)")
+        parser.add_argument("--modules", default=None, help=f"Log only this modules (separated by ,)")
+        parser.add_argument("--logfile", default=None, help="File to send logs to")
+        parser.add_argument("--save", default=None, help=f"Saves the output of this execution")
+        parser.add_argument("--graph", default=None, help=f"List of t in which save the network config")
+        parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
+        parser.add_argument("--debug", type=int, default=None,
+                            help="Stop and enter in debug mode after at this time")
+        parser.add_argument("--eta", type=float, default=Model.ŋ, help=f"Policy recommendation")
+        parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
+
+        args = parser.parse_args()
+
+        if args.t != model.config.T:
+            model.config.T = args.t
+        if args.n != model.config.N:
+            model.config.N = args.n
+        if args.eta != model.ŋ:
+            model.ŋ = args.eta
+        if args.debug:
+            model.do_debug(args.debug)
+        model.log.define_log(args.log, args.logfile, args.modules)
+        Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph))
 
     @staticmethod
     def run(save=None, save_graph_instants=None):
@@ -1052,10 +1058,16 @@ class Utils:
     def is_notebook():
         try:
             __IPYTHON__
-            return True
+            return get_ipython().__class__.__name__!="SpyderShell"
         except NameError:
             return False
-
+    
+    @staticmethod
+    def is_spyder():
+        try:
+            return get_ipython().__class__.__name__=="SpyderShell"
+        except:
+            return False    
 
 # %%
 
@@ -1067,7 +1079,7 @@ if Utils.is_notebook():
 else:
     # if we are running interactively:
     if __name__ == "__main__":
-        typer.run(Utils.run_interactive)
+        Utils.run_interactive()
 
 # in other cases, if you import it, the process will be:
 #   model = Model()
