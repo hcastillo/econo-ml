@@ -13,8 +13,6 @@ import random
 import logging
 import math
 import argparse
-import bokeh.plotting
-import bokeh.io
 import numpy as np
 import sys
 import networkx as nx

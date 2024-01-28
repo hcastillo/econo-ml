@@ -130,8 +130,8 @@ def run_interactive():
         plot.what()
     else:
         if args.load and args.save:
-            plot.load_data(args.load, args.tmin)
-            plot.plot(args.column, args.save, args.extension, args.tmin, args.y2, None)
+            plot.load_data(args.load, args.t_min)
+            plot.plot(args.column, args.save, args.extension, args.t_min, args.y2, None)
         else:
             print("bad usage: check --help")
 

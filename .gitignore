@@ -2,6 +2,8 @@
 __pycache__/
 alessio/
 logs/
+output/*
+models/*
 ppo/*
 .idea/*
 *.txt
