@@ -15,7 +15,6 @@ import math
 import argparse
 import numpy as np
 import sys
-import networkx as nx
 import matplotlib.pyplot as plt
 
 
@@ -42,7 +41,7 @@ class Config:
     ξ: float = 0.3  # xi
     ρ: float = 0.3  # ro fire sale cost
 
-    β: float = 5    # intensity of breaking the connection
+    β: float = 5    # intensity of breaking the connection (5)
     α: float = 0.1  # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
@@ -52,6 +51,10 @@ class Config:
     D_i0: float = 135   # deposits
     E_i0: float = 15    # equity
     r_i0: float = 0.02  # initial rate
+
+    # if enabled and != [] the values of t in the array (for instance [150,350]) will generate
+    # a graph with the relations of the firms:
+    GRAPHS_MOMENTS = []
 
     def __str__(self):
         description = sys.argv[0]
@@ -177,15 +180,20 @@ class Statistics:
         """
         Extracts from the model the graph that corresponds to the network in this instant
         """
+        import networkx as nx
         self.graphs[t] = nx.DiGraph(directed=True)
         for bank in self.model.banks:
             self.graphs[t].add_edge(bank.id, bank.lender)
         plt.clf()
+        plt.title(f"t={t}")
         pos = nx.spring_layout(self.graphs[t])
         # pos = nx.spiral_layout(graph)
         nx.draw(self.graphs[t], pos, with_labels=True, arrowstyle='->')
         filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-        plt.savefig(Statistics.get_export_path(filename).replace('.txt', f"_{t}.png"))
+        if Utils.is_spyder():
+            plt.show()
+        else:
+            plt.savefig(Statistics.get_export_path(filename).replace('.txt', f"_{t}.png"))
 
 
     @staticmethod
@@ -1045,6 +1053,8 @@ class Utils:
     @staticmethod
     def run(save=None, save_graph_instants=None):
         global model
+        if not save_graph_instants and Config.GRAPHS_MOMENTS:
+            save_graph_instants = Config.GRAPHS_MOMENTS
         model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants)
         model.simulate_full()
         model.finish()
