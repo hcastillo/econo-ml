@@ -20,7 +20,7 @@ import os
 from PIL import Image
 #import cv2
 import matplotlib.pyplot as plt
-#import interbank_lenderchange as lc
+import interbank_lenderchange as lc
 
 class Config:
     """
@@ -37,9 +37,7 @@ class Config:
     µ: float = 0.7  # mi
     ω: float = 0.6  # omega
 
-    # parameter to control the change of guru: 0 then Boltzmann only, 1 everyone will move randomly
-    γ: float = 0.5  # [0..1] gamma
-    CHANGE_LENDER_IF_HIGHER = 0.5
+    lenderchange : lc.LenderChange = lc.Boltzman()
 
     # screening costs
     Φ: float = 0.025  # phi
@@ -107,7 +105,6 @@ class Statistics:
     fitness = []
     rationing = []
     leverage = []
-    boltzmann = []
     P = []
     B = []
     model = None
@@ -360,8 +357,8 @@ class Statistics:
         plt.plot(xx, yy_std, '-', color="aquamarine", label="Std")
         plt.plot(xx, yy, '-', color="blue", label="Avg prob with $\gamma$")
         plt.xlabel("Time")
-        plt.title(f"Prob of change lender $\\gamma={Config.γ}$")
-        plt.ylabel(f"Changes if >{Config.CHANGE_LENDER_IF_HIGHER})")
+        plt.title(f"Prob of change lender $\\gamma={Config.lenderchange.γ}$")
+        plt.ylabel(f"Changes if >{self.model.config.lenderchange.CHANGE_LENDER_IF_HIGHER})")
         plt.legend()
         if export_datafile:
             plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_prob_change_lender.svg"))
@@ -516,14 +513,17 @@ class Log:
 
     def debug(self, module, text):
         if self.modules == [] or module in self.modules:
-            self.logger.debug(f"t={self.model.t:03}/{module:6} {text}")
+            if text:
+                self.logger.debug(f"t={self.model.t:03}/{module:6} {text}")
 
     def info(self, module, text):
         if self.modules == [] or module in self.modules:
-            self.logger.info(f" t={self.model.t:03}/{module:6} {text}")
+            if text:
+                self.logger.info(f" t={self.model.t:03}/{module:6} {text}")
 
     def error(self, module, text):
-        self.logger.error(f"t={self.model.t:03}/{module:6} {text}")
+        if text:
+            self.logger.error(f"t={self.model.t:03}/{module:6} {text}")
 
     def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = "%(module)s"):
         self.modules = modules.split(",") if modules else []
@@ -627,12 +627,7 @@ class Model:
         self.export_description = str(self.config) if export_description is None else export_description
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
-        self.define_relationships_between_banks()
-
-    def define_relationships_between_banks(self):
-        print("aqui_definimos_grafo")
-
-
+        self.config.lenderchange.initialize_bank_relationships()
 
     def forward(self):
         self.initialize_step()
@@ -988,41 +983,8 @@ class Model:
         if self.config.N <= 10:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
-        # we can now break old links and set up new lenders, using probability P
-        # (equation 8)
         for bank in self.banks:
-            possible_lender = bank.new_lender()
-            possible_lender_μ = self.banks[possible_lender].μ
-            current_lender_μ = bank.getLender().μ
-
-            bank.boltzmann = 1 / (1 + math.exp(-self.config.β * (possible_lender_μ - current_lender_μ)))
-
-
-            # con este trozo de codigo, estamos en realidad haciendo beta infinito:
-            ##if possible_lender_μ > current_lender_μ:
-            ##    bank.lender = possible_lender
-            ##    self.log.debug("links",
-            ##                   f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender}")
-
-            if self.t < 20:
-                # bank.P = 0.35
-                # bank.P = random.random()
-                bank.P = bank.boltzmann
-                # option a) bank.P initially 0.35
-                # option b) bank.P randomly
-                # option c) with t<=20 boltzmann, and later, stabilize it
-            else:
-                bank.P_yesterday = bank.P
-                # gamma is not sticky/loyalty, persistence of the previous attitude
-                bank.P = self.config.γ * bank.P_yesterday + (1-self.config.γ) * bank.boltzmann
-
-            if bank.P >= Config.CHANGE_LENDER_IF_HIGHER:
-                self.log.debug("links",
-                               f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}")
-                bank.lender = possible_lender
-            else:
-                self.log.debug("links", f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}")
-
+            self.log.debug("links",self.config.lenderchange.change_lender(model, bank, self.t))
 
 # %%
 
