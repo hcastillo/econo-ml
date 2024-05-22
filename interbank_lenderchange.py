@@ -20,7 +20,11 @@ import os
 from PIL import Image
 #import cv2
 import matplotlib.pyplot as plt
-#import interbank_lenderchange as lc
+import interbank_lenderchange as lc
+
+
+class LenderChange:
+    pass
 
 class Config:
     """
@@ -87,6 +91,7 @@ class DataColumns(enum.IntEnum):
     LEVERAGE = 9
     PROB_CHANGE_LENDER = 10
     BAD_DEBT = 11
+    PROB_CHANGE_LENDER_BOLTZMANN = 12
 
     def get_name(i):
         for j in DataColumns:
@@ -137,6 +142,7 @@ class Statistics:
         self.P_min = np.zeros(self.model.config.T, dtype=float)
         self.P_std = np.zeros(self.model.config.T, dtype=float)
         self.B = np.zeros(self.model.config.T, dtype=float)
+        self.boltzmann = np.zeros(self.model.config.T, dtype=float)
 
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
@@ -185,6 +191,8 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
 
+    def compute_probability_of_lender_change_boltzmann(self):
+        self.boltzmann[self.model.t] = sum(map(lambda x: x.boltzmann, self.model.banks)) / self.model.config.N
 
     def export_data(self, export_datafile=None, export_description=None):
         if export_datafile:
@@ -259,7 +267,7 @@ class Statistics:
         if export_datafile:
             with open(Statistics.get_export_path(export_datafile), 'w', encoding="utf-8") as savefile:
                 savefile.write('  t\tpolicy\tfitness           \tliquidity            \tir         \t' +
-                               'bankrupts\tbestLenderID\tbestLenderClients\tcreditChannels\trationing\tleverage\tprob_change_lender\tbad_debt\n')
+                               'bankrupts\tbestLenderID\tbestLenderClients\tcreditChannels\trationing\tleverage\tprob_change_lender\tbad_debt\tpercentage_boltzman\n')
                 if export_description:
                     savefile.write(f"# {export_description}\n")
                 else:
@@ -275,6 +283,7 @@ class Statistics:
                                    f"\t{self.leverage[i]:20}" +
                                    f"\t{self.P[i]:20}" +
                                    f"\t{self.B[i]:20}" +
+                                   f"\t{self.boltzmann[i]:20}" +
                                    "\n")
 
     def get_data(self):
@@ -290,7 +299,8 @@ class Statistics:
             np.array(self.rationing),
             np.array(self.leverage),
             np.array(self.P),
-            np.array(self.B))
+            np.array(self.B),
+            np.array(self.boltzmann))
 
     def plot_bankruptcies(self, export_datafile=None):
         xx = []
@@ -346,25 +356,44 @@ class Statistics:
         yy_min = []
         yy_max = []
         yy_std = []
-
+        boltz = []
         for i in range(self.model.config.T):
             xx.append(i)
             yy.append(self.P[i])
             yy_min.append(self.P_min[i])
             yy_max.append(self.P_max[i])
             yy_std.append(self.P_std[i])
-
+            if Config.γ>0:
+                boltz.append(self.boltzmann[i])
         plt.clf()
         plt.plot(xx, yy_min, ':', color="cyan", label="Max and min prob")
         plt.plot(xx, yy_max, ':', color="cyan")
         plt.plot(xx, yy_std, '-', color="aquamarine", label="Std")
         plt.plot(xx, yy, '-', color="blue", label="Avg prob with $\gamma$")
+        if Config.γ > 0:
+            plt.plot(xx, boltz, '-', color="red", label="Avg Boltzmann's prob")
         plt.xlabel("Time")
         plt.title(f"Prob of change lender $\\gamma={Config.γ}$")
         plt.ylabel(f"Changes if >{Config.CHANGE_LENDER_IF_HIGHER})")
         plt.legend()
         if export_datafile:
             plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_prob_change_lender.svg"))
+        else:
+            plt.show()
+
+    def plot_boltzmann(self, export_datafile=None):
+        xx = []
+        yy = []
+        for i in range(self.model.config.T):
+            xx.append(i)
+            yy.append(self.boltzmann[i])
+        plt.clf()
+        plt.plot(xx, yy, '-', color="blue")
+        plt.xlabel("Time")
+        plt.title("Percentage of Prob due to Boltzmann")
+        plt.ylabel("Percentage of Prob due to Boltzmann")
+        if export_datafile:
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_boltzmann.svg"))
         else:
             plt.show()
 
@@ -654,6 +683,7 @@ class Model:
         self.statistics.compute_rationing()
         self.setup_links()
         self.statistics.compute_probability_of_lender_change()
+        self.statistics.compute_probability_of_lender_change_boltzmann()
         self.log.debug_banks()
         if self.save_graphs is not None and (self.save_graphs=='*' or self.t in self.save_graphs):
             filename = self.statistics.get_graph(self.t)
@@ -1087,6 +1117,7 @@ class Bank:
         self.l = 0  # amount of loan done:  estimated later
         self.s = 0  # amount of loan received: estimated later
         self.B = 0  # bad debt: estimated later
+        self.boltzmann = 0  # Boltzmann's probability of change (without use of gamma)
         self.failed = False
 
         # identity of the lender

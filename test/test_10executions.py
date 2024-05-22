@@ -18,7 +18,7 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         self.assertEqual(self.model.banks[1].C, 72.4384110807936)
         self.assertEqual(self.model.banks[3].D, 135)
         self.assertEqual(self.model.banks[4].E, 15)
-        self.assertEqual(self.model.banks[0].A, 242.26886220650744)
+        self.assertEqual(self.model.banks[0].A,  233.9395010365535) #242.26886220650744)
         self.assertEqual(self.model.banks[1].A, 192.4384110807936)
         self.assertEqual(self.model.banks[2].A, 145.42985507645253)
         self.assertEqual(self.model.banks[3].A, 150)

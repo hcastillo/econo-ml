@@ -4,6 +4,7 @@ alessio/
 logs/
 output/*
 models/*
+lenders/*
 ppo/*
 .idea/*
 *.txt
