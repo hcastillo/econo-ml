@@ -1,26 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Generates a simulation of an interbank network following the rules described in paper
-  Reinforcement Learning Policy Recommendation for Interbank Network Stability
-  from Gabrielle and Alessio
+LenderChange is a class used from interbank.py to control the change of lender in a bank.
+   It contains different
 
 @author: hector@bith.net
 @date:   04/2023
 """
-import copy
-import enum
 import random
-import logging
 import math
-import argparse
 import numpy as np
-import networkx as nx
-import sys
-import os
-from PIL import Image
-#import cv2
-import matplotlib.pyplot as plt
-import interbank_lenderchange as lc
 
 
 class LenderChange:
@@ -28,20 +16,29 @@ class LenderChange:
     γ: float = 0.5  # [0..1] gamma
     CHANGE_LENDER_IF_HIGHER = 0.5
 
+    """ Call from Model.initialization()
+    """
+
     def initialize_bank_relationships(self):
         pass
 
+    """ Call at the end of each step before going to the next
+    """
+
     def change_lender(self, model, bank, t):
         pass
+
+    """ Call at the end of each step before going to the next
+    """
 
     def new_lender(self, model, bank):
         pass
 
 
 class Boltzman(LenderChange):
-
-    """ changes lender for the bank 'bank' in instant 't' 
+    """ changes lender for the bank 'bank' in instant 't'
     """
+
     def change_lender(self, model, bank, t):
         # sale de .new_lender()
         possible_lender = self.new_lender(model, bank)
@@ -68,8 +65,11 @@ class Boltzman(LenderChange):
             text_to_return = f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}"
             bank.lender = possible_lender
         else:
-            text_to_return= f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}"
+            text_to_return = f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}"
         return text_to_return
+
+    """ gives to the bank a random new lender. It's used initially and from change_lender() 
+    """
 
     def new_lender(self, model, bank):
         # r_i0 is used the first time the bank is created:
@@ -98,3 +98,22 @@ class Boltzman(LenderChange):
                         new_value += 1
         return new_value
 
+
+class InitialStability(Boltzman):
+    """ We define a Barabási–Albert graph with 1 edges for each node and we convert to a directed graph
+    """
+
+    def initialize_bank_relationships(self):
+        g = nx.barabasi_albert_graph(nodos, 3)
+        pos = nx.spring_layout(g)
+        nx.draw(g, pos, with_labels=True)
+        plt.show()
+
+
+class ShockedMarkt(LenderChange):
+    pass
+
+
+if __name__ == "__main__":
+    intento = InitialStability()
+    intento.initialize_bank_relationships()

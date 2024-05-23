@@ -11,7 +11,6 @@ import copy
 import enum
 import random
 import logging
-import math
 import argparse
 import numpy as np
 import networkx as nx
@@ -37,6 +36,10 @@ class Config:
     µ: float = 0.7  # mi
     ω: float = 0.6  # omega
 
+    # lc.Boltzman() -> using Boltzman probability to change
+    # lc.InitialStability -> using a Barabási–Albert graph to initially assign relationships between banks
+    # lc.ShockedMarkt -> using a Barabási–Albert graph with at least two edges for each node and restrict to it during
+    #                    all simulation
     lenderchange : lc.LenderChange = lc.Boltzman()
 
     # screening costs
