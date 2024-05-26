@@ -17,16 +17,16 @@ import networkx as nx
 import sys
 import os
 from PIL import Image
-#import cv2
 import matplotlib.pyplot as plt
 import interbank_lenderchange as lc
+
 
 class Config:
     """
     Configuration parameters for the interbank network
     """
     T: int = 1000  # time (1000)
-    N: int = 50    # number of banks (50)
+    N: int = 50  # number of banks (50)
 
     # not used in this implementation:
     # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
@@ -36,11 +36,8 @@ class Config:
     µ: float = 0.7  # mi
     ω: float = 0.6  # omega
 
-    # lc.Boltzman() -> using Boltzman probability to change
-    # lc.InitialStability -> using a Barabási–Albert graph to initially assign relationships between banks
-    # lc.ShockedMarkt -> using a Barabási–Albert graph with at least two edges for each node and restrict to it during
-    #                    all simulation
-    lenderchange : lc.LenderChange = lc.Boltzman()
+    # Lender's change mechanism
+    lender_change: lc.LenderChange = None
 
     # screening costs
     Φ: float = 0.025  # phi
@@ -50,15 +47,15 @@ class Config:
     ξ: float = 0.3  # xi
     ρ: float = 0.3  # ro fire sale cost
 
-    β: float = 5    # intensity of breaking the connection (5)
+    β: float = 5  # intensity of breaking the connection (5)
     α: float = 0.1  # below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
     # L + C + (R) = D + E
-    L_i0: float = 120   # long term assets
-    C_i0: float = 30    # capital
-    D_i0: float = 135   # deposits
-    E_i0: float = 15    # equity
+    L_i0: float = 120  # long term assets
+    C_i0: float = 30  # capital
+    D_i0: float = 135  # deposits
+    E_i0: float = 15  # equity
     r_i0: float = 0.02  # initial rate
 
     # if enabled and != [] the values of t in the array (for instance [150,350]) will generate
@@ -94,7 +91,7 @@ class DataColumns(enum.IntEnum):
             if j.value == i:
                 return j.name.replace("_", " ").lower()
         return None
-    
+
 
 class Statistics:
     bankruptcy = []
@@ -112,8 +109,10 @@ class Statistics:
     B = []
     model = None
     graphs = {}
+    graphs_pos = None
 
     OUTPUT_DIRECTORY = "output"
+    NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
 
     def __init__(self, model):
         self.model = model
@@ -185,7 +184,6 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
 
-
     def export_data(self, export_datafile=None, export_description=None):
         if export_datafile:
             self.save_data(export_datafile, export_description)
@@ -214,10 +212,8 @@ class Statistics:
             self.graphs[t].add_edge(bank.id, bank.lender)
         plt.clf()
         plt.title(f"t={t}")
-        pos = nx.spring_layout(self.graphs[t])
-
-        # pos = nx.spiral_layout(graph)
-        nx.draw(self.graphs[t], pos, with_labels=True, arrowstyle='->')
+        self.graphs_pos = nx.spring_layout(self.graphs[t], pos=self.graphs_pos)
+        nx.draw(self.graphs[t], pos=self.graphs_pos, with_labels=True, arrowstyle='->')
         filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
 
         if Utils.is_spyder():
@@ -228,29 +224,38 @@ class Statistics:
             plt.savefig(filename)
             return filename
 
-
-    def create_animation_graph(self,list_of_files):
-        filename_output = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-        filename_output = Statistics.get_export_path(filename_output).replace('.txt','.gif')
-        images=[]
-        for image_file in list_of_files:
-            images.append(Image.open(image_file))
-        images[0].save(fp=filename_output, format='GIF', append_images=images[1:],
-             save_all=True, duration=100, loop=0)
-        # filename_output = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-        # filename_output = Statistics.get_export_path(filename_output).replace('.txt', '.avi')
-        # frame0 = cv2.imread(list_of_files[0])
-        # height, width, layers = frame0.shape
-        # video = cv2.VideoWriter(filename_output, 0, 1, (width, height))
-        # video.write(frame0)
-        # for image in list_of_files[1:]:
-        #     video.write(cv2.imread(image))
-        # cv2.destroyAllWindows()
-        # video.release()
+    def create_animation_graph(self, list_of_files):
+        if len(list_of_files) == 0:
+            return
+        else:
+            if len(list_of_files) > self.NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH:
+                positions_of_images = len(list_of_files) / self.NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH
+            else:
+                positions_of_images = 1
+            filename_output = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
+            filename_output = Statistics.get_export_path(filename_output).replace('.txt', '.gif')
+            images = []
+            for idx, image_file in enumerate(list_of_files):
+                # if more >40 images, only those that are divisible by 40 are incorporated:
+                if not (idx % positions_of_images == 0):
+                    continue
+                images.append(Image.open(image_file))
+            images[0].save(fp=filename_output, format='GIF', append_images=images[1:],
+                           save_all=True, duration=100, loop=0)
+            # filename_output = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
+            # filename_output = Statistics.get_export_path(filename_output).replace('.txt', '.avi')
+            # frame0 = cv2.imread(list_of_files[0])
+            # height, width, layers = frame0.shape
+            # video = cv2.VideoWriter(filename_output, 0, 1, (width, height))
+            # video.write(frame0)
+            # for image in list_of_files[1:]:
+            #     video.write(cv2.imread(image))
+            # cv2.destroyAllWindows()
+            # video.release()
 
     @staticmethod
     def get_export_path(filename):
-        #if not filename.startswith(Statistics.OUTPUT_DIRECTORY):
+        # if not filename.startswith(Statistics.OUTPUT_DIRECTORY):
         if not os.path.dirname(filename):
             filename = f"{Statistics.OUTPUT_DIRECTORY}/{filename}"
         return filename if filename.endswith('.txt') else f"{filename}.txt"
@@ -360,8 +365,7 @@ class Statistics:
         plt.plot(xx, yy_std, '-', color="aquamarine", label="Std")
         plt.plot(xx, yy, '-', color="blue", label="Avg prob with $\gamma$")
         plt.xlabel("Time")
-        plt.title(f"Prob of change lender $\\gamma={Config.lenderchange.γ}$")
-        plt.ylabel(f"Changes if >{self.model.config.lenderchange.CHANGE_LENDER_IF_HIGHER})")
+        plt.title("Prob oc change lender "+self.model.config.lender_change.describe())
         plt.legend()
         if export_datafile:
             plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_prob_change_lender.svg"))
@@ -400,7 +404,6 @@ class Statistics:
         else:
             plt.show()
 
-
     def plot_best_lender(self, export_datafile=None):
         xx = []
         yy = []
@@ -414,7 +417,7 @@ class Statistics:
             xx.append(i)
             yy.append(self.best_lender[i] / self.model.config.N)
             yy2.append(self.best_lender_clients[i] / self.model.config.N)
-            if current_lender!=self.best_lender[i]:
+            if current_lender != self.best_lender[i]:
                 if max_duration < current_duration:
                     max_duration = current_duration
                     time_init = i - current_duration
@@ -428,11 +431,11 @@ class Statistics:
         plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue", label="id")
         plt.plot(xx, yy2, '-', color="red", label="Num clients")
-        plt.xlabel(f"Time (best lender={final_best_lender} at t=[{time_init}..{time_init+max_duration}])")
+        plt.xlabel(f"Time (best lender={final_best_lender} at t=[{time_init}..{time_init + max_duration}])")
 
         xx3 = []
         yy3 = []
-        for i in range(time_init,time_init+max_duration):
+        for i in range(time_init, time_init + max_duration):
             xx3.append(i)
             yy3.append(self.best_lender[i] / self.model.config.N)
         plt.plot(xx3, yy3, '-', color="orange", linewidth=2.0)
@@ -593,7 +596,7 @@ class Model:
     export_description = None
 
     policy_actions_translation = [0.0, 0.5, 1.0]
-    
+
     def __init__(self, **configuration):
         self.log = Log(self)
         self.statistics = Statistics(self)
@@ -618,7 +621,7 @@ class Model:
         self.initialize()
 
     def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None,
-                   export_datafile=None, export_description=None ):
+                   export_datafile=None, export_description=None):
         self.statistics.reset()
         if not dont_seed:
             random.seed(seed if seed else self.default_seed)
@@ -630,7 +633,7 @@ class Model:
         self.export_description = str(self.config) if export_description is None else export_description
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
-        self.config.lenderchange.initialize_bank_relationships()
+        self.config.lender_change.initialize_bank_relationships(self)
 
     def forward(self):
         self.initialize_step()
@@ -653,7 +656,7 @@ class Model:
         self.setup_links()
         self.statistics.compute_probability_of_lender_change()
         self.log.debug_banks()
-        if self.save_graphs is not None and (self.save_graphs=='*' or self.t in self.save_graphs):
+        if self.save_graphs is not None and (self.save_graphs == '*' or self.t in self.save_graphs):
             filename = self.statistics.get_graph(self.t)
             if filename:
                 self.save_graphs_results.append(filename)
@@ -691,8 +694,7 @@ class Model:
         else:
             summary += " ŋ variate during simulation"
         self.log.info("*****", summary)
-        if self.save_graphs=='*':
-            self.statistics.create_animation_graph(self.save_graphs_results)
+        self.statistics.create_animation_graph(self.save_graphs_results)
         return self.statistics.get_data()
 
     def set_policy_recommendation(self, n: int = None, ŋ: float = None, ŋ1: float = None):
@@ -707,7 +709,7 @@ class Model:
             self.log.debug("*****", f"ŋ changed to {ŋ}")
             self.policy_changes += 1
         self.ŋ = ŋ
-        
+
     def limit_to_two_policies(self):
         self.policy_actions_translation = [0.0, 1.0]
 
@@ -872,9 +874,10 @@ class Model:
                 if loan_to_return > bank.C:
                     we_need_to_sell = loan_to_return - bank.C
                     bank.C = 0
-                    bank.paidloan = bank.doFiresalesL(we_need_to_sell,
-                                                      f"to return loan and interest {loan_to_return:.3f} > C={bank.C:.3f}",
-                                                      "repay")
+                    bank.paidloan = bank.doFiresalesL(
+                        we_need_to_sell,
+                        f"to return loan and interest {loan_to_return:.3f} > C={bank.C:.3f}",
+                        "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
                 else:
                     bank.C -= loan_to_return
@@ -884,9 +887,10 @@ class Model:
                     bank.getLender().s -= bank.l  # we reduce the  's' => the lender could have more loans
                     bank.getLender().C += loan_to_return  # we return the loan and it's profits
                     bank.getLender().E += loan_profits  # the profits are paid as E
-                    self.log.debug("repay",
-                                   f"{bank.getId()} pays loan {loan_to_return:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
-                                   f" {bank.getLender().getId()} (ΔE={loan_profits:.3f},ΔC={bank.l:.3f})")
+                    self.log.debug(
+                        "repay",
+                        f"{bank.getId()} pays loan {loan_to_return:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
+                        f" {bank.getLender().getId()} (ΔE={loan_profits:.3f},ΔC={bank.l:.3f})")
 
         # now  when ΔD<0 it's time to use Capital or sell L again
         # (now we have the loans cancelled, or the bank bankrputed):
@@ -987,7 +991,8 @@ class Model:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
         for bank in self.banks:
-            self.log.debug("links",self.config.lenderchange.change_lender(model, bank, self.t))
+            self.log.debug("links", self.config.lender_change.change_lender(model, bank, self.t))
+
 
 # %%
 
@@ -1016,33 +1021,6 @@ class Bank:
         self.rationing = 0
         self.__assign_defaults__()
 
-    def new_lender(self):
-        # r_i0 is used the first time the bank is created:
-        if self.lender is None:
-            self.rij = np.full(self.model.config.N, self.model.config.r_i0, dtype=float)
-            self.rij[self.id] = 0
-            self.r = self.model.config.r_i0
-            self.μ = 0
-            # if it's just created, only not to be ourselves is enough
-            new_value = random.randrange(self.model.config.N - 1)
-        else:
-            # if we have a previous lender, new should not be the same
-            new_value = random.randrange(self.model.config.N - 2 if self.model.config.N > 2 else 1)
-
-        if self.model.config.N == 2:
-            new_value = 1 if self.id == 0 else 0
-        else:
-            if new_value >= self.id:
-                new_value += 1
-                if self.lender is not None and new_value >= self.lender:
-                    new_value += 1
-            else:
-                if self.lender is not None and new_value >= self.lender:
-                    new_value += 1
-                    if new_value >= self.id:
-                        new_value += 1
-        return new_value
-
     def __assign_defaults__(self):
         self.L = self.model.config.L_i0
         self.C = self.model.config.C_i0
@@ -1056,7 +1034,7 @@ class Bank:
 
         # identity of the lender
         self.lender = None
-        self.lender = self.new_lender()
+        self.lender = self.model.config.lender_change.new_lender(self.model, self)
 
         self.activeBorrowers = {}
 
@@ -1107,7 +1085,6 @@ class Bank:
             self.L -= costOfSell
             self.E -= recoveredE
 
-
             if self.L <= self.model.config.α:
                 self.model.log.debug(phase,
                                      f"{self.getId()} new L={self.L:.3f} makes bankruptcy of bank: {reason}")
@@ -1128,7 +1105,6 @@ class Utils:
     """
     Auxiliary class to encapsulate the
     """
-
 
     @staticmethod
     def __extract_t_values_from_arg__(param):
@@ -1156,12 +1132,14 @@ class Utils:
         parser.add_argument("--modules", default=None, help=f"Log only this modules (separated by ,)")
         parser.add_argument("--logfile", default=None, help="File to send logs to")
         parser.add_argument("--save", default=None, help=f"Saves the output of this execution")
-        parser.add_argument("--graph", default=None, help=f"List of t in which save the network config (* for all and an animated gif)")
+        parser.add_argument("--graph", default=None,
+                            help=f"List of t in which save the network config (* for all and an animated gif)")
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
         parser.add_argument("--debug", type=int, default=None,
                             help="Stop and enter in debug mode after at this time")
         parser.add_argument("--eta", type=float, default=Model.ŋ, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
+        parser.add_argument("--lc", type=str, default="default", help="Bank lender's change method (?=list)")
 
         args = parser.parse_args()
 
@@ -1173,6 +1151,7 @@ class Utils:
             model.ŋ = args.eta
         if args.debug:
             model.do_debug(args.debug)
+        model.config.lender_change = lc.determine_algorithm(args.lc)
         model.log.define_log(args.log, args.logfile, args.modules)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph))
 
@@ -1189,18 +1168,18 @@ class Utils:
     def is_notebook():
         try:
             __IPYTHON__
-            return get_ipython().__class__.__name__!="SpyderShell"
+            return get_ipython().__class__.__name__ != "SpyderShell"
         except NameError:
             return False
-    
+
     @staticmethod
     def is_spyder():
         try:
-            return get_ipython().__class__.__name__=="SpyderShell"
+            return get_ipython().__class__.__name__ == "SpyderShell"
         except:
-            return False    
+            return False
 
-# %%
+        # %%
 
 
 model = Model()
