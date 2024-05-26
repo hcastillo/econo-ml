@@ -210,16 +210,17 @@ class Statistics:
         self.graphs[t] = nx.DiGraph(directed=True)
         for bank in self.model.banks:
             self.graphs[t].add_edge(bank.id, bank.lender)
-        plt.clf()
-        plt.title(f"t={t}")
-        self.graphs_pos = nx.spring_layout(self.graphs[t], pos=self.graphs_pos)
-        nx.draw(self.graphs[t], pos=self.graphs_pos, with_labels=True, arrowstyle='->')
-        filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
+        #plt.clf()
+        #plt.title(f"t={t}")
+        #self.graphs_pos = nx.spring_layout(self.graphs[t], pos=self.graphs_pos)
+        #nx.draw(self.graphs[t], pos=self.graphs_pos, with_labels=True, arrowstyle='->')
 
+        lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
         if Utils.is_spyder():
             plt.show()
             return None
         else:
+            filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
             filename = Statistics.get_export_path(filename).replace('.txt', f"_{t}.png")
             plt.savefig(filename)
             return filename

@@ -17,7 +17,6 @@ import networkx as nx
 import sys
 import itertools
 import inspect
-import statistics
 
 
 def determine_algorithm(given_name: str):
@@ -40,23 +39,24 @@ def determine_algorithm(given_name: str):
         sys.exit(-1)
 
 
-node_position = None
+node_positions = None
 node_colors = None
 
 
-def __len_edges(graph, node):
-    if hasattr(graph, "in_edges"):
-        return len(graph.in_edges(node))
-    else:
-        return len(graph.edges(node))
-
-def draw(graph, force_colors=False):
+def draw(graph, new_guru_look_for=False, title=None, show=False):
     """ Draws the graph using a spring layout that reuses the previous one """
     plt.clf()
-    global node_position, node_colors
-    if not node_position:
-        node_position = nx.spring_layout(graph, pos=node_position)
-    if not node_colors or force_colors:
+    if title:
+        plt.title(title)
+    global node_positions, node_colors
+    #if not node_positions:
+    node_positions = nx.spring_layout(graph, pos=node_positions)
+    if new_guru_look_for:
+        guru, _ = find_guru(graph)
+        for (i,j) in list(graph.out_edges(guru)):
+            graph.remove_edge(i,j)
+        graph = get_graph_from_guru(graph.to_undirected())
+    if not node_colors or new_guru_look_for:
         node_colors = []
         guru_node, guru_node_edges = find_guru(graph)
         for node in graph.nodes():
@@ -68,8 +68,19 @@ def draw(graph, force_colors=False):
                 node_colors.append('steelblue')
             else:
                 node_colors.append('royalblue')
-    nx.draw(graph, pos=node_position, node_color=node_colors, with_labels=True)
-    plt.show()
+
+
+    nx.draw(graph, pos=node_positions, node_color=node_colors, arrowstyle='->', with_labels=True)
+    if show:
+        plt.show()
+
+
+
+def __len_edges(graph, node):
+    if hasattr(graph, "in_edges"):
+        return len(graph.in_edges(node))
+    else:
+        return len(graph.edges(node))
 
 
 def find_guru(graph):
@@ -82,6 +93,23 @@ def find_guru(graph):
             guru_node_edges = edges_node
             guru_node = node
     return guru_node, guru_node_edges
+
+
+def __get_graph_from_guru(input_graph, output_graph, current_node, previous_node):
+    """ It generates a new graph starting from the guru"""
+    if __len_edges(input_graph, current_node) > 1:
+        for (_, destination) in input_graph.edges(current_node):
+            if destination != previous_node:
+                __get_graph_from_guru(input_graph, output_graph, destination, current_node)
+    if previous_node is not None:
+        output_graph.add_edge(current_node, previous_node)
+
+
+def get_graph_from_guru(input_graph):
+    guru, _ = find_guru(input_graph)
+    output_graph = nx.DiGraph()
+    __get_graph_from_guru(input_graph, output_graph, guru, None)
+    return output_graph
 
 
 class LenderChange:
@@ -188,10 +216,8 @@ class InitialStability(Boltzman):
 
     def initialize_bank_relationships(self, model):
         g = nx.barabasi_albert_graph(model.config.N, 1)
-        G = nx.DiGraph()
-        guru, _ = find_guru(g)
-        print(guru)
-        self.__create_directed_graph_from_barabasi_albert(g, G, guru, None)
+        G = get_graph_from_guru(g)
+        # self.__create_directed_graph_from_barabasi_albert(g, G, guru, None)
         return g, G
 
 
@@ -215,4 +241,4 @@ if __name__ == "__main__":
     model = interbank.Model()
     intento = InitialStability()
     b, B = intento.initialize_bank_relationships(model)
-    draw(B)
+    draw(B, show=True)
