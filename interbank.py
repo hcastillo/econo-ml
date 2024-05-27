@@ -19,6 +19,7 @@ import os
 from PIL import Image
 import matplotlib.pyplot as plt
 import interbank_lenderchange as lc
+from progress.bar import Bar
 
 
 class Config:
@@ -140,10 +141,11 @@ class Statistics:
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
         for bank in self.model.banks:
-            if bank.lender in lenders:
-                lenders[bank.lender] += 1
-            else:
-                lenders[bank.lender] = 1
+            if bank.lender:
+                if bank.lender in lenders:
+                    lenders[bank.lender] += 1
+                else:
+                    lenders[bank.lender] = 1
         best = -1
         best_value = -1
         for lender in lenders.keys():
@@ -156,8 +158,16 @@ class Statistics:
         # self.credit_channels is updated directly in the moment the credit channel is set up during Model.do_loans()
 
     def compute_interest(self):
-        self.interest_rate[self.model.t] = sum(map(lambda x: x.getLoanInterest(), self.model.banks)) / \
-                                           self.model.config.N
+        num_of_banks_with_lenders = 0
+        sum_of_interests_rates = 0
+        for bank in self.model.banks:
+            if not bank.getLoanInterest() is None:
+                sum_of_interests_rates += bank.getLoanInterest()
+                num_of_banks_with_lenders += 1
+        if num_of_banks_with_lenders:
+            self.interest_rate[self.model.t] = sum_of_interests_rates / num_of_banks_with_lenders
+        else:
+            self.interest_rate[self.model.t] = np.inf
 
     def compute_liquidity(self):
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
@@ -209,12 +219,8 @@ class Statistics:
         """
         self.graphs[t] = nx.DiGraph(directed=True)
         for bank in self.model.banks:
-            self.graphs[t].add_edge(bank.id, bank.lender)
-        #plt.clf()
-        #plt.title(f"t={t}")
-        #self.graphs_pos = nx.spring_layout(self.graphs[t], pos=self.graphs_pos)
-        #nx.draw(self.graphs[t], pos=self.graphs_pos, with_labels=True, arrowstyle='->')
-
+            if bank.lender:
+                self.graphs[t].add_edge(bank.id, bank.lender)
         lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
         if Utils.is_spyder():
             plt.show()
@@ -225,7 +231,7 @@ class Statistics:
             plt.savefig(filename)
             return filename
 
-    def create_animation_graph(self, list_of_files):
+    def create_gif_with_graphs(self, list_of_files):
         if len(list_of_files) == 0:
             return
         else:
@@ -243,16 +249,6 @@ class Statistics:
                 images.append(Image.open(image_file))
             images[0].save(fp=filename_output, format='GIF', append_images=images[1:],
                            save_all=True, duration=100, loop=0)
-            # filename_output = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-            # filename_output = Statistics.get_export_path(filename_output).replace('.txt', '.avi')
-            # frame0 = cv2.imread(list_of_files[0])
-            # height, width, layers = frame0.shape
-            # video = cv2.VideoWriter(filename_output, 0, 1, (width, height))
-            # video.write(frame0)
-            # for image in list_of_files[1:]:
-            #     video.write(cv2.imread(image))
-            # cv2.destroyAllWindows()
-            # video.release()
 
     @staticmethod
     def get_export_path(filename):
@@ -305,6 +301,7 @@ class Statistics:
             xx.append(i)
             yy.append(self.bankruptcy[i])
         plt.clf()
+        plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue")
         plt.xlabel("Time")
         plt.title("Bankruptcies")
@@ -321,6 +318,7 @@ class Statistics:
             xx.append(i)
             yy.append(self.interest_rate[i])
         plt.clf()
+        plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue")
         plt.xlabel("Time")
         plt.title("Interest")
@@ -337,6 +335,7 @@ class Statistics:
             xx.append(i)
             yy.append(self.B[i])
         plt.clf()
+        plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue")
         plt.xlabel("Time")
         plt.title("Bad debt")
@@ -361,12 +360,13 @@ class Statistics:
             yy_std.append(self.P_std[i])
 
         plt.clf()
+        plt.figure(figsize=(14, 6))
         plt.plot(xx, yy_min, ':', color="cyan", label="Max and min prob")
         plt.plot(xx, yy_max, ':', color="cyan")
         plt.plot(xx, yy_std, '-', color="aquamarine", label="Std")
         plt.plot(xx, yy, '-', color="blue", label="Avg prob with $\gamma$")
         plt.xlabel("Time")
-        plt.title("Prob oc change lender "+self.model.config.lender_change.describe())
+        plt.title("Prob oc change lender " + self.model.config.lender_change.describe())
         plt.legend()
         if export_datafile:
             plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_prob_change_lender.svg"))
@@ -380,6 +380,7 @@ class Statistics:
             xx.append(i)
             yy.append(self.liquidity[i])
         plt.clf()
+        plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue")
         plt.xlabel("Time")
         plt.title("Liquidity")
@@ -396,6 +397,7 @@ class Statistics:
             xx.append(i)
             yy.append(self.credit_channels[i])
         plt.clf()
+        plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue")
         plt.xlabel("Time")
         plt.title("Credit channels")
@@ -456,6 +458,7 @@ class Log:
     modules = []
     model = None
     logLevel = "ERROR"
+    progress_bar = None
 
     def __init__(self, model):
         self.model = model
@@ -498,7 +501,10 @@ class Log:
             text += f" FAILED "
         else:
             if details and hasattr(bank, 'd') and bank.d > 0:
-                text += f" lender{bank.getLender().getId(short=True)},r={bank.getLoanInterest():.2f}%"
+                if bank.getLender() is None:
+                    text += f" no lender"
+                else:
+                    text += f" lender{bank.getLender().getId(short=True)},r={bank.getLoanInterest():.2f}%"
             else:
                 text += list_borrowers
         text += f" B={Log.__format_number__(bank.B)}" if bank.B else "        "
@@ -608,7 +614,13 @@ class Model:
 
     def configure(self, **configuration):
         for attribute in configuration:
-            if hasattr(self.config, attribute):
+            if attribute.startswith('lc'):
+                attribute = attribute.replace("lc_", "")
+                if attribute == 'lc':
+                    self.config.lender_change = lc.determine_algorithm(configuration[attribute])
+                else:
+                    self.config.lender_change.set_parameter(attribute, configuration["lc_" + attribute])
+            elif hasattr(self.config, attribute):
                 current_value = getattr(self.config, attribute)
                 if isinstance(current_value, int):
                     setattr(self.config, attribute, int(configuration[attribute]))
@@ -629,6 +641,8 @@ class Model:
         self.save_graphs = save_graphs_instants
         self.banks = []
         self.t = 0
+        if not self.config.lender_change:
+            self.config.lender_change = lc.determine_algorithm()
         self.policy_changes = 0
         self.export_datafile = export_datafile
         self.export_description = str(self.config) if export_description is None else export_description
@@ -646,6 +660,8 @@ class Model:
         self.do_shock("shock2")
         self.do_repayments()
         self.log.debug_banks()
+        if self.log.progress_bar:
+            self.log.progress_bar.next()
         self.statistics.compute_liquidity()
         self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_interest()
@@ -682,7 +698,9 @@ class Model:
     def enable_backward(self):
         self.backward_enabled = True
 
-    def simulate_full(self):
+    def simulate_full(self, interactive=False):
+        if interactive:
+            self.log.progress_bar = Bar(f"Simulating t=0..{self.config.T}", max=self.config.T)
         for t in range(self.config.T):
             self.forward()
 
@@ -695,7 +713,7 @@ class Model:
         else:
             summary += " ŋ variate during simulation"
         self.log.info("*****", summary)
-        self.statistics.create_animation_graph(self.save_graphs_results)
+        self.statistics.create_gif_with_graphs(self.save_graphs_results)
         return self.statistics.get_data()
 
     def set_policy_recommendation(self, n: int = None, ŋ: float = None, ŋ1: float = None):
@@ -825,7 +843,12 @@ class Model:
         for bank in self.banks:
             # decrement in which we should borrow
             if bank.d > 0:
-                if bank.getLender().d > 0:
+                if bank.getLender() is None:
+                    # new situation: the bank has no borrower, so we should firesale or die:
+                    bank.doFiresalesL(bank.d, f"no lender for this bank", "loans")
+                    bank.rationing = bank.d
+                    bank.l = 0
+                elif bank.getLender().d > 0:
                     # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
                     bank.doFiresalesL(bank.d, f"lender {bank.getLender().getId(short=True)} has no money", "loans")
                     bank.rationing = bank.d
@@ -1003,10 +1026,16 @@ class Bank:
     """
 
     def getLender(self):
-        return self.model.banks[self.lender]
+        if not self.lender is None:
+            return self.model.banks[self.lender]
+        else:
+            return None
 
     def getLoanInterest(self):
-        return self.model.banks[self.lender].rij[self.id]
+        if not self.lender is None:
+            return self.model.banks[self.lender].rij[self.id]
+        else:
+            return None
 
     def getId(self, short: bool = False):
         init = "bank#" if not short else "#"
@@ -1032,9 +1061,9 @@ class Bank:
         self.s = 0  # amount of loan received: estimated later
         self.B = 0  # bad debt: estimated later
         self.failed = False
+        self.lender = None
 
         # identity of the lender
-        self.lender = None
         self.lender = self.model.config.lender_change.new_lender(self.model, self)
 
         self.activeBorrowers = {}
@@ -1071,7 +1100,7 @@ class Bank:
                                      f".ΔB=0,ΔC={recovered:.3f}) (paidD={self.l:.3f})")
         self.D = 0
         # the loan is not paid correctly, but we remove it
-        if self.id in self.getLender().activeBorrowers:
+        if self.getLender() and self.id in self.getLender().activeBorrowers:
             self.getLender().s -= self.l
             del self.getLender().activeBorrowers[self.id]
 
@@ -1140,6 +1169,8 @@ class Utils:
                             help="Stop and enter in debug mode after at this time")
         parser.add_argument("--eta", type=float, default=Model.ŋ, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
+        parser.add_argument("--lc_p", type=float, default=None,
+                            help=f"For Erdos-Renyi bank lender's change value of p=xxx")
         parser.add_argument("--lc", type=str, default="default", help="Bank lender's change method (?=list)")
 
         args = parser.parse_args()
@@ -1153,16 +1184,18 @@ class Utils:
         if args.debug:
             model.do_debug(args.debug)
         model.config.lender_change = lc.determine_algorithm(args.lc)
+        model.config.lender_change.set_parameter("p", args.lc_p)
         model.log.define_log(args.log, args.logfile, args.modules)
-        Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph))
+        Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
+                  interactive=(args.log == 'ERROR' or not args.logfile is None))
 
     @staticmethod
-    def run(save=None, save_graph_instants=None):
+    def run(save=None, save_graph_instants=None, interactive=False):
         global model
         if not save_graph_instants and Config.GRAPHS_MOMENTS:
             save_graph_instants = Config.GRAPHS_MOMENTS
         model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants)
-        model.simulate_full()
+        model.simulate_full(interactive=interactive)
         return model.finish()
 
     @staticmethod
