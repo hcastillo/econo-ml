@@ -1,4 +1,5 @@
-import unittest, interbank
+import unittest
+import interbank
 
 
 # 1. borrower obtains a loan,

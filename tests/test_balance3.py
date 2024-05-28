@@ -1,12 +1,12 @@
+# -*- coding: utf-8 -*-
+
 import unittest
-
 from mock import patch
-
 import interbank
-from test import interbank_testclass
+import tests.interbank_testclass
 
 
-class Balance3TestCase(interbank_testclass.InterbankTest):
+class Balance3TestCase(tests.interbank_testclass.InterbankTest):
     """
     test borrower obtains a loan, and after does bankruptcy
     """
@@ -15,7 +15,7 @@ class Balance3TestCase(interbank_testclass.InterbankTest):
         self.setBank(bank=self.model.banks[0], C=10.0, L=20.0, D=20.0, E=10.0)
         self.setBank(bank=self.model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
 
-    @patch.object(interbank.Model, "do_shock", interbank_testclass.mockedShock)
+    @patch.object(interbank.Model, "do_shock", tests.interbank_testclass.mockedShock)
     def setUp(self):
         self.configureTest( N=2,T=1,
                             shocks=[

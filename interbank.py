@@ -35,7 +35,7 @@ class Config:
 
     # shocks parameters:
     µ: float = 0.7  # mi
-    ω: float = 0.6  # omega
+    ω: float = 0.55  # omega
 
     # Lender's change mechanism
     lender_change: lc.LenderChange = None
@@ -111,12 +111,13 @@ class Statistics:
     model = None
     graphs = {}
     graphs_pos = None
+    file_format = '.svg'
 
     OUTPUT_DIRECTORY = "output"
     NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
 
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, in_model):
+        self.model = in_model
         if not os.path.isdir(self.OUTPUT_DIRECTORY):
             os.mkdir(self.OUTPUT_DIRECTORY)
 
@@ -222,7 +223,9 @@ class Statistics:
             if bank.lender:
                 self.graphs[t].add_edge(bank.id, bank.lender)
         lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
-        if Utils.is_spyder():
+        if 'unittest' in sys.modules.keys():
+            return None
+        elif Utils.is_spyder():
             plt.show()
             return None
         else:
@@ -230,6 +233,20 @@ class Statistics:
             filename = Statistics.get_export_path(filename).replace('.txt', f"_{t}.png")
             plt.savefig(filename)
             return filename
+
+    def define_format(self, file_format):
+        match file_format.lower():
+            case 'svg':
+                self.file_format = '.svg'
+            case 'png':
+                self.file_format = '.png'
+            case '.gif':
+                self.file_format = '.gif'
+            case '.pdf':
+                self.file_format = '.pdf'
+            case _:
+                print(f'Invalid file format: {file_format}')
+                sys.exit(-1)
 
     def create_gif_with_graphs(self, list_of_files):
         if len(list_of_files) == 0:
@@ -307,7 +324,7 @@ class Statistics:
         plt.title("Bankruptcies")
         plt.ylabel("num of bankruptcies")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_bankruptcies.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_bankruptcies{self.file_format}"))
         else:
             plt.show()
 
@@ -324,7 +341,7 @@ class Statistics:
         plt.title("Interest")
         plt.ylabel("interest")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_interest_rate.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_interest_rate{self.file_format}"))
         else:
             plt.show()
 
@@ -341,7 +358,7 @@ class Statistics:
         plt.title("Bad debt")
         plt.ylabel("Bad debt")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_bad_debt.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_bad_debt{self.file_format}"))
         else:
             plt.show()
 
@@ -369,7 +386,7 @@ class Statistics:
         plt.title("Prob oc change lender " + self.model.config.lender_change.describe())
         plt.legend()
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_prob_change_lender.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_prob_change_lender{self.file_format}"))
         else:
             plt.show()
 
@@ -386,7 +403,7 @@ class Statistics:
         plt.title("Liquidity")
         plt.ylabel("Ʃ liquidity")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_liquidity.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_liquidity{self.file_format}"))
         else:
             plt.show()
 
@@ -403,7 +420,7 @@ class Statistics:
         plt.title("Credit channels")
         plt.ylabel("Credit channels")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_credit_channels.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_credit_channels{self.file_format}"))
         else:
             plt.show()
 
@@ -445,7 +462,7 @@ class Statistics:
         plt.title("Best Lender (blue) #clients (red)")
         plt.ylabel("Best Lender")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", "_best_lender.svg"))
+            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_best_lender{self.file_format}"))
         else:
             plt.show()
 
@@ -1015,7 +1032,7 @@ class Model:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
         for bank in self.banks:
-            self.log.debug("links", self.config.lender_change.change_lender(model, bank, self.t))
+            self.log.debug("links", self.config.lender_change.change_lender(self, bank, self.t))
 
 
 # %%
@@ -1049,6 +1066,7 @@ class Bank:
         self.model = model
         self.failures = 0
         self.rationing = 0
+        self.lender = None
         self.__assign_defaults__()
 
     def __assign_defaults__(self):
@@ -1061,11 +1079,8 @@ class Bank:
         self.s = 0  # amount of loan received: estimated later
         self.B = 0  # bad debt: estimated later
         self.failed = False
-        self.lender = None
-
         # identity of the lender
         self.lender = self.model.config.lender_change.new_lender(self.model, self)
-
         self.activeBorrowers = {}
 
     def replaceBank(self):
@@ -1172,6 +1187,7 @@ class Utils:
         parser.add_argument("--lc_p", type=float, default=None,
                             help=f"For Erdos-Renyi bank lender's change value of p=xxx")
         parser.add_argument("--lc", type=str, default="default", help="Bank lender's change method (?=list)")
+        parser.add_argument("--format", type=str, default="svg", help="File extension for plots (svg,png,pdf..)")
 
         args = parser.parse_args()
 
@@ -1186,6 +1202,7 @@ class Utils:
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.log.define_log(args.log, args.logfile, args.modules)
+        model.statistics.define_format(args.format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
                   interactive=(args.log == 'ERROR' or not args.logfile is None))
 

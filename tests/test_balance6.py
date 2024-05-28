@@ -1,9 +1,10 @@
+# -*- coding: utf-8 -*-
+
 import unittest
 
 from mock import patch
-
 import interbank
-from test import interbank_testclass
+from tests import interbank_testclass
 
 
 class Balance1TestCase(interbank_testclass.InterbankTest):
