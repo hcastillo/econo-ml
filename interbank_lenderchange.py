@@ -301,10 +301,4 @@ class ShockedMarket(LenderChange):
         return f"{bank.getId()} maintains lender #{bank.lender} with %1 (ShockedMarket)"
 
 
-if __name__ == "__main__":
-    import interbank
 
-    # model = interbank.Model(lc='ShockedMarket', lc_p=0.001)
-    model = interbank.Model(lc='InitialStability')
-    model.initialize()
-    draw(model.config.lender_change.banks_graph, show=True)

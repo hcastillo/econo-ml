@@ -1,12 +1,17 @@
 @echo off
 
-python interbank.py --save boltzman
-python interbank.py --lc initialstability --save inistab
-python interbank.py --lc shockedmarket --lc_p 0.001 --t 10 --save shocked
+python interbank.py --save boltzman --format png 
+python interbank.py --lc initialstability --save inistab --format png 
+python interbank.py --lc shockedmarket --lc_p 0.001  --save shocked --format png # --t 10
+python interbank.py --lc shockedmarket --lc_p 0.002  --save shocked2 --format png  # --t 10
 
 python -m unittest discover -s test
 if %errorlevel%==0 (
- jupytext interbank.py --to notebook
+ powershell -command "(Get-Content interbank.py) -replace 'lc.','' -replace 'import interbank_lenderchange as lc','' | Out-File -encoding Default inter.py"
+ jupytext inter.py -o inter.ipynb
+ jupytext interbank_lenderchange.py -o lc.ipynb
+ nbmerge lc.ipynb inter.ipynb -o interbank.ipynb
+ del inter.ipynb lc.ipynb inter.py
  git add .
  git commit -a
  git push
