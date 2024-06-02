@@ -731,6 +731,7 @@ class Model:
             summary += " ŋ variate during simulation"
         self.log.info("*****", summary)
         self.statistics.create_gif_with_graphs(self.save_graphs_results)
+        plt.close()
         return self.statistics.get_data()
 
     def set_policy_recommendation(self, n: int = None, ŋ: float = None, ŋ1: float = None):
@@ -950,6 +951,7 @@ class Model:
         for bank in self.banks:
             bank.B = 0
             bank.rationing = 0
+        self.config.lender_change.initialize_step(self)
         if self.t == 0:
             self.log.debug_banks()
 
@@ -1185,7 +1187,9 @@ class Utils:
         parser.add_argument("--eta", type=float, default=Model.ŋ, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
         parser.add_argument("--lc_p", type=float, default=None,
-                            help=f"For Erdos-Renyi bank lender's change value of p=xxx")
+                            help=f"For Erdos-Renyi bank lender's change value of p=0.0x")
+        parser.add_argument("--lc_m", type=int, default=None,
+                            help=f"For Preferential bank lender's change value of graph grade m")
         parser.add_argument("--lc", type=str, default="default", help="Bank lender's change method (?=list)")
         parser.add_argument("--format", type=str, default="svg", help="File extension for plots (svg,png,pdf..)")
 
@@ -1201,6 +1205,7 @@ class Utils:
             model.do_debug(args.debug)
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
+        model.config.lender_change.set_parameter("m", args.lc_m)
         model.log.define_log(args.log, args.logfile, args.modules)
         model.statistics.define_format(args.format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),

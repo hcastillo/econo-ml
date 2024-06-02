@@ -6,6 +6,8 @@ LenderChange is a class used from interbank.py to control the change of lender i
     - InitialStability   using a Barabási–Albert graph to initially assign relationships between banks
     - ShockedMarket      using a Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
                             lender for each bank, it replicates the situation after a crisis when banks do not credit
+    - Preferential       using a Barabási-Albert with degree m to set up only a set o possible links between
+                            banks
 @author: hector@bith.net
 @date:   05/2023
 """
@@ -49,14 +51,16 @@ def draw(graph, new_guru_look_for=False, title=None, show=False):
         plt.title(title)
     global node_positions, node_colors
     # if not node_positions:
-    node_positions = nx.spring_layout(graph, pos=node_positions)
+    guru = None
+    if node_positions is None:
+        node_positions = nx.spring_layout(graph, pos=node_positions)
     if not hasattr(graph, "type"):
         # guru should not have out edges, and surely by random graphs it has:
         guru, _ = find_guru(graph)
         for (i, j) in list(graph.out_edges(guru)):
             graph.remove_edge(i, j)
     if hasattr(graph, "type") and graph.type == "barabasi_albert_graph":
-        graph = get_graph_from_guru(graph.to_undirected())
+        graph, guru = get_graph_from_guru(graph.to_undirected())
     if hasattr(graph, "type") and graph.type == "erdos_renyi_graph":
         for node in list(graph.nodes()):
             if not graph.edges(node) and not graph.in_edges(node):
@@ -64,9 +68,9 @@ def draw(graph, new_guru_look_for=False, title=None, show=False):
         new_guru_look_for = True
     if not node_colors or new_guru_look_for:
         node_colors = []
-        guru_node, guru_node_edges = find_guru(graph)
+        guru, guru_node_edges = find_guru(graph)
         for node in graph.nodes():
-            if node == guru_node:
+            if node == guru:
                 node_colors.append('darkorange')
             elif __len_edges(graph, node) == 0:
                 node_colors.append('lightblue')
@@ -74,10 +78,14 @@ def draw(graph, new_guru_look_for=False, title=None, show=False):
                 node_colors.append('steelblue')
             else:
                 node_colors.append('royalblue')
+    if hasattr(graph, "type") and graph.type == "barabasi_preferential":
+        nx.draw(graph, pos=node_positions, node_color=node_colors, with_labels=True)
+    else:
+        nx.draw(graph, pos=node_positions, node_color=node_colors, arrowstyle='->', with_labels=True)
 
-    nx.draw(graph, pos=node_positions, node_color=node_colors, arrowstyle='->', with_labels=True)
     if show:
         plt.show()
+    return guru
 
 
 def __len_edges(graph, node):
@@ -113,11 +121,11 @@ def get_graph_from_guru(input_graph):
     guru, _ = find_guru(input_graph)
     output_graph = nx.DiGraph()
     __get_graph_from_guru(input_graph, output_graph, guru, None)
-    return output_graph
+    return output_graph, guru
 
 
 def from_graph_to_array_banks(banks_graph, this_model):
-    """ Only one out_edge for each bank """
+    """ From the graph to a lender for each possible bank (or None if no links in the graph)"""
     for node in banks_graph:
         if banks_graph.out_edges(node):
             this_model.banks[node].lender = list(banks_graph.out_edges(node))[0][1]
@@ -132,7 +140,11 @@ class LenderChange:
         self.parameter = {}
 
     def initialize_bank_relationships(self, this_model):
-        """ Call at the end of each step before going to the next """
+        """ Call once at initilize() model """
+        pass
+
+    def initialize_step(self, this_model):
+        """ Call at the beginning of each step """
         pass
 
     def change_lender(self, this_model, bank, t):
@@ -144,14 +156,20 @@ class LenderChange:
         pass
 
     def describe(self):
-        return "-"
+        return ""
+
+    def check_parameter(self, name, value):
+        """ Called after set_parameter() to verify that the necessary parameters are set """
+        return False
 
     def set_parameter(self, name, value):
-        self.parameter[name] = value
-        if isinstance(self, ShockedMarket):
-            if name != 'p' or value is None:
-                print("parameter 'p' should be used with ShockedMarket")
+        if not value is None:
+            if self.check_parameter(name, value):
+                self.parameter[name] = value
+            else:
+                print(f"error with parameter '{name}' for {self.__class__.__name__}")
                 sys.exit(-1)
+
 
 # ---------------------------------------------------------
 
@@ -164,16 +182,8 @@ class Boltzman(LenderChange):
     γ: float = 0.5  # [0..1] gamma
     CHANGE_LENDER_IF_HIGHER = 0.5
 
-
     def initialize_bank_relationships(self, this_model):
         this_model.statistics.get_graph(0)
-        # if this_model.export_datafile:
-        #
-        #     #draw(self.banks_graph, new_guru_look_for=True, title=f"random links with d̂=1")
-        #     #filename = this_model.statistics.get_export_path(this_model.export_datafile).replace('.txt',
-        #     #                                                                                     f"_boltman.png")
-        #     #plt.savefig(filename)
-
 
     def change_lender(self, this_model, bank, t):
         """ It uses γ but only after t=20, at the beginning only Boltzmann"""
@@ -183,7 +193,7 @@ class Boltzman(LenderChange):
             current_lender_μ = bank.getLender().μ
         else:
             current_lender_μ = 0
-            
+
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)
         boltzmann = 1 / (1 + math.exp(-this_model.config.β * (possible_lender_μ - current_lender_μ)))
@@ -258,7 +268,7 @@ class InitialStability(Boltzman):
             result.add_edge(current_node, previous_node)
 
     def initialize_bank_relationships(self, this_model):
-        self.banks_graph = get_graph_from_guru(nx.barabasi_albert_graph(this_model.config.N, 1))
+        self.banks_graph, _ = get_graph_from_guru(nx.barabasi_albert_graph(this_model.config.N, 1))
         self.banks_graph.type = "barabasi_albert_graph"
         if this_model.export_datafile:
             draw(self.banks_graph, new_guru_look_for=True, title=f"barabasi_albert m=1")
@@ -274,6 +284,16 @@ class ShockedMarket(LenderChange):
           lender for each bank, it replicates the situation after a crisis when banks do not credit
 
     """
+
+    def check_parameter(self, name, value):
+        if name == 'p':
+            if isinstance(value, float) and 0 < value < 1:
+                return True
+            else:
+                print("value for 'p' should be a float number > 0 and < 1")
+                return False
+        else:
+            return False
 
     def initialize_bank_relationships(self, this_model):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationsships till the end"""
@@ -301,4 +321,85 @@ class ShockedMarket(LenderChange):
         return f"{bank.getId()} maintains lender #{bank.lender} with %1 (ShockedMarket)"
 
 
+class Preferential(Boltzman):
+    """ Using a Barabasi with grade m we restrict to those relations the possibilities to obtain an outgoing link
+          (a lender). To improve the specialization of banks, granting 3*C0 to the guru, 2*C0 to its neighbours
+          and C to the others. To balance those with 2C0 and 3C0, we will reduce D:
+    """
+    banks_graph = None
+    guru = None
 
+    def check_parameter(self, name, value):
+        if name == 'm':
+            if isinstance(value, int) and 1 < value:
+                return True
+            else:
+                print("value for 'm' should be an integer > 1")
+                return False
+        else:
+            return False
+
+    def initialize_bank_relationships(self, this_model):
+        self.banks_graph_full = nx.barabasi_albert_graph(this_model.config.N, self.parameter['m'])
+        self.banks_graph_full.type = "barabasi_preferential"
+        if this_model.export_datafile:
+            self.guru = draw(self.banks_graph_full, new_guru_look_for=True,
+                             title=f"barabasi_pref m={self.parameter['m']}")
+            filename = this_model.statistics.get_export_path(this_model.export_datafile).replace('.txt',
+                                                                                                 f"_barabasi_pref.png")
+            plt.savefig(filename)
+        else:
+            self.guru = find_guru(self.banks_graph_full)
+        self.full_barabasi_extract_random_directed(this_model)
+        self.prize_for_good_banks(this_model)
+        return self.banks_graph
+
+    def prize_for_good_banks(self, this_model):
+        this_model.banks[self.guru].D -= this_model.banks[self.guru].C * 2
+        this_model.banks[self.guru].C *= 3
+        for (_, node) in self.banks_graph_full.edges(self.guru):
+            this_model.banks[node].D -= this_model.banks[node].C
+            this_model.banks[node].C *= 2
+
+    def initialize_step(self, this_model):
+        self.full_barabasi_extract_random_directed(this_model)
+
+    def full_barabasi_extract_random_directed(self, this_model, current_node=None):
+        if current_node is None:
+            self.banks_graph = nx.DiGraph()
+            self.banks_graph.type = 'barabasi_albert_graph'
+            current_node = self.guru
+        edges = list(self.banks_graph_full.edges(current_node))
+        self.banks_graph.add_node(current_node)
+        for (_, destination) in edges[:]:
+            if destination not in self.banks_graph.nodes():
+                self.full_barabasi_extract_random_directed(this_model, destination)
+        try:
+            edges.remove((current_node, this_model.banks[current_node].lender))
+        except ValueError:
+            pass
+        candidate = None
+        while candidate is None and edges:
+            candidate = random.choice(edges)[1]
+            if (candidate, current_node) in self.banks_graph.edges():
+                edges.remove((current_node, candidate))
+                candidate = None
+        if not candidate is None:
+            self.banks_graph.add_edge(current_node, candidate)
+        else:
+            self.banks_graph.add_edge(current_node, this_model.banks[current_node].lender)
+        return current_node
+
+    def new_lender(self, this_model, bank):
+        if bank.lender is None:
+            bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
+            bank.rij[bank.id] = 0
+            bank.r = this_model.config.r_i0
+            bank.μ = 0
+        if self.banks_graph and self.banks_graph.out_edges():
+            return list(self.banks_graph.out_edges(bank.id))[0][1]
+        else:
+            return None
+
+    def describe(self):
+        return f"($\\gamma={self.γ} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"

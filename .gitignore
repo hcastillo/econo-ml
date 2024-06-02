@@ -1,10 +1,13 @@
 .ipynb_checkpoints/
 __pycache__/
 alessio/
+old/
+quarto/interbank_files/
 logs/
 output/*
 models/*
 lenders/*
+shocked_market/*
 ppo/*
 .idea/*
 *.txt
