@@ -5,7 +5,7 @@ import interbank
 class ValuesAfterExecutionTestCase(unittest.TestCase):
     def setUp(self):
         self.model = interbank.Model()
-        self.model.configure(N=5, T=10, µ=0.7, ω= 0.55)
+        self.model.configure(N=5, T=10, mi=0.7, omega= 0.55)
         self.model.set_policy_recommendation(1)
         self.model.log.define_log('DEBUG')
         self.model.initialize()

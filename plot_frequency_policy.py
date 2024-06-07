@@ -15,6 +15,7 @@ class Plot:
     data = []
     legend = []
     colors_and_styles = ['black', 'red', 'green', 'blue', 'pink']
+    default_interbank = interbank.Model()
 
     def get_color(self, i):
         return self.colors_and_styles[i % len(self.colors_and_styles)]
@@ -25,7 +26,8 @@ class Plot:
             self.legend.append(datafile.replace("_policy","").upper())
             lines = 0
             ignored = 0
-            with open(interbank.Statistics.get_export_path(datafile), 'r', encoding="utf-8") as loadfile:
+            with open(self.default_interbank.statistics.get_export_path(datafile, '.txt'),
+                      'r', encoding="utf-8") as loadfile:
                 for line in loadfile.readlines():
                     if not line.strip().startswith("#"):
                         elements = line.split("\t")
@@ -36,8 +38,7 @@ class Plot:
             print(f"{ignored} lines in {datafile}, {lines} incorporated")
 
     def plot(self, save, file_format):
-        #description = "Frequency of ŋ between PPO/MonteCarlo"
-        destination = interbank.Statistics.get_export_path(save).replace(".txt", "." + file_format)
+        destination = self.default_interbank.statistics.get_export_path(save, file_format)
         if len(self.data) == 0:
             print("no data loaded to create the plot")
             return False
@@ -83,7 +84,7 @@ def run_interactive():
     args = parser.parse_args()
     if args.load and args.save:
         plot.load_data(args.load)
-        plot.plot(args.save, args.extension)
+        plot.plot(args.save, "."+args.extension)
     else:
         print("bad usage: check --load mc,ppo --save freq_mc_ppo")
 

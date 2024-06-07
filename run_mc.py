@@ -10,7 +10,7 @@ import interbank
 import numpy as np
 import argparse
 import sys
-import tqdm
+from progress.bar import Bar
 from scipy.stats import bernoulli
 
 NUM_SIMULATIONS = 50
@@ -20,7 +20,6 @@ class Montecarlo:
     """
     Create self.simulations of Interbank.model, using Montecarlo MCMC
     """
-
     simulations = NUM_SIMULATIONS
 
     def __init__(self, environment, simulations: int = None, fixed_eta: int = None):
@@ -51,44 +50,45 @@ class Montecarlo:
 
     def run(self):
         self.interbank_model.limit_to_two_policies()
-        for i in tqdm.tqdm(range(self.simulations), total=self.simulations):
+        progress_bar = Bar(f"Running {self.simulations} simulations", max=self.simulations)
+        for i in range(self.simulations):
             self.data.append(self.do_one_simulation(i))
+            progress_bar.next()
 
-    def save_column(self, prefix, name, column):
-        filename = interbank.Statistics.get_export_path(f"{prefix}_{name}.txt")
+    def save_column(self, prefix, column):
+        filename = self.interbank_model.statistics.get_export_path(f"{prefix}_{column}", ".csv")
         total = np.zeros(self.simulations, dtype=float)
         with open(filename, 'w', encoding="utf-8") as savefile:
-            head = "# t"
+            header = '# '+str(self.interbank_model.config) + f'\n#{column}\nt'
             for i in range(self.simulations):
-                head += f"\t{i:18}#"
-            head += f"\n# {name}\n"
-            savefile.write(head)
-
+                header += f";v{i}"
+            savefile.write(header+"\n")
             for j in range(self.interbank_model.config.T):
-                line = f"{j:3}"
+                line = f"{j}"
                 for i in range(self.simulations):
-                    line += f"\t{self.data[i][column][j]:19}"
+                    line += f";{self.data[i][column][j]}"
                     total[i] += self.data[i][column][j]
                 savefile.write(line + "\n")
-        self.summary[name] = total
+        self.summary[column] = total
 
     def save_summary(self, filename):
-        filename = interbank.Statistics.get_export_path(f"{filename}.txt")
+        filename = self.interbank_model.statistics.get_export_path(f"{filename}", ".txt")
         with open(filename, 'w', encoding="utf-8") as savefile:
-            head = "# n"
-            for item in self.summary:
-                head += f"\tsum_{item}"
-            savefile.write(head+"\n")
+            header = '# ' + str(self.interbank_model.config) + f'\n# results\nt'
             for i in range(self.simulations):
-                line = f"{i:3}"
+                header += f";v{i}"
+            savefile.write(header + "\n")
+            for i in range(self.simulations):
+                line = f"{i}"
                 for j in self.summary:
-                    line += f"\t{self.summary[j][i]:19}"
+                    line += f";{self.summary[j][i]}"
                 savefile.write(line + "\n")
 
     def save(self, filename):
-        for column in interbank.DataColumns:
-            self.save_column(filename, column.name.lower(), column.value)
-        self.save_summary(filename)
+        if filename:
+            for column in self.data[0].columns:
+                self.save_column(filename, column)
+            self.save_summary(filename)
 
 
 def run_interactive():

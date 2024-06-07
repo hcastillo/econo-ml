@@ -77,8 +77,8 @@ class InterbankAgent(gymnasium.Env):
 
     def step(self, action):
         self.steps += 1
-        self.interbank_model.set_policy_recommendation(ŋ1=action[0])
-        self.last_action = self.interbank_model.ŋ
+        self.interbank_model.set_policy_recommendation(eta_1=action[0])
+        self.last_action = self.interbank_model.eta
         self.interbank_model.forward()
         observation = self.__get_observations()
 

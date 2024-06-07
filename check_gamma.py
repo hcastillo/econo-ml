@@ -53,7 +53,7 @@ for x in range(0, 10):
     gamma = x/10
     model = interbank.Model()
     model.initialize(export_datafile=f'{OUTPUT}gamma{gamma}')
-    model.config.γ = gamma
+    model.config.gamma = gamma
     model.simulate_full()
     result_iteration = model.finish()
     prob_change_lender[gamma] = result_iteration[interbank.DataColumns.PROB_CHANGE_LENDER]

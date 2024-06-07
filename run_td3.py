@@ -13,11 +13,11 @@ from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckA
 from interbank_agent import InterbankAgent
 import numpy as np
 import interbank
-import typer
 import time
 import sys
 import run_mc
 import os
+import argparse
 
 # we run STEPS_BEFORE_TRAINING times the Interbank.model() before train
 STEPS_BEFORE_TRAINING: int = 5
@@ -25,7 +25,7 @@ STEPS_BEFORE_TRAINING: int = 5
 # we train the number of times the tuple we have and using a different seed each time
 SEEDS_FOR_TRAINING: tuple = (1979, 1880, 1234, 6125, 1234, 9999)
 
-OUTPUT_TRAINING: str = "td3.log"
+OUTPUT_TRAINING: str = "td3.txt"
 MODELS_DIRECTORY = "models"
 
 # same as MC model repetitions, to compare
@@ -76,7 +76,7 @@ def training(verbose, times, env, logs):
         for j in range(STEPS_BEFORE_TRAINING):
             env.interbank_model.forward()
         model.learn(total_timesteps=times, log_interval=10,
-                    tb_log_name=interbank.Statistics.get_export_path(OUTPUT_TRAINING))
+                    tb_log_name=env.interbank_model.statistics.get_export_path(OUTPUT_TRAINING))
         env.close()
     return model
 

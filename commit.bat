@@ -5,7 +5,7 @@ python interbank.py --lc initialstability --save inistab --format png
 python interbank.py --lc shockedmarket --lc_p 0.001  --save shocked --format png # --t 10
 python interbank.py --lc shockedmarket --lc_p 0.002  --save shocked2 --format png  # --t 10
 
-python -m unittest discover -s test
+python -m unittest discover -s tests
 if %errorlevel%==0 (
  powershell -command "(Get-Content interbank.py) -replace 'lc.','' -replace 'import interbank_lenderchange as lc','' | Out-File -encoding Default inter.py"
  jupytext inter.py -o inter.ipynb

@@ -24,6 +24,7 @@ class Plot:
     mean = []
     colors = ['black', 'red', 'green', 'blue', 'purple']
     fills = ['gray', 'mistyrose', 'honeydew', 'lavender', 'plum']
+    default_interbank = interbank.Model()
 
     def get_color(self, i):
         return self.colors[i % len(self.colors)]
@@ -51,7 +52,8 @@ class Plot:
             self.legend.append(datafile.replace("_fitness", "").upper())
             lines = 0
             ignored = 0
-            with open(interbank.Statistics.get_export_path(datafile), 'r', encoding="utf-8") as loadfile:
+            with open(self.default_interbank.statistics.get_export_path(datafile, '.txt'),
+                      'r', encoding="utf-8") as loadfile:
                 for line in loadfile.readlines():
                     if not line.strip().startswith("#"):
                         line_strings = line.split("\t")
@@ -75,7 +77,7 @@ class Plot:
 
 
     def plot(self, save, file_format, type):
-        destination = interbank.Statistics.get_export_path(save).replace(".txt", "." + file_format)
+        destination = self.default_interbank.statistics.get_export_path(save, file_format)
         if len(self.t) == 0:
             print("no data loaded to create the plot")
             return False
@@ -127,7 +129,7 @@ def run_interactive():
     args = parser.parse_args()
     if args.load and args.save:
         plot.load_data(args.n, args.load)
-        plot.plot(args.save, args.extension, type)
+        plot.plot(args.save, "."+args.extension, type)
     else:
         print("bad usage: check --load mc,ppo --save freq_mc_ppo")
 

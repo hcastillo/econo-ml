@@ -8,7 +8,6 @@ Generates a simulation of an interbank network following the rules described in 
 @date:   04/2023
 """
 import copy
-import enum
 import random
 import logging
 import argparse
@@ -20,6 +19,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import interbank_lenderchange as lc
 from progress.bar import Bar
+import pandas as pd
+import lxml.etree
+import lxml.builder
 
 
 class Config:
@@ -27,29 +29,29 @@ class Config:
     Configuration parameters for the interbank network
     """
     T: int = 1000  # time (1000)
-    N: int = 50  # number of banks (50)
+    N: int = 50    # number of banks (50)
 
     # not used in this implementation:
     # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
     # đ: int    = 1        # number of outgoing links allowed
 
     # shocks parameters:
-    µ: float = 0.7  # mi
-    ω: float = 0.55  # omega
+    mi: float = 0.7  # mi µ
+    omega: float = 0.55  # omega ω
 
     # Lender's change mechanism
     lender_change: lc.LenderChange = None
 
     # screening costs
-    Φ: float = 0.025  # phi
-    Χ: float = 0.015  # ji
+    phi: float = 0.025  # phi Φ
+    ji: float = 0.015  # ji Χ
 
     # liquidation cost of collateral
-    ξ: float = 0.3  # xi
-    ρ: float = 0.3  # ro fire sale cost
+    xi: float = 0.3  # xi ξ
+    ro: float = 0.3  # ro ρ fire sale cost
 
-    β: float = 5  # intensity of breaking the connection (5)
-    α: float = 0.1  # below this level of E or D, we will bankrupt the bank
+    beta: float = 5  # β beta intensity of breaking the connection (5)
+    alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
     # L + C + (R) = D + E
@@ -65,7 +67,7 @@ class Config:
     GRAPHS_MOMENTS = []
 
     def __str__(self):
-        description = sys.argv[0]
+        description = sys.argv[0] if __name__ == '__main__' else ''
         for attr in dir(self):
             value = getattr(self, attr)
             if isinstance(value, int) or isinstance(value, float):
@@ -73,26 +75,7 @@ class Config:
         return description
 
 
-class DataColumns(enum.IntEnum):
-    POLICY = 0
-    FITNESS = 1
-    LIQUIDITY = 2
-    IR = 3
-    BANKRUPTCY = 4
-    BEST_LENDER = 5
-    BEST_NUM_CLIENTS = 6
-    CREDIT_CHANNELS = 7
-    RATIONING = 8
-    LEVERAGE = 9
-    PROB_CHANGE_LENDER = 10
-    BAD_DEBT = 11
-
-    def get_name(i):
-        for j in DataColumns:
-            if j.value == i:
-                return j.name.replace("_", " ").lower()
-        return None
-
+# %%
 
 class Statistics:
     bankruptcy = []
@@ -111,7 +94,9 @@ class Statistics:
     model = None
     graphs = {}
     graphs_pos = None
-    file_format = '.svg'
+
+    plot_format = '.svg'
+    output_format = '.gdt'
 
     OUTPUT_DIRECTORY = "output"
     NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
@@ -156,7 +141,8 @@ class Statistics:
 
         self.best_lender[self.model.t] = best
         self.best_lender_clients[self.model.t] = best_value
-        # self.credit_channels is updated directly in the moment the credit channel is set up during Model.do_loans()
+        # self.credit_channels is updated directly in the moment the credit channel is set up
+        # during Model.do_loans()
 
     def compute_interest(self):
         num_of_banks_with_lenders = 0
@@ -174,10 +160,10 @@ class Statistics:
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
 
     def compute_fitness(self):
-        self.fitness[self.model.t] = sum(map(lambda x: x.μ, self.model.banks)) / self.model.config.N
+        self.fitness[self.model.t] = sum(map(lambda x: x.mu, self.model.banks)) / self.model.config.N
 
     def compute_policy(self):
-        self.policy[self.model.t] = self.model.ŋ
+        self.policy[self.model.t] = self.model.eta
 
     def compute_bad_debt(self):
         self.B[self.model.t] = sum(map(lambda x: x.B, self.model.banks))
@@ -195,57 +181,61 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
 
-    def export_data(self, export_datafile=None, export_description=None):
+    def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
         if export_datafile:
             self.save_data(export_datafile, export_description)
-            self.plot_credit_channels(export_datafile)
-            self.plot_bankruptcies(export_datafile)
-            self.plot_liquidity(export_datafile)
-            self.plot_best_lender(export_datafile)
-            self.plot_interest_rate(export_datafile)
-            self.plot_P(export_datafile)
-            self.plot_B(export_datafile)
+            if generate_plots:
+                self.get_plots(export_datafile)
         if Utils.is_notebook() or Utils.is_spyder():
-            self.plot_credit_channels()
-            self.plot_bankruptcies()
-            self.plot_liquidity()
-            self.plot_best_lender()
-            self.plot_interest_rate()
-            self.plot_P()
-            self.plot_B()
+            self.get_plots(None)
 
-    def get_graph(self, t):
+    def get_graph(self, t, special_name=None, description=None):
         """
         Extracts from the model the graph that corresponds to the network in this instant
         """
-        self.graphs[t] = nx.DiGraph(directed=True)
-        for bank in self.model.banks:
-            if bank.lender:
-                self.graphs[t].add_edge(bank.id, bank.lender)
-        lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
         if 'unittest' in sys.modules.keys():
             return None
-        elif Utils.is_spyder():
-            plt.show()
-            return None
         else:
-            filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-            filename = Statistics.get_export_path(filename).replace('.txt', f"_{t}.png")
-            plt.savefig(filename)
-            return filename
+            self.graphs[t] = nx.DiGraph(directed=True)
+            for bank in self.model.banks:
+                if bank.lender:
+                    self.graphs[t].add_edge(bank.id, bank.lender)
+            lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
+            if Utils.is_spyder():
+                plt.show()
+                return None
+            else:
+                filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
+                filename = self.get_export_path(filename, f"_{t}{self.plot_format}")
+                plt.savefig(filename)
+                return filename
 
-    def define_format(self, file_format):
-        match file_format.lower():
+    def define_plot_format(self, plot_format):
+        match plot_format.lower():
             case 'svg':
-                self.file_format = '.svg'
+                self.plot_format = '.svg'
             case 'png':
-                self.file_format = '.png'
+                self.plot_format = '.png'
             case '.gif':
-                self.file_format = '.gif'
+                self.plot_format = '.gif'
             case '.pdf':
-                self.file_format = '.pdf'
+                self.plot_format = '.pdf'
             case _:
-                print(f'Invalid file format: {file_format}')
+                print(f'Invalid plot file format: {plot_format}')
+                sys.exit(-1)
+
+    def define_output_format(self, output_format):
+        match output_format.lower():
+            case 'both':
+                self.output_format = '.both'
+            case 'gdt':
+                self.output_format = '.gdt'
+            case 'csv':
+                self.output_format = '.csv'
+            case '.txt':
+                self.output_format = '.txt'
+            case _:
+                print(f'Invalid output file format: {output_format}')
                 sys.exit(-1)
 
     def create_gif_with_graphs(self, list_of_files):
@@ -257,7 +247,7 @@ class Statistics:
             else:
                 positions_of_images = 1
             filename_output = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-            filename_output = Statistics.get_export_path(filename_output).replace('.txt', '.gif')
+            filename_output = self.get_export_path(filename_output, '.gif')
             images = []
             for idx, image_file in enumerate(list_of_files):
                 # if more >40 images, only those that are divisible by 40 are incorporated:
@@ -267,100 +257,144 @@ class Statistics:
             images[0].save(fp=filename_output, format='GIF', append_images=images[1:],
                            save_all=True, duration=100, loop=0)
 
-    @staticmethod
-    def get_export_path(filename):
-        # if not filename.startswith(Statistics.OUTPUT_DIRECTORY):
+    def get_export_path(self, filename, ending_name=''):
+        # we ensure that the output goes to OUTPUT_DIRECTORY:
         if not os.path.dirname(filename):
             filename = f"{Statistics.OUTPUT_DIRECTORY}/{filename}"
-        return filename if filename.endswith('.txt') else f"{filename}.txt"
+        path, extension = os.path.splitext(filename)
+        # if there is an ending_name it means that we don't want the output.csv, we are using the
+        # function to generate a plot_file, for instance:
+        if ending_name:
+            return path + ending_name
+        else:
+            # we ensure that the output goes with the correct extension:
+            return path + self.output_format.lower()
+
+    def __generate_csv_or_txt(self, export_datafile, header, delimiter):
+        with open(export_datafile, 'w', encoding="utf-8") as savefile:
+            for line_header in header:
+                savefile.write(f"# {line_header}\n")
+            savefile.write(f"# pd.read_csv('file{self.output_format}',header={len(header)+1}',"
+                           f" delimiter='{delimiter}')\nt")
+            for element_name, _ in self.enumerate_results():
+                savefile.write(f"{delimiter}{element_name}")
+            savefile.write("\n")
+            for i in range(self.model.config.T):
+                savefile.write(f"{i}")
+                for _, element in self.enumerate_results():
+                    savefile.write(f"{delimiter}{element[i]}")
+                savefile.write(f"\n")
+
+    def __generate_gdt(self, export_datafile, header):
+        E = lxml.builder.ElementMaker()
+        GRETLDATA = E.gretldata
+        DESCRIPTION = E.description
+        VARIABLES = E.variables
+        VARIABLE = E.variable
+        OBSERVATIONS = E.observations
+        OBS = E.obs
+        variables = VARIABLES(count=f"{sum(1 for _ in self.enumerate_results())}")
+        for variable_name, _ in self.enumerate_results():
+            variables.append(VARIABLE(name=f"{variable_name}"))
+
+        observations = OBSERVATIONS(count=f"{self.model.config.T}", labels="false")
+        for i in range(self.model.config.T):
+            string_obs = ''
+            for _, variable in self.enumerate_results():
+                string_obs += f"{variable[i]}  "
+            observations.append(OBS(string_obs))
+        gdt_result = GRETLDATA(
+            DESCRIPTION("Datos importados"),
+            variables,
+            observations,
+            version="1.4", name='prueba', frequency="special:1", startobs="1",
+            endobs=f"{self.model.config.T}", type="time-series"
+        )
+        with open(self.get_export_path(export_datafile),'w') as output_file:
+            output_file.write(
+                '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
+            output_file.write(
+                lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str))
 
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
-            with open(Statistics.get_export_path(export_datafile), 'w', encoding="utf-8") as savefile:
-                savefile.write('  t\tpolicy\tfitness           \tliquidity            \tir         \t' +
-                               'bankrupts\tbestLenderID\tbestLenderClients\tcreditChannels\trationing\tleverage\tprob_change_lender\tbad_debt\n')
-                if export_description:
-                    savefile.write(f"# {export_description}\n")
-                else:
+            if export_description:
+                header = [f"{export_description}"]
+            else:
+                header = [f"{__name__} T={self.model.config.T} N={self.model.config.N}"]
+            if self.output_format.lower() == '.both':
+                self.output_format = '.csv'
+                self.__generate_csv_or_txt(self.get_export_path(export_datafile), header, ';')
+                self.output_format = '.gdt'
+                self.__generate_gdt(self.get_export_path(export_datafile), header)
+            elif self.output_format.lower() == '.csv':
+                self.__generate_csv_or_txt(self.get_export_path(export_datafile), header, ';')
+            elif self.output_format.lower() == '.txt':
+                self.__generate_csv_or_txt(self.get_export_path(export_datafile), header, '\t')
+            else:
+                self.__generate_gdt(self.get_export_path(export_datafile), header)
 
-                    savefile.write(f"# {__name__} T={self.model.config.T} N={self.model.config.N}\n")
-                for i in range(self.model.config.T):
-                    savefile.write(f"{i:3}\t{self.policy[i]:3}\t{self.fitness[i]:19}\t{self.liquidity[i]:19}" +
-                                   f"\t{self.interest_rate[i]:20}\t{self.bankruptcy[i]:3}" +
-                                   f"\t{self.best_lender[i]:20}" +
-                                   f"\t{self.best_lender_clients[i]:20}" +
-                                   f"\t{self.credit_channels[i]:3}" +
-                                   f"\t{self.rationing[i]:20}" +
-                                   f"\t{self.leverage[i]:20}" +
-                                   f"\t{self.P[i]:20}" +
-                                   f"\t{self.B[i]:20}" +
-                                   "\n")
+    def enumerate_results(self):
+        for element in ('policy', 'fitness', 'liquidity', 'interest_rate', 'bankruptcy',
+                        'best_lender', 'best_lender_clients', 'credit_channels', 'rationing',
+                        'leverage', 'P', 'B'):
+            yield self.get_name(element), getattr(self, element)
+
+    def get_name(self, variable):
+        match variable:
+            case 'bankruptcy':
+                return 'bankruptcies'
+            case 'P':
+                return 'prob_change_lender'
+            case 'B':
+                return 'bad_debt'
+            case 'leverage':
+                return 'leverage_'
+        return variable
 
     def get_data(self):
-        return (
-            np.array(self.policy),
-            np.array(self.fitness),
-            np.array(self.liquidity),
-            np.array(self.interest_rate),
-            np.array(self.bankruptcy),
-            np.array(self.best_lender),
-            np.array(self.best_lender_clients),
-            np.array(self.credit_channels),
-            np.array(self.rationing),
-            np.array(self.leverage),
-            np.array(self.P),
-            np.array(self.B))
+        result = pd.DataFrame()
+        for variable_name,variable in self.enumerate_results():
+            result[variable_name] = np.array(variable)
+        return result
+        # return pd.DataFrame({
+        #     'policy': np.array(self.policy),
+        #     'fitness': np.array(self.fitness),
+        #     'liquidity': np.array(self.liquidity),
+        #     'ir': np.array(self.interest_rate),
+        #     'bankrupts': np.array(self.bankruptcy),
+        #     'bestLenderID': np.array(self.best_lender),
+        #     'bestLenderClients': np.array(self.best_lender_clients),
+        #     'creditChannels': np.array(self.credit_channels),
+        #     'rationing':np.array(self.rationing),
+        #     'leverage': np.array(self.leverage),
+        #     'prob_change_lender': np.array(self.P),
+        #     'bad_debt':np.array(self.B)})
 
-    def plot_bankruptcies(self, export_datafile=None):
+
+    def plot_result(self, variable, title, export_datafile=None):
         xx = []
         yy = []
         for i in range(self.model.config.T):
             xx.append(i)
-            yy.append(self.bankruptcy[i])
+            yy.append(getattr(self, variable)[i])
         plt.clf()
         plt.figure(figsize=(14, 6))
         plt.plot(xx, yy, '-', color="blue")
         plt.xlabel("Time")
-        plt.title("Bankruptcies")
-        plt.ylabel("num of bankruptcies")
+        plt.title(title.capitalize().replace("_", ' '))
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_bankruptcies{self.file_format}"))
+            plt.savefig(self.get_export_path(export_datafile,
+                                             f"_{variable.lower()}{self.plot_format}"))
         else:
             plt.show()
 
-    def plot_interest_rate(self, export_datafile=None):
-        xx = []
-        yy = []
-        for i in range(self.model.config.T):
-            xx.append(i)
-            yy.append(self.interest_rate[i])
-        plt.clf()
-        plt.figure(figsize=(14, 6))
-        plt.plot(xx, yy, '-', color="blue")
-        plt.xlabel("Time")
-        plt.title("Interest")
-        plt.ylabel("interest")
-        if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_interest_rate{self.file_format}"))
-        else:
-            plt.show()
 
-    def plot_B(self, export_datafile=None):
-        xx = []
-        yy = []
-        for i in range(self.model.config.T):
-            xx.append(i)
-            yy.append(self.B[i])
-        plt.clf()
-        plt.figure(figsize=(14, 6))
-        plt.plot(xx, yy, '-', color="blue")
-        plt.xlabel("Time")
-        plt.title("Bad debt")
-        plt.ylabel("Bad debt")
-        if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_bad_debt{self.file_format}"))
-        else:
-            plt.show()
+    def get_plots(self,export_datafile):
+        for variable in ('bankruptcy', 'liquidity', 'credit_channels', 'interest_rate', 'B'):
+            self.plot_result(variable, self.get_name(variable), export_datafile)
+        self.plot_best_lender(export_datafile)
+        self.plot_P(export_datafile)
 
     def plot_P(self, export_datafile=None):
         xx = []
@@ -386,41 +420,8 @@ class Statistics:
         plt.title("Prob oc change lender " + self.model.config.lender_change.describe())
         plt.legend()
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_prob_change_lender{self.file_format}"))
-        else:
-            plt.show()
-
-    def plot_liquidity(self, export_datafile=None):
-        xx = []
-        yy = []
-        for i in range(self.model.config.T):
-            xx.append(i)
-            yy.append(self.liquidity[i])
-        plt.clf()
-        plt.figure(figsize=(14, 6))
-        plt.plot(xx, yy, '-', color="blue")
-        plt.xlabel("Time")
-        plt.title("Liquidity")
-        plt.ylabel("Ʃ liquidity")
-        if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_liquidity{self.file_format}"))
-        else:
-            plt.show()
-
-    def plot_credit_channels(self, export_datafile=None):
-        xx = []
-        yy = []
-        for i in range(self.model.config.T):
-            xx.append(i)
-            yy.append(self.credit_channels[i])
-        plt.clf()
-        plt.figure(figsize=(14, 6))
-        plt.plot(xx, yy, '-', color="blue")
-        plt.xlabel("Time")
-        plt.title("Credit channels")
-        plt.ylabel("Credit channels")
-        if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_credit_channels{self.file_format}"))
+            plt.savefig(self.get_export_path(export_datafile,
+                                             f"_prob_change_lender{self.plot_format}"))
         else:
             plt.show()
 
@@ -462,7 +463,7 @@ class Statistics:
         plt.title("Best Lender (blue) #clients (red)")
         plt.ylabel("Best Lender")
         if export_datafile:
-            plt.savefig(Statistics.get_export_path(export_datafile).replace(".txt", f"_best_lender{self.file_format}"))
+            plt.savefig(self.get_export_path(export_datafile, f"_best_lender{self.plot_format}"))
         else:
             plt.show()
 
@@ -600,7 +601,7 @@ class Model:
     """
     banks = []  # An array of Bank with size Model.config.N
     t: int = 0  # current value of time, t = 0..Model.config.T
-    ŋ: float = 1  # eta : current value of policy recommendation
+    eta: float = 1  # ŋ eta : current value of policy recommendation
     test = False  # it's true when we are inside a test
     default_seed: int = 20579  # seed for this simulation
     backward_enabled = False  # if true, we can execute backward()
@@ -620,6 +621,8 @@ class Model:
     export_description = None
 
     policy_actions_translation = [0.0, 0.5, 1.0]
+
+    generate_plots = True
 
     def __init__(self, **configuration):
         self.log = Log(self)
@@ -651,7 +654,7 @@ class Model:
         self.initialize()
 
     def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None,
-                   export_datafile=None, export_description=None):
+                   export_datafile=None, export_description=None, generate_plots=True):
         self.statistics.reset()
         if not dont_seed:
             random.seed(seed if seed else self.default_seed)
@@ -662,6 +665,7 @@ class Model:
             self.config.lender_change = lc.determine_algorithm()
         self.policy_changes = 0
         self.export_datafile = export_datafile
+        self.generate_plots = generate_plots
         self.export_description = str(self.config) if export_description is None else export_description
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
@@ -723,10 +727,12 @@ class Model:
 
     def finish(self):
         if not self.test:
-            self.statistics.export_data(self.export_datafile, self.export_description)
+            self.statistics.export_data(export_datafile=self.export_datafile,
+                                        export_description=self.export_description,
+                                        generate_plots=self.generate_plots)
         summary = f"Finish: model T={self.config.T}  N={self.config.N}"
         if not self.__policy_recommendation_changed__():
-            summary += f" ŋ={self.ŋ}"
+            summary += f" ŋ={self.eta}"
         else:
             summary += " ŋ variate during simulation"
         self.log.info("*****", summary)
@@ -734,18 +740,18 @@ class Model:
         plt.close()
         return self.statistics.get_data()
 
-    def set_policy_recommendation(self, n: int = None, ŋ: float = None, ŋ1: float = None):
-        if ŋ1 is not None:
-            n = round(ŋ1)
-        if n is not None and ŋ is None:
+    def set_policy_recommendation(self, n: int = None, eta: float = None, eta_1: float = None):
+        if eta_1 is not None:
+            n = round(eta_1)
+        if n is not None and eta is None:
             if type(n) is int:
-                ŋ = self.policy_actions_translation[n]
+                eta = self.policy_actions_translation[n]
             else:
-                ŋ = float(n)
-        if self.ŋ != ŋ:
-            self.log.debug("*****", f"ŋ changed to {ŋ}")
+                eta = float(n)
+        if self.eta != eta:
+            self.log.debug("*****", f"eta(ŋ) changed to {eta}")
             self.policy_changes += 1
-        self.ŋ = ŋ
+        self.eta = eta
 
     def limit_to_two_policies(self):
         self.policy_actions_translation = [0.0, 1.0]
@@ -829,33 +835,33 @@ class Model:
     def do_shock(self, which_shock):
         # (equation 2)
         for bank in self.banks:
-            bank.newD = bank.D * (self.config.µ + self.config.ω * random.random())
-            bank.ΔD = bank.newD - bank.D
+            bank.newD = bank.D * (self.config.mi + self.config.omega * random.random())
+            bank.incrD = bank.newD - bank.D
             bank.D = bank.newD
-            if bank.ΔD >= 0:
-                bank.C += bank.ΔD
+            if bank.incrD >= 0:
+                bank.C += bank.incrD
                 # if "shock1" then we can be a lender:
                 if which_shock == "shock1":
                     bank.s = bank.C
                 bank.d = 0  # it will not need to borrow
-                if bank.ΔD > 0:
+                if bank.incrD > 0:
                     self.log.debug(which_shock,
-                                   f"{bank.getId()} wins ΔD={bank.ΔD:.3f}")
+                                   f"{bank.getId()} wins ΔD={bank.incrD:.3f}")
             else:
                 # if "shock1" then we cannot be a lender: we have lost deposits
                 if which_shock == "shock1":
                     bank.s = 0
-                if bank.ΔD + bank.C >= 0:
+                if bank.incrD + bank.C >= 0:
                     bank.d = 0  # it will not need to borrow
-                    bank.C += bank.ΔD
+                    bank.C += bank.incrD
                     self.log.debug(which_shock,
-                                   f"{bank.getId()} loses ΔD={bank.ΔD:.3f}, covered by capital")
+                                   f"{bank.getId()} loses ΔD={bank.incrD:.3f}, covered by capital")
                 else:
-                    bank.d = abs(bank.ΔD + bank.C)  # it will need money
+                    bank.d = abs(bank.incrD + bank.C)  # it will need money
                     self.log.debug(which_shock,
-                                   f"{bank.getId()} loses ΔD={bank.ΔD:.3f} but has only C={bank.C:.3f}")
+                                   f"{bank.getId()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
-            self.statistics.incrementD[self.t] += bank.ΔD
+            self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
         for bank in self.banks:
@@ -960,17 +966,16 @@ class Model:
         # p = probability borrower not failing
         # c = lending capacity
         # h = borrower haircut (leverage of bank respect to the maximum)
-
         maxE = max(self.banks, key=lambda k: k.E).E
         maxC = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
             bank.p = bank.E / maxE
-            bank.λ = bank.L / bank.E
-            bank.ΔD = 0
+            bank._lambda = bank.L / bank.E
+            bank.incrD = 0
 
-        maxλ = max(self.banks, key=lambda k: k.λ).λ
+        max_lambda = max(self.banks, key=lambda k: k._lambda)._lambda
         for bank in self.banks:
-            bank.h = bank.λ / maxλ
+            bank.h = bank._lambda / max_lambda
             bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
 
         # determine c (lending capacity) for all other banks (to whom give loans):
@@ -994,15 +999,15 @@ class Model:
                         if self.banks[j].p == 0 or bank_i.c[j] == 0:
                             bank_i.rij[j] = self.config.r_i0
                         else:
-                            bank_i.rij[j] = (self.config.Χ * bank_i.A -
-                                             self.config.Φ * self.banks[j].A -
+                            bank_i.rij[j] = (self.config.ji * bank_i.A -
+                                             self.config.phi * self.banks[j].A -
                                              (1 - self.banks[j].p) *
-                                             (self.config.ξ * self.banks[j].A - bank_i.c[j])) \
+                                             (self.config.xi * self.banks[j].A - bank_i.c[j])) \
                                             / (self.banks[j].p * bank_i.c[j])
                         if bank_i.rij[j] < 0:
                             bank_i.rij[j] = self.config.r_i0
                 # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
-                # L and E are equal for all banks, and so maxλ=anyλ and h=1 , so cij=(1-1)A=0, and r division
+                # L and E are equal for all banks, and so max_lambda=anyλ and h=1 , so cij=(1-1)A=0, and r division
                 # by zero -> solution then is to use still r_i0:
                 except ZeroDivisionError:
                     bank_i.rij[j] = self.config.r_i0
@@ -1011,10 +1016,10 @@ class Model:
                 line2 += f"{bank_i.c[j]:.3f},"
             if lines:
                 lines.append("  |" + line2[:-1] + "|   |" +
-                             line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
+                             line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i._lambda:.3f} ")
             else:
                 lines.append("c=|" + line2[:-1] + "| r=|" +
-                             line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i.λ:.3f} ")
+                             line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i._lambda:.3f} ")
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             if bank_i.r < minr:
                 minr = bank_i.r
@@ -1022,13 +1027,14 @@ class Model:
         if self.config.N < 10:
             for line in lines:
                 self.log.debug("links", f"{line}")
-        self.log.debug("links", f"maxE={maxE:.3f} maxC={maxC:.3f} maxλ={maxλ:.3f} minr={minr:.3f} ŋ={self.ŋ:.3f}")
+        self.log.debug("links", f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} minr={minr:.3f} ŋ={self.eta:.3f}")
 
         # (equation 7)
         loginfo = loginfo1 = ""
         for bank in self.banks:
-            bank.μ = self.ŋ * (bank.C / maxC) + (1 - self.ŋ) * (minr / bank.r)
-            loginfo += f"{bank.getId(short=True)}:{bank.μ:.3f},"
+            # bank.μ mu
+            bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (minr / bank.r)
+            loginfo += f"{bank.getId(short=True)}:{bank.mu:.3f},"
             loginfo1 += f"{bank.getId(short=True)}:{bank.r:.3f},"
         if self.config.N <= 10:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
@@ -1076,7 +1082,7 @@ class Bank:
         self.C = self.model.config.C_i0
         self.D = self.model.config.D_i0
         self.E = self.model.config.E_i0
-        self.μ = 0  # fitness of the bank:  estimated later
+        self.mu = 0  # fitness of the bank:  estimated later
         self.l = 0  # amount of loan done:  estimated later
         self.s = 0  # amount of loan received: estimated later
         self.B = 0  # bad debt: estimated later
@@ -1092,7 +1098,7 @@ class Bank:
     def __doBankruptcy__(self, phase):
         self.failed = True
         self.model.statistics.bankruptcy[self.model.t] += 1
-        recovered_in_fire_sales = self.L * self.model.config.ρ  # we firesale what we have
+        recovered_in_fire_sales = self.L * self.model.config.ro  # we firesale what we have
         recovered = recovered_in_fire_sales - self.D  # we should pay D to clients
         if recovered < 0:
             recovered = 0
@@ -1122,8 +1128,8 @@ class Bank:
             del self.getLender().activeBorrowers[self.id]
 
     def doFiresalesL(self, amountToSell, reason, phase):
-        costOfSell = amountToSell / self.model.config.ρ
-        recoveredE = costOfSell * (1 - self.model.config.ρ)
+        costOfSell = amountToSell / self.model.config.ro
+        recoveredE = costOfSell * (1 - self.model.config.ro)
         if costOfSell > self.L:
             self.model.log.debug(phase,
                                  f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
@@ -1132,12 +1138,12 @@ class Bank:
             self.L -= costOfSell
             self.E -= recoveredE
 
-            if self.L <= self.model.config.α:
+            if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,
                                      f"{self.getId()} new L={self.L:.3f} makes bankruptcy of bank: {reason}")
                 return self.__doBankruptcy__(phase)
             else:
-                if self.E <= self.model.config.α:
+                if self.E <= self.model.config.alfa:
                     self.model.log.debug(phase,
                                          f"{self.getId()} new E={self.E:.3f} makes bankruptcy of bank: {reason}")
                     return self.__doBankruptcy__(phase)
@@ -1184,14 +1190,18 @@ class Utils:
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
         parser.add_argument("--debug", type=int, default=None,
                             help="Stop and enter in debug mode after at this time")
-        parser.add_argument("--eta", type=float, default=Model.ŋ, help=f"Policy recommendation")
+        parser.add_argument("--eta", type=float, default=Model.eta, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
         parser.add_argument("--lc_p", type=float, default=None,
                             help=f"For Erdos-Renyi bank lender's change value of p=0.0x")
         parser.add_argument("--lc_m", type=int, default=None,
                             help=f"For Preferential bank lender's change value of graph grade m")
-        parser.add_argument("--lc", type=str, default="default", help="Bank lender's change method (?=list)")
-        parser.add_argument("--format", type=str, default="svg", help="File extension for plots (svg,png,pdf..)")
+        parser.add_argument("--lc", type=str, default="default",
+                            help="Bank lender's change method (?=list)")
+        parser.add_argument("--plot_format", type=str, default="svg",
+                            help="File extension for plots (svg,png,pdf..)")
+        parser.add_argument("--output_format", type=str, default="gdt",
+                            help="File extension for data (gdt,txt,csv,both)")
 
         args = parser.parse_args()
 
@@ -1199,15 +1209,16 @@ class Utils:
             model.config.T = args.t
         if args.n != model.config.N:
             model.config.N = args.n
-        if args.eta != model.ŋ:
-            model.ŋ = args.eta
+        if args.eta != model.eta:
+            model.eta = args.eta
         if args.debug:
             model.do_debug(args.debug)
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)
         model.log.define_log(args.log, args.logfile, args.modules)
-        model.statistics.define_format(args.format)
+        model.statistics.define_output_format(args.output_format)
+        model.statistics.define_plot_format(args.plot_format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
                   interactive=(args.log == 'ERROR' or not args.logfile is None))
 
@@ -1223,6 +1234,7 @@ class Utils:
     @staticmethod
     def is_notebook():
         try:
+            # noinspection PyBroadException
             __IPYTHON__
             return get_ipython().__class__.__name__ != "SpyderShell"
         except NameError:
@@ -1230,12 +1242,13 @@ class Utils:
 
     @staticmethod
     def is_spyder():
+        # noinspection PyBroadException
         try:
             return get_ipython().__class__.__name__ == "SpyderShell"
-        except:
+        except NameError:
             return False
 
-        # %%
+# %%
 
 
 model = Model()

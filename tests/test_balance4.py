@@ -12,7 +12,7 @@ import tests.interbank_testclass
 class Balance3TestCase(tests.interbank_testclass.InterbankTest):
 
     def initialValues(self):
-        interbank.Config.ρ = 0.4 # fire sale cost
+        interbank.Config.ro = 0.4 # fire sale cost
         self.setBank(bank=self.model.banks[0], C=0.0, L=8.0, D=3.0, E=5.0)
         self.setBank(bank=self.model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
 
@@ -24,7 +24,7 @@ class Balance3TestCase(tests.interbank_testclass.InterbankTest):
                             ])
         self.initialValues()
         self.doTest()
-        interbank.Config.ρ = 0.3 # fire sale cost
+        interbank.Config.ro = 0.3 # fire sale cost
 
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], C=0, L=0.5, D=0, E=0.5, paidloan=0, bankrupted=False)

@@ -188,15 +188,15 @@ class Boltzman(LenderChange):
     def change_lender(self, this_model, bank, t):
         """ It uses γ but only after t=20, at the beginning only Boltzmann"""
         possible_lender = self.new_lender(this_model, bank)
-        possible_lender_μ = this_model.banks[possible_lender].μ
+        possible_lender_μ = this_model.banks[possible_lender].mu
         if not bank.getLender() is None:
-            current_lender_μ = bank.getLender().μ
+            current_lender_μ = bank.getLender().mu
         else:
             current_lender_μ = 0
 
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)
-        boltzmann = 1 / (1 + math.exp(-this_model.config.β * (possible_lender_μ - current_lender_μ)))
+        boltzmann = 1 / (1 + math.exp(-this_model.config.beta * (possible_lender_μ - current_lender_μ)))
 
         if t < 20:
             # bank.P = 0.35
@@ -224,7 +224,7 @@ class Boltzman(LenderChange):
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
             bank.r = this_model.config.r_i0
-            bank.μ = 0
+            bank.mu = 0
             # if it's just created, only not to be ourselves is enough
             new_value = random.randrange(this_model.config.N - 1)
         else:
@@ -272,9 +272,7 @@ class InitialStability(Boltzman):
         self.banks_graph.type = "barabasi_albert_graph"
         if this_model.export_datafile:
             draw(self.banks_graph, new_guru_look_for=True, title=f"barabasi_albert m=1")
-            filename = this_model.statistics.get_export_path(this_model.export_datafile).replace('.txt',
-                                                                                                 f"_barabasi.png")
-            plt.savefig(filename)
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi.png"))
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
 
@@ -301,9 +299,7 @@ class ShockedMarket(LenderChange):
         self.banks_graph.type = "erdos_renyi_graph"
         if this_model.export_datafile:
             draw(self.banks_graph, new_guru_look_for=True, title=f"erdos_renyi p={self.parameter['p']}")
-            filename = this_model.statistics.get_export_path(this_model.export_datafile).replace('.txt',
-                                                                                                 f"_erdos_renyi.png")
-            plt.savefig(filename)
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.png"))
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
 
@@ -312,7 +308,7 @@ class ShockedMarket(LenderChange):
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
         bank.rij[bank.id] = 0
         bank.r = this_model.config.r_i0
-        bank.μ = 0
+        bank.mu = 0
         return bank.lender
 
     def change_lender(self, this_model, bank, t):
@@ -345,9 +341,7 @@ class Preferential(Boltzman):
         if this_model.export_datafile:
             self.guru = draw(self.banks_graph_full, new_guru_look_for=True,
                              title=f"barabasi_pref m={self.parameter['m']}")
-            filename = this_model.statistics.get_export_path(this_model.export_datafile).replace('.txt',
-                                                                                                 f"_barabasi_pref.png")
-            plt.savefig(filename)
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi_pref.png"))
         else:
             self.guru = find_guru(self.banks_graph_full)
         self.full_barabasi_extract_random_directed(this_model)
@@ -395,7 +389,7 @@ class Preferential(Boltzman):
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
             bank.r = this_model.config.r_i0
-            bank.μ = 0
+            bank.mu = 0
         if self.banks_graph and self.banks_graph.out_edges():
             return list(self.banks_graph.out_edges(bank.id))[0][1]
         else:
