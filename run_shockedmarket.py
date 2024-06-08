@@ -32,7 +32,7 @@ class Experiment:
     }
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.001, 0.100, num=100),
+        "p": np.linspace(0.001, 0.200, num=200),
     }
 
     LENGTH_FILENAME_PARAMETER = 5
@@ -59,25 +59,29 @@ class Experiment:
                 title += f" x={title_x} MC={self.MC}"
                 plt.title(title)
                 plt.xticks(rotation=90)
-                plt.errorbar(
-                    array_with_x_values,
-                    mean,
-                    standard_deviation,
-                    linestyle="None",
-                    marker="^",
-                )
+                try:
+                    plt.errorbar(
+                        array_with_x_values,
+                        mean,
+                        standard_deviation,
+                        linestyle="None",
+                        marker="^",
+                    )
+                except:
+                    pass
                 plt.savefig(f"{directory}{i}.png", dpi=300)
 
     def save(self, array_with_data, array_with_x_values, directory):
         with open(f"{directory}results.csv", "w") as file:
             file.write(
-                f"# MC={self.MC} N={self.N} T={self.T}\neta"
+                f"# MC={self.MC} N={self.N} T={self.T}\n"
             )
-            for i in array_with_data:
-                file.write(f";{i};std_{i}")
+            file.write(array_with_x_values[0].split("=")[0])
+            for j in array_with_data:
+                file.write(f";{j};std_{j}")
             file.write("\n")
             for i in range(len(array_with_x_values)):
-                file.write(f"{array_with_x_values[i]}")
+                file.write(f"{array_with_x_values[i].split('=')[1]}")
                 for j in array_with_data:
                     file.write(
                         f";{array_with_data[j][i][0]};{array_with_data[j][i][1]}"
@@ -86,13 +90,14 @@ class Experiment:
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()
+        model.export_datafile = filename
+        model.config.lender_change = self.ALGORITHM()
+        model.config.lender_change.set_parameter("p", execution_parameters["p"])
         model.configure(T=self.T, N=self.N, **execution_config)
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
                          export_description=str(model.config) + str(execution_parameters))
-        model.config.lender_change = self.ALGORITHM()
-        model.config.lender_change.set_parameter("p", execution_parameters["p"])
         model.simulate_full(interactive=False)
         return model.finish()
 

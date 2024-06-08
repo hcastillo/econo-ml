@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import sys
 import inspect
+import json
 
 
 def determine_algorithm(given_name: str = "default"):
@@ -88,6 +89,18 @@ def draw(graph, new_guru_look_for=False, title=None, show=False):
     return guru
 
 
+def save_graph_json(graph, filename):
+    graph_json = nx.node_link_data(graph)
+    with open(filename, 'w') as f:
+        json.dump(graph_json,f)
+
+
+def load_graph_json(filename):
+    with open(filename, 'r') as f:
+        graph_json = json.load(f)
+        return nx.node_link_graph(graph_json)
+
+
 def __len_edges(graph, node):
     if hasattr(graph, "in_edges"):
         return len(graph.in_edges(node))
@@ -138,6 +151,7 @@ def from_graph_to_array_banks(banks_graph, this_model):
 class LenderChange:
     def __init__(self):
         self.parameter = {}
+        self.initial_graph_file = None
 
     def initialize_bank_relationships(self, this_model):
         """ Call once at initilize() model """
@@ -154,6 +168,10 @@ class LenderChange:
     def new_lender(self, this_model, bank):
         """ Describes the mechanism of change"""
         pass
+
+    def set_initial_graph_file(self, lc_ini_graph_file):
+        if lc_ini_graph_file:
+            self.initial_graph_file = lc_ini_graph_file
 
     def describe(self):
         return ""
@@ -183,6 +201,9 @@ class Boltzman(LenderChange):
     CHANGE_LENDER_IF_HIGHER = 0.5
 
     def initialize_bank_relationships(self, this_model):
+        if self.initial_graph_file:
+            graph = load_graph_json(self.initial_graph_file)
+            from_graph_to_array_banks(graph,this_model)
         this_model.statistics.get_graph(0)
 
     def change_lender(self, this_model, bank, t):
@@ -268,11 +289,18 @@ class InitialStability(Boltzman):
             result.add_edge(current_node, previous_node)
 
     def initialize_bank_relationships(self, this_model):
-        self.banks_graph, _ = get_graph_from_guru(nx.barabasi_albert_graph(this_model.config.N, 1))
+        if self.initial_graph_file:
+            self.banks_graph = load_graph_json(self.initial_graph_file)
+            description = f"barabasi_albert from file {self.initial_graph_file}"
+        else:
+            self.banks_graph, _ = get_graph_from_guru(nx.barabasi_albert_graph(this_model.config.N, 1))
+            description = f"barabasi_albert m=1"
         self.banks_graph.type = "barabasi_albert_graph"
         if this_model.export_datafile:
-            draw(self.banks_graph, new_guru_look_for=True, title=f"barabasi_albert m=1")
+            draw(self.banks_graph, new_guru_look_for=True, title=description)
             plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi.png"))
+            save_graph_json(self.banks_graph.
+                            this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi.json"))
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
 
@@ -295,11 +323,19 @@ class ShockedMarket(LenderChange):
 
     def initialize_bank_relationships(self, this_model):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationsships till the end"""
-        self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
+        if self.initial_graph_file:
+            self.banks_graph = load_graph_json(self.initial_graph_file)
+            description = f"erdos_renyi from file {self.initial_graph_file}"
+        else:
+            self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
+            description = f"erdos_renyi p={self.parameter['p']}"
         self.banks_graph.type = "erdos_renyi_graph"
         if this_model.export_datafile:
-            draw(self.banks_graph, new_guru_look_for=True, title=f"erdos_renyi p={self.parameter['p']}")
+            draw(self.banks_graph, new_guru_look_for=True, title=description)
             plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.png"))
+            save_graph_json(self.banks_graph,
+                            this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.json"))
+
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
 
@@ -336,11 +372,17 @@ class Preferential(Boltzman):
             return False
 
     def initialize_bank_relationships(self, this_model):
-        self.banks_graph_full = nx.barabasi_albert_graph(this_model.config.N, self.parameter['m'])
+
+        if self.initial_graph_file:
+            self.banks_graph_full = load_graph_json(self.initial_graph_file)
+            description = f"barabasi_pref from file {self.initial_graph_file}"
+        else:
+            self.banks_graph_full = nx.barabasi_albert_graph(this_model.config.N, self.parameter['m'])
+            description = f"barabasi_pref m={self.parameter['m']}"
         self.banks_graph_full.type = "barabasi_preferential"
         if this_model.export_datafile:
             self.guru = draw(self.banks_graph_full, new_guru_look_for=True,
-                             title=f"barabasi_pref m={self.parameter['m']}")
+                             title=description)
             plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi_pref.png"))
         else:
             self.guru = find_guru(self.banks_graph_full)

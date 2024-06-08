@@ -97,6 +97,7 @@ class Statistics:
 
     plot_format = '.svg'
     output_format = '.gdt'
+    create_gif = False
 
     OUTPUT_DIRECTORY = "output"
     NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
@@ -106,6 +107,9 @@ class Statistics:
         if not os.path.isdir(self.OUTPUT_DIRECTORY):
             os.mkdir(self.OUTPUT_DIRECTORY)
 
+    def set_gif_graph(self, gif_graph):
+        if gif_graph:
+            self.create_gif = True
     def reset(self):
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
@@ -189,7 +193,7 @@ class Statistics:
         if Utils.is_notebook() or Utils.is_spyder():
             self.get_plots(None)
 
-    def get_graph(self, t, special_name=None, description=None):
+    def get_graph(self, t):
         """
         Extracts from the model the graph that corresponds to the network in this instant
         """
@@ -203,12 +207,13 @@ class Statistics:
             lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
             if Utils.is_spyder():
                 plt.show()
-                return None
+                filename = None
             else:
                 filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
                 filename = self.get_export_path(filename, f"_{t}{self.plot_format}")
                 plt.savefig(filename)
-                return filename
+            plt.close()
+            return filename
 
     def define_plot_format(self, plot_format):
         match plot_format.lower():
@@ -239,7 +244,7 @@ class Statistics:
                 sys.exit(-1)
 
     def create_gif_with_graphs(self, list_of_files):
-        if len(list_of_files) == 0:
+        if len(list_of_files) == 0 or not self.create_gif:
             return
         else:
             if len(list_of_files) > self.NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH:
@@ -388,6 +393,7 @@ class Statistics:
                                              f"_{variable.lower()}{self.plot_format}"))
         else:
             plt.show()
+        plt.close()
 
 
     def get_plots(self,export_datafile):
@@ -424,6 +430,7 @@ class Statistics:
                                              f"_prob_change_lender{self.plot_format}"))
         else:
             plt.show()
+        plt.close()
 
     def plot_best_lender(self, export_datafile=None):
         xx = []
@@ -466,6 +473,7 @@ class Statistics:
             plt.savefig(self.get_export_path(export_datafile, f"_best_lender{self.plot_format}"))
         else:
             plt.show()
+        plt.close()
 
 
 class Log:
@@ -664,8 +672,10 @@ class Model:
         if not self.config.lender_change:
             self.config.lender_change = lc.determine_algorithm()
         self.policy_changes = 0
-        self.export_datafile = export_datafile
-        self.generate_plots = generate_plots
+        if export_datafile:
+            self.export_datafile = export_datafile
+        if generate_plots:
+            self.generate_plots = generate_plots
         self.export_description = str(self.config) if export_description is None else export_description
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
@@ -1186,7 +1196,10 @@ class Utils:
         parser.add_argument("--logfile", default=None, help="File to send logs to")
         parser.add_argument("--save", default=None, help=f"Saves the output of this execution")
         parser.add_argument("--graph", default=None,
-                            help=f"List of t in which save the network config (* for all and an animated gif)")
+                            help=f"List of t in which save the network config (* for all)")
+        parser.add_argument("--gif_graph", default=False,
+                            action=argparse.BooleanOptionalAction,
+                            help=f"If --graph, then also an animated gif with all graphs ")
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
         parser.add_argument("--debug", type=int, default=None,
                             help="Stop and enter in debug mode after at this time")
@@ -1198,6 +1211,8 @@ class Utils:
                             help=f"For Preferential bank lender's change value of graph grade m")
         parser.add_argument("--lc", type=str, default="default",
                             help="Bank lender's change method (?=list)")
+        parser.add_argument("--lc_ini_graph_file", type=str, default=None,
+                            help="Load a graph in json networkx.node_link_data() format")
         parser.add_argument("--plot_format", type=str, default="svg",
                             help="File extension for plots (svg,png,pdf..)")
         parser.add_argument("--output_format", type=str, default="gdt",
@@ -1216,8 +1231,10 @@ class Utils:
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)
+        model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
         model.log.define_log(args.log, args.logfile, args.modules)
         model.statistics.define_output_format(args.output_format)
+        model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
                   interactive=(args.log == 'ERROR' or not args.logfile is None))
