@@ -8,11 +8,13 @@ import random
 import warnings
 
 import numpy as np
+
+import interbank
 from interbank import Model
 from interbank_lenderchange import ShockedMarket
 import pandas as pd
 from progress.bar import Bar
-import os, sys
+import os
 import matplotlib.pyplot as plt
 import argparse
 from itertools import product
@@ -23,6 +25,7 @@ class Experiment:
     T = 1000
     MC = 10
 
+    BOLTZMAN_DATA = "boltzman"
     OUTPUT_DIRECTORY = "shocked_market"
     ALGORITHM = ShockedMarket
 
@@ -32,44 +35,53 @@ class Experiment:
     }
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.001, 0.200, num=200),
+        "p": np.linspace(0.001, 0.100, num=200),
     }
 
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    def plot(self, array_with_data, array_with_x_values, title_x, directory):
+    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_boltzman):
+        # we plot only x labels 1 of each 10:
+        plot_x_values = []
+        for j in range(len(array_with_x_values)):
+            plot_x_values.append(array_with_x_values[j] if (j % 10 == 0) else " ")
+        plot_x_values[-1] = array_with_x_values[-1]
         for i in array_with_data:
             i = i.strip()
             if i != "t":
-                use_logarithm = i in [
-                    "not_exists",
-                ]
                 mean = []
-                standard_deviation = []
                 for j in array_with_data[i]:
                     # mean is 0, std is 1:
-                    mean.append(np.log(j[0]) if use_logarithm else j[0])
-                    standard_deviation.append(
-                        abs(np.log(j[1]) / 2 if use_logarithm else j[1] / 2)
-                    )
+                    mean.append(j[0])
                 plt.clf()
-                plt.xlabel(title_x)
-                title = f"y=log({i})" if use_logarithm else f"{i}"
+                title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
                 plt.title(title)
-                plt.xticks(rotation=90)
-                try:
-                    plt.errorbar(
-                        array_with_x_values,
-                        mean,
-                        standard_deviation,
-                        linestyle="None",
-                        marker="^",
-                    )
-                except:
-                    pass
+                plt.plot(array_with_x_values, mean)
+                ax = plt.gca()
+                ax.plot(0, array_boltzman[i][0][0], "or")
+                plt.xticks(plot_x_values, rotation=270, fontsize=5)
                 plt.savefig(f"{directory}{i}.png", dpi=300)
+
+    def load(self, directory):
+        if os.path.exists(f"{directory}results.csv"):
+            dataframe = pd.read_csv(
+                f"{directory}results.csv", header=1, delimiter=";")
+            array_with_data = {}
+            array_with_x_values = []
+            name_for_x_column = dataframe.columns[0]
+            for i in dataframe.columns[1:]:
+                if not i.startswith('std_'):
+                    array_with_data[i] = []
+            for i in array_with_data.keys():
+                for j in range(len(dataframe[i])):
+                    array_with_data[i].append([dataframe[i][j], dataframe['std_'+i][j]])
+            for j in dataframe[name_for_x_column]:
+                array_with_x_values.append(f"{name_for_x_column}={j}")
+            return array_with_data, array_with_x_values
+        else:
+            return {}, []
 
     def save(self, array_with_data, array_with_x_values, directory):
         with open(f"{directory}results.csv", "w") as file:
@@ -111,12 +123,23 @@ class Experiment:
 
     def __filename_clean(self, value, max_length):
         value = str(value)
-        for r in "{}',:. ":
+        for r in "{}',: ":
             value = value.replace(r, "")
-        while len(value) < max_length:
-            value += "0"
-        if len(value) > max_length:
-            value = value[:max_length]
+        if value.endswith(".0"):
+            # integer: 0 at left
+            value = value[:-2]
+            last_digit = len(value)-1
+            while last_digit > 0 and value[last_digit].isdigit():
+                last_digit -= 1
+            while len(value) <= max_length:
+                value = value[:last_digit+1]+'0'+value[last_digit+1:]
+        else:
+            # float: 0 at right
+            value = value.replace(".", "")
+            while len(value) <= max_length:
+                value += "0"
+            if len(value) > max_length:
+                value = value[:max_length]
         return value
 
     def get_filename_for_iteration(self, parameters, config):
@@ -136,60 +159,67 @@ class Experiment:
                 num += 1
         print("total: ", num)
 
-
     def __get_value_for(self, param):
         result = ''
         if param:
             for i in param.keys():
                 if hasattr(param[i], "__len__"):
-                    result += i+" "
+                    result += i + " "
                 else:
-                    result += i+'='+str(param[i])+" "
+                    result += i + '=' + str(param[i]) + " "
         return result
+
     def __get_title_for(self, param1, param2):
-        result = self.__get_value_for(param1)+" "+self.__get_value_for(param2)
+        result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
     def do(self):
-        self.__verify_directories__()
-        progress_bar = Bar(
-            "Executing models", max=self.get_num_models()
-        )
-        results_to_plot = {}
-        results_x_axis = []
-        progress_bar.update()
-        for model_configuration in self.get_models(self.config):
-            for model_parameters in self.get_models(self.parameters):
-                result_iteration = pd.DataFrame()
-                filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
-                for i in range(self.MC):
-                    mc_iteration = random.randint(9999, 20000)
-                    if not os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv"):
-                        result_mc = self.run_model(
-                            f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
-                            model_configuration, model_parameters, mc_iteration)
-                    else:
-                        result_mc = pd.read_csv(
-                            f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
-                    result_iteration = pd.concat([result_iteration, result_mc])
-                for k in result_iteration.keys():
-                    if k.strip() == "t":
-                        continue
-                    mean_estimated = result_iteration[k].mean()
-                    warnings.filterwarnings(
-                        "ignore"
-                    )  # it generates RuntimeWarning: overflow encountered in multiply
-                    std_estimated = result_iteration[k].std()
-                    if k in results_to_plot:
-                        results_to_plot[k].append([mean_estimated, std_estimated])
-                    else:
-                        results_to_plot[k] = [[mean_estimated, std_estimated]]
-                results_x_axis.append(self.__get_title_for(model_configuration,model_parameters))
-                progress_bar.next()
-        self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config,self.parameters),
-                  f"{self.OUTPUT_DIRECTORY}/")
-        self.save(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
-        progress_bar.finish()
+        results_boltzman, _ = self.load(f"{self.BOLTZMAN_DATA}/")
+        results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
+        if not results_to_plot:
+            self.__verify_directories__()
+            progress_bar = Bar(
+                "Executing models", max=self.get_num_models()
+            )
+            progress_bar.update()
+            for model_configuration in self.get_models(self.config):
+                for model_parameters in self.get_models(self.parameters):
+                    result_iteration = pd.DataFrame()
+                    filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
+                    for i in range(self.MC):
+                        mc_iteration = random.randint(9999, 20000)
+                        if os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv"):
+                            result_mc = pd.read_csv(
+                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
+                        elif os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
+                            result_mc = interbank.Statistics.read_gdt(
+                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+                        else:
+                            result_mc = self.run_model(
+                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
+                                model_configuration, model_parameters, mc_iteration)
+                        result_iteration = pd.concat([result_iteration, result_mc])
+                    for k in result_iteration.keys():
+                        if k.strip() == "t":
+                            continue
+                        mean_estimated = result_iteration[k].mean()
+                        warnings.filterwarnings(
+                            "ignore"
+                        )  # it generates RuntimeWarning: overflow encountered in multiply
+                        std_estimated = result_iteration[k].std()
+                        if k in results_to_plot:
+                            results_to_plot[k].append([mean_estimated, std_estimated])
+                        else:
+                            results_to_plot[k] = [[mean_estimated, std_estimated]]
+                    results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+                    progress_bar.next()
+            self.save(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
+            progress_bar.finish()
+        else:
+            print("Loaded data from previous work")
+        print("Plotting...")
+        self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
+                  f"{self.OUTPUT_DIRECTORY}/", results_boltzman)
 
 
 if __name__ == "__main__":

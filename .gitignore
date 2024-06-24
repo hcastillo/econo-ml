@@ -8,6 +8,9 @@ output/*
 models/*
 lenders/*
 shocked_market/*
+preferential/*
+RestrictedMarket/*
+boltzman/*
 ppo/*
 .idea/*
 *.txt

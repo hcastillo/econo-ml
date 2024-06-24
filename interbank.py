@@ -4,6 +4,15 @@ Generates a simulation of an interbank network following the rules described in 
   Reinforcement Learning Policy Recommendation for Interbank Network Stability
   from Gabrielle and Alessio
 
+  You can use it interactively, but if you import it, the process will be:
+    # model = Model()
+    #   # step by step:
+    #   model.enable_backward()
+    #   model.forward() # t=0 -> t=1
+    #   model.backward() : reverts the last step (when executed
+    #   # all in a loop:
+    #   model.simulate_full()
+
 @author: hector@bith.net
 @date:   04/2023
 """
@@ -22,6 +31,7 @@ from progress.bar import Bar
 import pandas as pd
 import lxml.etree
 import lxml.builder
+import gzip
 
 
 class Config:
@@ -29,7 +39,7 @@ class Config:
     Configuration parameters for the interbank network
     """
     T: int = 1000  # time (1000)
-    N: int = 50    # number of banks (50)
+    N: int = 50  # number of banks (50)
 
     # not used in this implementation:
     # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
@@ -95,8 +105,9 @@ class Statistics:
     graphs = {}
     graphs_pos = None
 
-    plot_format = '.svg'
-    output_format = '.gdt'
+    plot_format = None
+    graph_format = ".svg"
+    output_format = ".gdt"
     create_gif = False
 
     OUTPUT_DIRECTORY = "output"
@@ -110,6 +121,7 @@ class Statistics:
     def set_gif_graph(self, gif_graph):
         if gif_graph:
             self.create_gif = True
+
     def reset(self):
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
@@ -210,13 +222,15 @@ class Statistics:
                 filename = None
             else:
                 filename = sys.argv[0] if self.model.export_datafile is None else self.model.export_datafile
-                filename = self.get_export_path(filename, f"_{t}{self.plot_format}")
+                filename = self.get_export_path(filename, f"_{t}{self.graph_format}")
                 plt.savefig(filename)
             plt.close()
             return filename
 
     def define_plot_format(self, plot_format):
         match plot_format.lower():
+            case 'none':
+                self.plot_format = None
             case 'svg':
                 self.plot_format = '.svg'
             case 'png':
@@ -233,7 +247,7 @@ class Statistics:
         match output_format.lower():
             case 'both':
                 self.output_format = '.both'
-            case 'gdt':
+            case "gdt":
                 self.output_format = '.gdt'
             case 'csv':
                 self.output_format = '.csv'
@@ -279,7 +293,7 @@ class Statistics:
         with open(export_datafile, 'w', encoding="utf-8") as savefile:
             for line_header in header:
                 savefile.write(f"# {line_header}\n")
-            savefile.write(f"# pd.read_csv('file{self.output_format}',header={len(header)+1}',"
+            savefile.write(f"# pd.read_csv('file{self.output_format}',header={len(header) + 1}',"
                            f" delimiter='{delimiter}')\nt")
             for element_name, _ in self.enumerate_results():
                 savefile.write(f"{delimiter}{element_name}")
@@ -308,18 +322,51 @@ class Statistics:
             for _, variable in self.enumerate_results():
                 string_obs += f"{variable[i]}  "
             observations.append(OBS(string_obs))
+        header_text = ""
+        for item in header:
+            header_text += item + " "
         gdt_result = GRETLDATA(
-            DESCRIPTION("Datos importados"),
+            DESCRIPTION(header_text),
             variables,
             observations,
             version="1.4", name='prueba', frequency="special:1", startobs="1",
             endobs=f"{self.model.config.T}", type="time-series"
         )
-        with open(self.get_export_path(export_datafile),'w') as output_file:
+        with gzip.open(self.get_export_path(export_datafile), 'w') as output_file:
             output_file.write(
-                '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
+                b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(
-                lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str))
+                lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
+
+    @staticmethod
+    def __transform_line_from_string(line_with_values):
+        items = []
+        for i in line_with_values.replace("  ", " ").strip().split(" "):
+            try:
+                items.append(int(i))
+            except ValueError:
+                items.append(float(i))
+        return items
+
+    @staticmethod
+    def read_gdt(filename):
+        tree = lxml.etree.parse(filename)
+        root = tree.getroot()
+        children = root.getchildren()
+        values = []
+        columns = []
+        if len(children) == 3:
+            # children[0] = description
+            # children[1] = variables
+            # children[2] = observations
+            for variable in children[1].getchildren():
+                columns.append(variable.values()[0].strip().replace("leverage_", "leverage"))
+            for value in children[2].getchildren():
+                values.append(Statistics.__transform_line_from_string(value.text))
+        if columns and values:
+            return pd.DataFrame(columns=columns, data=values)
+        else:
+            return pd.Dataframe()
 
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
@@ -359,23 +406,9 @@ class Statistics:
 
     def get_data(self):
         result = pd.DataFrame()
-        for variable_name,variable in self.enumerate_results():
+        for variable_name, variable in self.enumerate_results():
             result[variable_name] = np.array(variable)
         return result
-        # return pd.DataFrame({
-        #     'policy': np.array(self.policy),
-        #     'fitness': np.array(self.fitness),
-        #     'liquidity': np.array(self.liquidity),
-        #     'ir': np.array(self.interest_rate),
-        #     'bankrupts': np.array(self.bankruptcy),
-        #     'bestLenderID': np.array(self.best_lender),
-        #     'bestLenderClients': np.array(self.best_lender_clients),
-        #     'creditChannels': np.array(self.credit_channels),
-        #     'rationing':np.array(self.rationing),
-        #     'leverage': np.array(self.leverage),
-        #     'prob_change_lender': np.array(self.P),
-        #     'bad_debt':np.array(self.B)})
-
 
     def plot_result(self, variable, title, export_datafile=None):
         xx = []
@@ -389,14 +422,14 @@ class Statistics:
         plt.xlabel("Time")
         plt.title(title.capitalize().replace("_", ' '))
         if export_datafile:
-            plt.savefig(self.get_export_path(export_datafile,
-                                             f"_{variable.lower()}{self.plot_format}"))
+            if self.plot_format:
+                plt.savefig(self.get_export_path(export_datafile,
+                                                 f"_{variable.lower()}{self.plot_format}"))
         else:
             plt.show()
         plt.close()
 
-
-    def get_plots(self,export_datafile):
+    def get_plots(self, export_datafile):
         for variable in ('bankruptcy', 'liquidity', 'credit_channels', 'interest_rate', 'B'):
             self.plot_result(variable, self.get_name(variable), export_datafile)
         self.plot_best_lender(export_datafile)
@@ -426,8 +459,9 @@ class Statistics:
         plt.title("Prob oc change lender " + self.model.config.lender_change.describe())
         plt.legend()
         if export_datafile:
-            plt.savefig(self.get_export_path(export_datafile,
-                                             f"_prob_change_lender{self.plot_format}"))
+            if self.plot_format:
+                plt.savefig(self.get_export_path(export_datafile,
+                                                 f"_prob_change_lender{self.plot_format}"))
         else:
             plt.show()
         plt.close()
@@ -470,7 +504,8 @@ class Statistics:
         plt.title("Best Lender (blue) #clients (red)")
         plt.ylabel("Best Lender")
         if export_datafile:
-            plt.savefig(self.get_export_path(export_datafile, f"_best_lender{self.plot_format}"))
+            if self.plot_format:
+                plt.savefig(self.get_export_path(export_datafile, f"_best_lender{self.plot_format}"))
         else:
             plt.show()
         plt.close()
@@ -878,10 +913,10 @@ class Model:
             # decrement in which we should borrow
             if bank.d > 0:
                 if bank.getLender() is None:
+                    bank.l = 0
                     # new situation: the bank has no borrower, so we should firesale or die:
                     bank.doFiresalesL(bank.d, f"no lender for this bank", "loans")
                     bank.rationing = bank.d
-                    bank.l = 0
                 elif bank.getLender().d > 0:
                     # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
                     bank.doFiresalesL(bank.d, f"lender {bank.getLender().getId(short=True)} has no money", "loans")
@@ -967,7 +1002,7 @@ class Model:
         for bank in self.banks:
             bank.B = 0
             bank.rationing = 0
-        self.config.lender_change.initialize_step(self)
+        # self.config.lender_change.initialize_step(self)
         if self.t == 0:
             self.log.debug_banks()
 
@@ -1037,7 +1072,8 @@ class Model:
         if self.config.N < 10:
             for line in lines:
                 self.log.debug("links", f"{line}")
-        self.log.debug("links", f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} minr={minr:.3f} ŋ={self.eta:.3f}")
+        self.log.debug("links",
+                       f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} minr={minr:.3f} ŋ={self.eta:.3f}")
 
         # (equation 7)
         loginfo = loginfo1 = ""
@@ -1049,6 +1085,7 @@ class Model:
         if self.config.N <= 10:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
+        self.config.lender_change.finish_step(self)
         for bank in self.banks:
             self.log.debug("links", self.config.lender_change.change_lender(self, bank, self.t))
 
@@ -1116,7 +1153,7 @@ class Bank:
             recovered = self.l
 
         badDebt = self.l - recovered  # the fire sale minus paying D: what the lender recovers
-        if badDebt > 0:
+        if badDebt > 0:  #TODO
             self.paidLoan = recovered
             self.getLender().B += badDebt
             self.getLender().E -= badDebt
@@ -1213,7 +1250,7 @@ class Utils:
                             help="Bank lender's change method (?=list)")
         parser.add_argument("--lc_ini_graph_file", type=str, default=None,
                             help="Load a graph in json networkx.node_link_data() format")
-        parser.add_argument("--plot_format", type=str, default="svg",
+        parser.add_argument("--plot_format", type=str, default="none",
                             help="File extension for plots (svg,png,pdf..)")
         parser.add_argument("--output_format", type=str, default="gdt",
                             help="File extension for data (gdt,txt,csv,both)")
@@ -1265,6 +1302,7 @@ class Utils:
         except NameError:
             return False
 
+
 # %%
 
 
@@ -1276,12 +1314,3 @@ else:
     # if we are running interactively:
     if __name__ == "__main__":
         Utils.run_interactive()
-
-# in other cases, if you import it, the process will be:
-#   model = Model()
-#   # step by step:
-#   model.enable_backward()
-#   model.forward() # t=0 -> t=1
-#   model.backward() : reverts the last step (when executed
-#   # all in a loop:
-#   model.simulate_full()
