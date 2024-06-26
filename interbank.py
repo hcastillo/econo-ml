@@ -32,7 +32,7 @@ import pandas as pd
 import lxml.etree
 import lxml.builder
 import gzip
-
+from gooey import Gooey, GooeyParser
 
 class Config:
     """
@@ -99,6 +99,7 @@ class Statistics:
     fitness = []
     rationing = []
     leverage = []
+    loans = []
     P = []
     B = []
     model = None
@@ -122,6 +123,7 @@ class Statistics:
         if gif_graph:
             self.create_gif = True
 
+
     def reset(self):
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
@@ -139,6 +141,7 @@ class Statistics:
         self.P_min = np.zeros(self.model.config.T, dtype=float)
         self.P_std = np.zeros(self.model.config.T, dtype=float)
         self.B = np.zeros(self.model.config.T, dtype=float)
+        self.loans = np.zeros(self.model.config.T, dtype=float)
 
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
@@ -188,7 +191,10 @@ class Statistics:
         self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
 
     def compute_leverage(self):
-        self.leverage[self.model.t] = sum(map(lambda x: (x.E / x.L), self.model.banks)) / self.model.config.N
+        self.leverage[self.model.t] = sum(map(lambda x: (x.L / x.E), self.model.banks)) / self.model.config.N
+
+    def compute_loans(self):
+        self.loans[self.model.t] = sum(map(lambda x: x.l, self.model.banks)) / self.model.config.N
 
     def compute_probability_of_lender_change(self):
         probabilities = [bank.P for bank in self.model.banks]
@@ -389,7 +395,7 @@ class Statistics:
     def enumerate_results(self):
         for element in ('policy', 'fitness', 'liquidity', 'interest_rate', 'bankruptcy',
                         'best_lender', 'best_lender_clients', 'credit_channels', 'rationing',
-                        'leverage', 'P', 'B'):
+                        'leverage', 'P', 'B', 'loans'):
             yield self.get_name(element), getattr(self, element)
 
     def get_name(self, variable):
@@ -520,9 +526,20 @@ class Log:
     model = None
     logLevel = "ERROR"
     progress_bar = None
+    graphical = False
 
     def __init__(self, model):
         self.model = model
+
+    def define_gui(self, gui):
+        self.graphical = gui.gooey
+
+    def do_progress_bar(self, message, maximum):
+        if self.graphical:
+            self.progress_bar = Gui()
+            self.progress_bar.progress_bar(message, maximum)
+        else:
+            self.progress_bar = Bar(message, max=maximum)
 
     @staticmethod
     def __format_number__(number):
@@ -735,6 +752,7 @@ class Model:
         self.statistics.compute_policy()
         self.statistics.compute_bad_debt()
         self.statistics.compute_leverage()
+        self.statistics.compute_loans()
         self.statistics.compute_rationing()
         self.setup_links()
         self.statistics.compute_probability_of_lender_change()
@@ -766,7 +784,7 @@ class Model:
 
     def simulate_full(self, interactive=False):
         if interactive:
-            self.log.progress_bar = Bar(f"Simulating t=0..{self.config.T}", max=self.config.T)
+            self.log.do_progress_bar(f"Simulating t=0..{self.config.T}", self.config.T)
         for t in range(self.config.T):
             self.forward()
 
@@ -1201,10 +1219,45 @@ class Bank:
                     return amountToSell
 
 
+class Gui:
+    gooey = False
+    def __init__(self):
+        try:
+            import tkinter as tk
+            tk.Tk().destroy()
+        except ModuleNotFoundError:
+            self.graphical = False
+        else:
+            self.graphical = True
+
+    @Gooey
+    def generate_gui(self):
+        self.gooey = True
+        pass
+
+    def progress_bar(self, message, maximum):
+        print(message)
+        self.maximum = maximum
+        self.current = 1
+
+    def next(self):
+        self.current += 1
+        print("progress: {}%".format(self.current/self.maximum*100))
+        sys.stdout.flush()
+
+    def parser(self):
+        if not sys.argv[1:] and self.graphical:
+            self.generate_gui()
+            return GooeyParser(description="Interbank model")
+        else:
+            return argparse.ArgumentParser()
+
+
 class Utils:
     """
-    Auxiliary class to encapsulate the
+    Auxiliary class to encapsulate the use of the model
     """
+
 
     @staticmethod
     def __extract_t_values_from_arg__(param):
@@ -1221,13 +1274,15 @@ class Utils:
                         raise ValueError(f"{t[-1]} greater than Config.T or below 0")
                 return t
 
+
     @staticmethod
     def run_interactive():
         """
             Run interactively the model
         """
         global model
-        parser = argparse.ArgumentParser()
+        gui = Gui()
+        parser = gui.parser()
         parser.add_argument("--log", default='ERROR', help="Log level messages (ERROR,DEBUG,INFO...)")
         parser.add_argument("--modules", default=None, help=f"Log only this modules (separated by ,)")
         parser.add_argument("--logfile", default=None, help="File to send logs to")
@@ -1235,7 +1290,7 @@ class Utils:
         parser.add_argument("--graph", default=None,
                             help=f"List of t in which save the network config (* for all)")
         parser.add_argument("--gif_graph", default=False,
-                            action=argparse.BooleanOptionalAction,
+                            type=bool,
                             help=f"If --graph, then also an animated gif with all graphs ")
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
         parser.add_argument("--debug", type=int, default=None,
@@ -1254,9 +1309,7 @@ class Utils:
                             help="File extension for plots (svg,png,pdf..)")
         parser.add_argument("--output_format", type=str, default="gdt",
                             help="File extension for data (gdt,txt,csv,both)")
-
         args = parser.parse_args()
-
         if args.t != model.config.T:
             model.config.T = args.t
         if args.n != model.config.N:
@@ -1270,13 +1323,14 @@ class Utils:
         model.config.lender_change.set_parameter("m", args.lc_m)
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
         model.log.define_log(args.log, args.logfile, args.modules)
+        model.log.define_gui(gui)
         model.statistics.define_output_format(args.output_format)
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
                   interactive=(args.log == 'ERROR' or not args.logfile is None))
 
-    @staticmethod
+
     def run(save=None, save_graph_instants=None, interactive=False):
         global model
         if not save_graph_instants and Config.GRAPHS_MOMENTS:

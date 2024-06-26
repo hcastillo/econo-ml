@@ -212,11 +212,14 @@ class Boltzman(LenderChange):
     def change_lender(self, this_model, bank, t):
         """ It uses γ but only after t=20, at the beginning only Boltzmann"""
         possible_lender = self.new_lender(this_model, bank)
-        possible_lender_μ = this_model.banks[possible_lender].mu
-        if not bank.getLender() is None:
-            current_lender_μ = bank.getLender().mu
+        if possible_lender is None:
+            possible_lender_μ = 0
         else:
+            possible_lender_μ = this_model.banks[possible_lender].mu
+        if bank.getLender() is None:
             current_lender_μ = 0
+        else:
+            current_lender_μ = bank.getLender().mu
 
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)

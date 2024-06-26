@@ -26,7 +26,6 @@ class Experiment:
     MC = 10
 
     BOLTZMAN_DATA = "boltzman"
-    SHOCKED_DATA = "shocked_market"
     OUTPUT_DIRECTORY = "RestrictedMarket"
     ALGORITHM = ShockedMarket
 
@@ -42,7 +41,7 @@ class Experiment:
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_boltzman, array_shocked):
+    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_boltzman):
         # we plot only x labels 1 of each 10:
         plot_x_values = []
         for j in range(len(array_with_x_values)):
@@ -52,20 +51,17 @@ class Experiment:
             i = i.strip()
             if i != "t":
                 mean = []
-                mean_shocked = []
                 for j in array_with_data[i]:
                     # mean is 0, std is 1:
                     mean.append(j[0])
-                for j in array_shocked[i]:
-                    # mean is 0, std is 1:
-                    mean_shocked.append(j[0])
                 plt.clf()
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
                 plt.title(title)
                 plt.plot(array_with_x_values, mean, "b-", label="Restricted")
-                plt.plot(array_with_x_values, mean_shocked, "c-", label="Shocked")
                 ax = plt.gca()
+                if i == "leverage":
+                    i = "leverage_"
                 ax.plot(0, array_boltzman[i][0][0], "or", label="Boltzman")
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
                 plt.legend(loc='best')
@@ -83,7 +79,7 @@ class Experiment:
                     array_with_data[i] = []
             for i in array_with_data.keys():
                 for j in range(len(dataframe[i])):
-                    array_with_data[i].append([dataframe[i][j], dataframe['std_'+i][j]])
+                    array_with_data[i].append([dataframe[i][j], dataframe['std_' + i][j]])
             for j in dataframe[name_for_x_column]:
                 array_with_x_values.append(f"{name_for_x_column}={j}")
             return array_with_data, array_with_x_values
@@ -135,11 +131,11 @@ class Experiment:
         if value.endswith(".0"):
             # integer: 0 at left
             value = value[:-2]
-            last_digit = len(value)-1
+            last_digit = len(value) - 1
             while last_digit > 0 and value[last_digit].isdigit():
                 last_digit -= 1
             while len(value) <= max_length:
-                value = value[:last_digit+1]+'0'+value[last_digit+1:]
+                value = value[:last_digit + 1] + '0' + value[last_digit + 1:]
         else:
             # float: 0 at right
             value = value.replace(".", "")
@@ -182,7 +178,6 @@ class Experiment:
 
     def do(self):
         results_boltzman, _ = self.load(f"{self.BOLTZMAN_DATA}/")
-        results_shocked, _ =  self.load(f"{self.SHOCKED_DATA}/")
         results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
         if not results_to_plot:
             self.__verify_directories__()
@@ -227,7 +222,7 @@ class Experiment:
             print("Loaded data from previous work")
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
-                  f"{self.OUTPUT_DIRECTORY}/", results_boltzman, results_shocked)
+                  f"{self.OUTPUT_DIRECTORY}/", results_boltzman)
 
 
 if __name__ == "__main__":

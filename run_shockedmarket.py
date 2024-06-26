@@ -58,9 +58,12 @@ class Experiment:
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
                 plt.title(title)
-                plt.plot(array_with_x_values, mean)
+                plt.plot(array_with_x_values, mean, label="shocked_market")
                 ax = plt.gca()
-                ax.plot(0, array_boltzman[i][0][0], "or")
+                if i=="leverage":
+                    i="leverage_"
+                plt.legend(loc='best')
+                ax.plot(0, array_boltzman[i][0][0], "or", label="Boltzman")
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
                 plt.savefig(f"{directory}{i}.png", dpi=300)
 

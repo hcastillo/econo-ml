@@ -26,6 +26,8 @@ class Experiment:
     MC = 10
 
     OUTPUT_DIRECTORY = "preferential"
+    BOLTZMAN_DATA = "boltzman"
+    SHOCKED_DATA = "shocked_market"
     ALGORITHM = Preferential
 
     config = {  # items should be iterable:
@@ -34,13 +36,13 @@ class Experiment:
     }
 
     parameters = {  # items should be iterable:
-        "m": np.linspace(1, 50, num=50),
+        "m": np.linspace(1, 49, num=49),
     }
 
     LENGTH_FILENAME_PARAMETER = 2
     LENGTH_FILENAME_CONFIG = 0
 
-    def plot(self, array_with_data, array_with_x_values, title_x, directory):
+    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_boltzman):
         # we plot only x labels 1 of each 10:
         plot_x_values = []
         for j in range(len(array_with_x_values)):
@@ -50,20 +52,21 @@ class Experiment:
             i = i.strip()
             if i != "t":
                 mean = []
-                standard_deviation = []
                 for j in array_with_data[i]:
                     # mean is 0, std is 1:
                     mean.append(j[0])
-                    ##standard_deviation.append(
-                    ##    abs(np.log(j[1]) / 2 if use_logarithm else j[1] / 2)
-                    ##)
+
                 plt.clf()
-                # plt.xlabel(title_x)
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
                 plt.title(title)
-                plt.plot(array_with_x_values, mean)
+                plt.plot(array_with_x_values, mean, label="Preferential")
+                ax = plt.gca()
+                if i=="leverage":
+                    i="leverage_"
+                ax.plot(0, array_boltzman[i][0][0], "or", label="Boltzman")
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
+                plt.legend(loc='best')
                 plt.savefig(f"{directory}{i}.png", dpi=300)
 
     def load(self, directory):
@@ -176,6 +179,7 @@ class Experiment:
         return result.strip()
 
     def do(self):
+        results_boltzman, _ = self.load(f"{self.BOLTZMAN_DATA}/")
         results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
         if not results_to_plot:
             self.__verify_directories__()
@@ -220,7 +224,7 @@ class Experiment:
             print("Loaded data from previous work")
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
-                  f"{self.OUTPUT_DIRECTORY}/")
+                  f"{self.OUTPUT_DIRECTORY}/", results_boltzman)
 
 
 if __name__ == "__main__":
