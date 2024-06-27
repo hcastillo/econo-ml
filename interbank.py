@@ -257,7 +257,7 @@ class Statistics:
                 self.output_format = '.gdt'
             case 'csv':
                 self.output_format = '.csv'
-            case '.txt':
+            case 'txt':
                 self.output_format = '.txt'
             case _:
                 print(f'Invalid output file format: {output_format}')
