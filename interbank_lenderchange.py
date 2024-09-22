@@ -6,9 +6,10 @@ LenderChange is a class used from interbank.py to control the change of lender i
     - InitialStability   using a Barabási–Albert graph to initially assign relationships between banks
     - Preferential       using a Barabási-Albert with degree m to set up only a set o possible links between
                             banks
-    - RestrictedMarket   using a Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
+    - RestrictedMarket   using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
                             lender for each bank, it replicates the situation after a crisis when banks do not credit
-    - ShockedMarket      using a Erdos Renyi graph with p=parameter['p']. But creating a new one in each step
+    - ShockedMarket      using an Erdos Renyi graph with p=parameter['p']. But creating a new one in each step
+    - Small World        using a Watts and Strogatz algorithm with parameter['p'] also
 @author: hector@bith.net
 @date:   05/2023
 """
@@ -23,7 +24,8 @@ import json
 
 
 def determine_algorithm(given_name: str = "default"):
-    DEFAULT_METHOD = "Boltzman"
+    DEFAULT_METHOD = (""
+                      "")
 
     if given_name == "default":
         given_name = DEFAULT_METHOD
@@ -46,8 +48,10 @@ node_positions = None
 node_colors = None
 
 
-def draw(graph, new_guru_look_for=False, title=None, show=False):
-    """ Draws the graph using a spring layout that reuses the previous one """
+def draw(original_graph, new_guru_look_for=False, title=None, show=False):
+    """ Draws the graph using a spring layout that reuses the previous one layout, to show similar position for
+        the same ids of nodes along time. If the graph is undirected (Barabasi) then no """
+    graph_to_draw = original_graph.copy()
     plt.clf()
     if title:
         plt.title(title)
@@ -55,35 +59,35 @@ def draw(graph, new_guru_look_for=False, title=None, show=False):
     # if not node_positions:
     guru = None
     if node_positions is None:
-        node_positions = nx.spring_layout(graph, pos=node_positions)
-    if not hasattr(graph, "type"):
+        node_positions = nx.spring_layout(graph_to_draw, pos=node_positions)
+    if not hasattr(original_graph, "type"):
         # guru should not have out edges, and surely by random graphs it has:
-        guru, _ = find_guru(graph)
-        for (i, j) in list(graph.out_edges(guru)):
-            graph.remove_edge(i, j)
-    if hasattr(graph, "type") and graph.type == "barabasi_albert_graph":
-        graph, guru = get_graph_from_guru(graph.to_undirected())
-    if hasattr(graph, "type") and graph.type == "erdos_renyi_graph":
-        for node in list(graph.nodes()):
-            if not graph.edges(node) and not graph.in_edges(node):
-                graph.remove_node(node)
+        guru, _ = find_guru(graph_to_draw)
+        for (i, j) in list(graph_to_draw.out_edges(guru)):
+            graph_to_draw.remove_edge(i, j)
+    if hasattr(original_graph, "type") and original_graph.type == "barabasi_albert":
+        graph_to_draw, guru = get_graph_from_guru(graph_to_draw.to_undirected())
+    if hasattr(original_graph, "type") and original_graph.type == "erdos_renyi":
+        for node in list(graph_to_draw.nodes()):
+            if not graph_to_draw.edges(node) and not graph_to_draw.in_edges(node):
+                graph_to_draw.remove_node(node)
         new_guru_look_for = True
     if not node_colors or new_guru_look_for:
         node_colors = []
-        guru, guru_node_edges = find_guru(graph)
-        for node in graph.nodes():
+        guru, guru_node_edges = find_guru(graph_to_draw)
+        for node in graph_to_draw.nodes():
             if node == guru:
                 node_colors.append('darkorange')
-            elif __len_edges(graph, node) == 0:
+            elif __len_edges(graph_to_draw, node) == 0:
                 node_colors.append('lightblue')
-            elif __len_edges(graph, node) == 1:
+            elif __len_edges(graph_to_draw, node) == 1:
                 node_colors.append('steelblue')
             else:
                 node_colors.append('royalblue')
-    if hasattr(graph, "type") and graph.type == "barabasi_preferential":
-        nx.draw(graph, pos=node_positions, node_color=node_colors, with_labels=True)
+    if hasattr(original_graph, "type") and original_graph.type == "barabasi_pref":
+        nx.draw(graph_to_draw, pos=node_positions, node_color=node_colors, with_labels=True)
     else:
-        nx.draw(graph, pos=node_positions, node_color=node_colors, arrowstyle='->', with_labels=True)
+        nx.draw(graph_to_draw, pos=node_positions, node_color=node_colors, arrowstyle='->', with_labels=True)
 
     if show:
         plt.show()
@@ -91,9 +95,10 @@ def draw(graph, new_guru_look_for=False, title=None, show=False):
 
 
 def save_graph_json(graph, filename):
-    graph_json = nx.node_link_data(graph)
-    with open(filename, 'w') as f:
-        json.dump(graph_json,f)
+    if graph:
+        graph_json = nx.node_link_data(graph)
+        with open(filename, 'w') as f:
+            json.dump(graph_json, f)
 
 
 def load_graph_json(filename):
@@ -119,6 +124,43 @@ def find_guru(graph):
             guru_node_edges = edges_node
             guru_node = node
     return guru_node, guru_node_edges
+
+
+
+class GraphStatistics:
+    @staticmethod
+    def giant_component_size(graph):
+        """weakly connected componentes of the directed graph using Tarjan's algorithm:
+           https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm"""
+        if graph.is_directed():
+            return len(max(nx.weakly_connected_components(graph), key=len))
+        else:
+            return len(max(nx.connected_components(graph), key=len))
+
+    @staticmethod
+    def clustering_coeff(graph):
+        """clustering coefficient 0..1, 1 for totally connected graphs, and 0 for totally isolated
+           if ~0 then a small world"""
+        try:
+            return nx.average_clustering(graph,count_zeros=False)
+        except ZeroDivisionError:
+            return 0
+
+    @staticmethod
+    def communities(graph):
+        """number of communities using greedy modularity maximization"""
+        return nx.community.greedy_modularity_communities(graph)
+
+    @staticmethod
+    def describe(graph):
+        clustering = GraphStatistics.clustering_coeff(graph)
+        if clustering>0 and clustering<1:
+            clustering = f"clus_coef={clustering:5.3f}"
+        else:
+            clustering = f"clus_coef={clustering}"
+        return (f"giant={GraphStatistics.giant_component_size(graph)} " +
+                clustering +
+                f" comm={len(GraphStatistics.communities(graph))}")
 
 
 def __get_graph_from_guru(input_graph, output_graph, current_node, previous_node):
@@ -152,6 +194,9 @@ def from_graph_to_array_banks(banks_graph, this_model):
 # ---------------------------------------------------------
 # prototype
 class LenderChange:
+
+    GRAPH_NAME = ""
+
     def __init__(self):
         self.parameter = {}
         self.initial_graph_file = None
@@ -200,30 +245,30 @@ class Boltzman(LenderChange):
          Also it has parameter γ to control the change [0..1], 0=Boltzmann only, 1 everyone will move randomly
     """
     # parameter to control the change of guru: 0 then Boltzmann only, 1 everyone will move randomly
-    γ: float = 0.5  # [0..1] gamma
+    gamma: float = 0.5  # [0..1] gamma
     CHANGE_LENDER_IF_HIGHER = 0.5
 
     def initialize_bank_relationships(self, this_model):
         if self.initial_graph_file:
             graph = load_graph_json(self.initial_graph_file)
-            from_graph_to_array_banks(graph,this_model)
+            from_graph_to_array_banks(graph, this_model)
         this_model.statistics.get_graph(0)
 
     def change_lender(self, this_model, bank, t):
         """ It uses γ but only after t=20, at the beginning only Boltzmann"""
         possible_lender = self.new_lender(this_model, bank)
         if possible_lender is None:
-            possible_lender_μ = 0
+            possible_lender_mi = 0
         else:
-            possible_lender_μ = this_model.banks[possible_lender].mu
+            possible_lender_mi = this_model.banks[possible_lender].mu
         if bank.getLender() is None:
-            current_lender_μ = 0
+            current_lender_mi = 0
         else:
-            current_lender_μ = bank.getLender().mu
+            current_lender_mi = bank.getLender().mu
 
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)
-        boltzmann = 1 / (1 + math.exp(-this_model.config.beta * (possible_lender_μ - current_lender_μ)))
+        boltzmann = 1 / (1 + math.exp(-this_model.config.beta * (possible_lender_mi - current_lender_mi)))
 
         if t < 20:
             # bank.P = 0.35
@@ -235,7 +280,7 @@ class Boltzman(LenderChange):
         else:
             bank.P_yesterday = bank.P
             # gamma is not sticky/loyalty, persistence of the previous attitude
-            bank.P = self.γ * bank.P_yesterday + (1 - self.γ) * boltzmann
+            bank.P = self.gamma * bank.P_yesterday + (1 - self.gamma) * boltzmann
 
         if bank.P >= self.CHANGE_LENDER_IF_HIGHER:
             text_to_return = f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}"
@@ -252,6 +297,9 @@ class Boltzman(LenderChange):
             bank.rij[bank.id] = 0
             bank.r = this_model.config.r_i0
             bank.mu = 0
+            bank.asset_i = 0
+            bank.asset_j = 0
+            bank.asset_equity = 0
             # if it's just created, only not to be ourselves is enough
             new_value = random.randrange(this_model.config.N - 1)
         else:
@@ -273,7 +321,7 @@ class Boltzman(LenderChange):
         return new_value
 
     def describe(self):
-        return f"($\\gamma={self.γ} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
+        return f"($\\gamma={self.gamma} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
 
 
 class InitialStability(Boltzman):
@@ -282,6 +330,7 @@ class InitialStability(Boltzman):
     """
 
     CHANGE_LENDER_IF_HIGHER = 0.8
+    GRAPH_NAME = 'barabasi_albert'
 
     def __create_directed_graph_from_barabasi_albert(self, barabasi_albert, result, current_node, previous_node):
         if len(barabasi_albert.edges(current_node)) > 1:
@@ -297,16 +346,17 @@ class InitialStability(Boltzman):
     def initialize_bank_relationships(self, this_model):
         if self.initial_graph_file:
             self.banks_graph = load_graph_json(self.initial_graph_file)
-            description = f"barabasi_albert from file {self.initial_graph_file}"
+            description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
         else:
             self.banks_graph, _ = get_graph_from_guru(nx.barabasi_albert_graph(this_model.config.N, 1))
-            description = f"barabasi_albert m=1"
-        self.banks_graph.type = "barabasi_albert_graph"
+            description = f"{self.GRAPH_NAME} m=1 {GraphStatistics.describe(self.banks_graph)}"
+        self.banks_graph.type = self.GRAPH_NAME
         if this_model.export_datafile:
             draw(self.banks_graph, new_guru_look_for=True, title=description)
-            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi.png"))
-            save_graph_json(self.banks_graph.
-                            this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi.json"))
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
+            save_graph_json(self.banks_graph,
+                            this_model.statistics.get_export_path(this_model.export_datafile, 
+                                                                  f"_{self.GRAPH_NAME}.json"))
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
 
@@ -316,6 +366,8 @@ class RestrictedMarket(LenderChange):
           lender for each bank, it replicates the situation after a crisis when banks do not credit
 
     """
+
+    GRAPH_NAME = "erdos_renyi"
 
     def check_parameter(self, name, value):
         if name == 'p':
@@ -328,19 +380,20 @@ class RestrictedMarket(LenderChange):
             return False
 
     def initialize_bank_relationships(self, this_model):
-        """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationsships till the end"""
+        """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""
         if self.initial_graph_file:
             self.banks_graph = load_graph_json(self.initial_graph_file)
             description = f"erdos_renyi from file {self.initial_graph_file}"
         else:
             self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
-            description = f"erdos_renyi p={self.parameter['p']}"
-        self.banks_graph.type = "erdos_renyi_graph"
+            description = f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
+        self.banks_graph.type = self.GRAPH_NAME
         if this_model.export_datafile:
             draw(self.banks_graph, new_guru_look_for=True, title=description)
-            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.png"))
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
             save_graph_json(self.banks_graph,
-                            this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.json"))
+                            this_model.statistics.get_export_path(this_model.export_datafile,
+                                                                  f"_{self.GRAPH_NAME}.json"))
 
         from_graph_to_array_banks(self.banks_graph, this_model)
         this_model.statistics.get_graph(0)
@@ -367,6 +420,7 @@ class Preferential(Boltzman):
     """
     banks_graph = None
     guru = None
+    GRAPH_NAME = "barabasi_pref"
 
     def check_parameter(self, name, value):
         if name == 'm':
@@ -382,19 +436,24 @@ class Preferential(Boltzman):
 
         if self.initial_graph_file:
             self.banks_graph_full = load_graph_json(self.initial_graph_file)
-            description = f"barabasi_pref from file {self.initial_graph_file}"
+            description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
         else:
             self.banks_graph_full = nx.barabasi_albert_graph(this_model.config.N, self.parameter['m'])
-            description = f"barabasi_pref m={self.parameter['m']}"
-        self.banks_graph_full.type = "barabasi_preferential"
+            description = (f"{self.GRAPH_NAME} m={self.parameter['m']:5.3f} "
+                           f"{GraphStatistics.describe(self.banks_graph_full)}")
+        self.banks_graph_full.type = self.GRAPH_NAME
         if this_model.export_datafile:
             self.guru = draw(self.banks_graph_full, new_guru_look_for=True,
                              title=description)
-            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_barabasi_pref.png"))
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
         else:
             self.guru = find_guru(self.banks_graph_full)
         self.full_barabasi_extract_random_directed(this_model)
         self.prize_for_good_banks(this_model)
+        if this_model.export_datafile:
+            save_graph_json(self.banks_graph,
+                            this_model.statistics.get_export_path(this_model.export_datafile,
+                                                                  f"_{self.GRAPH_NAME}.json"))
         return self.banks_graph
 
     def prize_for_good_banks(self, this_model):
@@ -410,7 +469,7 @@ class Preferential(Boltzman):
     def full_barabasi_extract_random_directed(self, this_model, current_node=None):
         if current_node is None:
             self.banks_graph = nx.DiGraph()
-            self.banks_graph.type = 'barabasi_albert_graph'
+            self.banks_graph.type = self.GRAPH_NAME
             current_node = self.guru
         edges = list(self.banks_graph_full.edges(current_node))
         self.banks_graph.add_node(current_node)
@@ -446,9 +505,7 @@ class Preferential(Boltzman):
             return None
 
     def describe(self):
-        return f"($\\gamma={self.γ} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
-
-
+        return f"($\\gamma={self.gamma} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
 
 
 class ShockedMarket(LenderChange):
@@ -457,6 +514,8 @@ class ShockedMarket(LenderChange):
         in t=i are destroyed and new aleatory links in t=i+1 are created using a new Erdos Renyi
         graph
     """
+    
+    GRAPH_NAME = "erdos_renyi"
 
     def check_parameter(self, name, value):
         if name == 'p':
@@ -470,23 +529,24 @@ class ShockedMarket(LenderChange):
 
     def finish_step(self, this_model):
         self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
-        self.banks_graph.type = "erdos_renyi_graph"
+        self.banks_graph.type = self.GRAPH_NAME
         from_graph_to_array_banks(self.banks_graph, this_model)
 
     def initialize_bank_relationships(self, this_model):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationsships till the end"""
         if self.initial_graph_file:
             self.banks_graph = load_graph_json(self.initial_graph_file)
-            description = f"erdos_renyi from file {self.initial_graph_file}"
+            description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
         else:
             self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
-            description = f"erdos_renyi p={self.parameter['p']}"
-        self.banks_graph.type = "erdos_renyi_graph"
+            description = f"{self.GRAPH_NAME} p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
+        self.banks_graph.type = self.GRAPH_NAME
         if this_model.export_datafile:
             draw(self.banks_graph, new_guru_look_for=True, title=description)
-            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.png"))
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
             save_graph_json(self.banks_graph,
-                            this_model.statistics.get_export_path(this_model.export_datafile, f"_erdos_renyi.json"))
+                            this_model.statistics.get_export_path(this_model.export_datafile, 
+                                                                  f"_{self.GRAPH_NAME}.json"))
 
         from_graph_to_array_banks(self.banks_graph, this_model)
         # this_model.statistics.get_graph(0)
@@ -497,6 +557,9 @@ class ShockedMarket(LenderChange):
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
         bank.rij[bank.id] = 0
         bank.r = this_model.config.r_i0
+        bank.asset_i = 0
+        bank.asset_j = 0
+        bank.asset_equity = 0
         bank.mu = 0
         return bank.lender
 
@@ -506,4 +569,39 @@ class ShockedMarket(LenderChange):
         return f"{bank.getId()} maintains lender #{bank.lender} with %1 (ShockedMarket)"
 
 
+class SmallWorld(ShockedMarket):
+    """ SmallWorld implementation using Watts Strogatz
+    """
+    
+    GRAPH_NAME = 'small_world'
 
+    def __create_directed_graph_from_watts_strogatz(self, watts_strogatz):
+        result = watts_strogatz.to_directed()
+        for current_node in result:
+            edges_current_node = list(result.edges(current_node))
+            while len(edges_current_node) > 1:
+                selected = random.choice(edges_current_node)
+                edges_current_node.remove(selected)
+                result.remove_edge(selected[0],selected[1])
+        return result
+
+    def initialize_bank_relationships(self, this_model):
+        """ It creates a small world graph using Watts Strogatz. It's indirected and we directed it
+        """
+        if self.initial_graph_file:
+            self.banks_graph = load_graph_json(self.initial_graph_file)
+            description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
+        else:
+            self.banks_smallworld = nx.watts_strogatz_graph(this_model.config.N, 2, self.parameter['p'])
+            self.banks_graph = self.__create_directed_graph_from_watts_strogatz(self.banks_smallworld)
+            # self.banks_graph = nx.random_reference(self.banks_smallworld)
+            description = f"{self.GRAPH_NAME} p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
+        self.banks_graph.type = self.GRAPH_NAME
+        if this_model.export_datafile:
+            draw(self.banks_graph, new_guru_look_for=True, title=description)
+            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
+            save_graph_json(self.banks_graph,
+                            this_model.statistics.get_export_path(this_model.export_datafile, 
+                                                                  f"_{self.GRAPH_NAME}.json"))
+        from_graph_to_array_banks(self.banks_graph, this_model)
+        return self.banks_graph

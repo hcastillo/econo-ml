@@ -7,11 +7,9 @@ logs/
 output/*
 models/*
 lenders/*
-shocked_market/*
-preferential/*
-RestrictedMarket/*
-boltzman/*
+experiments/*
 ppo/*
+tommaso/*
 .idea/*
 *.txt
 Econometrics-With-Python/

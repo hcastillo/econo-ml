@@ -100,6 +100,9 @@ class Statistics:
     rationing = []
     leverage = []
     loans = []
+    asset_i = []
+    asset_j = []
+    asset_equity = []
     P = []
     B = []
     model = None
@@ -131,6 +134,9 @@ class Statistics:
         self.credit_channels = np.zeros(self.model.config.T, dtype=int)
         self.fitness = np.zeros(self.model.config.T, dtype=float)
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
+        self.asset_i = np.zeros(self.model.config.T, dtype=float)
+        self.asset_j = np.zeros(self.model.config.T, dtype=float)
+        self.asset_equity = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
@@ -166,14 +172,30 @@ class Statistics:
     def compute_interest(self):
         num_of_banks_with_lenders = 0
         sum_of_interests_rates = 0
+
+        sum_of_asset_i = 0
+        sum_of_asset_j = 0
+        sum_of_asset_equity = 0
+
         for bank in self.model.banks:
+
             if not bank.getLoanInterest() is None:
                 sum_of_interests_rates += bank.getLoanInterest()
+                sum_of_asset_i += bank.asset_i
+                sum_of_asset_j += bank.asset_j
+                sum_of_asset_equity += bank.asset_equity
+
                 num_of_banks_with_lenders += 1
         if num_of_banks_with_lenders:
             self.interest_rate[self.model.t] = sum_of_interests_rates / num_of_banks_with_lenders
+            self.asset_i[self.model.t] = sum_of_asset_i / num_of_banks_with_lenders
+            self.asset_j[self.model.t] = sum_of_asset_j / num_of_banks_with_lenders
+            self.asset_equity[self.model.t] = sum_of_asset_equity / num_of_banks_with_lenders
         else:
             self.interest_rate[self.model.t] = np.inf
+            self.asset_j[self.model.t] = np.inf
+            self.asset_j[self.model.t] = np.inf
+            self.asset_equity[self.model.t] = np.inf
 
     def compute_liquidity(self):
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
@@ -393,7 +415,8 @@ class Statistics:
                 self.__generate_gdt(self.get_export_path(export_datafile), header)
 
     def enumerate_results(self):
-        for element in ('policy', 'fitness', 'liquidity', 'interest_rate', 'bankruptcy',
+        for element in ('policy', 'fitness', 'liquidity', 'interest_rate', 'asset_i','asset_j','asset_equity',
+                        'bankruptcy',
                         'best_lender', 'best_lender_clients', 'credit_channels', 'rationing',
                         'leverage', 'P', 'B', 'loans'):
             yield self.get_name(element), getattr(self, element)
@@ -436,7 +459,7 @@ class Statistics:
         plt.close()
 
     def get_plots(self, export_datafile):
-        for variable in ('bankruptcy', 'liquidity', 'credit_channels', 'interest_rate', 'B'):
+        for variable in ('bankruptcy', 'liquidity', 'credit_channels', 'interest_rate', 'asset_i','asset_j','asset_equity', 'B'):
             self.plot_result(variable, self.get_name(variable), export_datafile)
         self.plot_best_lender(export_datafile)
         self.plot_P(export_datafile)
@@ -1051,9 +1074,15 @@ class Model:
         # (equation 6)
         minr = sys.maxsize
         lines = []
+        
         for bank_i in self.banks:
             line1 = ""
             line2 = ""
+
+            bank_i.asset_i = 0
+            bank_i.asset_j = 0
+            bank_i.asset_equity = 0
+
             for j in range(self.config.N):
                 try:
                     if j == bank_i.id:
@@ -1067,6 +1096,10 @@ class Model:
                                              (1 - self.banks[j].p) *
                                              (self.config.xi * self.banks[j].A - bank_i.c[j])) \
                                             / (self.banks[j].p * bank_i.c[j])
+
+                            bank_i.asset_i += self.config.ji * bank_i.A
+                            bank_i.asset_j += self.config.phi * self.banks[j].A
+                            bank_i.asset_j += (1 - self.banks[j].p)
                         if bank_i.rij[j] < 0:
                             bank_i.rij[j] = self.config.r_i0
                 # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
@@ -1083,7 +1116,13 @@ class Model:
             else:
                 lines.append("c=|" + line2[:-1] + "| r=|" +
                              line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i._lambda:.3f} ")
+            
+            
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
+            bank_i.asset_i = bank_i.asset_i  /  (self.config.N - 1)
+            bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
+            bank_i.asset_equity = bank_i.asset_equity / (self.config.N - 1)
+
             if bank_i.r < minr:
                 minr = bank_i.r
 
@@ -1155,6 +1194,10 @@ class Bank:
         # identity of the lender
         self.lender = self.model.config.lender_change.new_lender(self.model, self)
         self.activeBorrowers = {}
+        self.asset_i = 0
+        self.asset_j = 0
+        self.asset_equity = 0
+
 
     def replaceBank(self):
         self.failures += 1
@@ -1171,7 +1214,7 @@ class Bank:
             recovered = self.l
 
         badDebt = self.l - recovered  # the fire sale minus paying D: what the lender recovers
-        if badDebt > 0:  #TODO
+        if badDebt > 0:
             self.paidLoan = recovered
             self.getLender().B += badDebt
             self.getLender().E -= badDebt
@@ -1225,7 +1268,7 @@ class Gui:
         try:
             import tkinter as tk
             tk.Tk().destroy()
-        except ModuleNotFoundError:
+        except:
             self.graphical = False
         else:
             self.graphical = True

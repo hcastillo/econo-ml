@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-Executor for the interbank model using different values for the lc ShockedMarket
+Executor base class for the interbank model
 @author: hector@bith.net
 """
 import random
@@ -11,22 +11,30 @@ import numpy as np
 
 import interbank
 from interbank import Model
-from interbank_lenderchange import Boltzman
+import interbank_lenderchange
 import pandas as pd
 from progress.bar import Bar
 import os
 import matplotlib.pyplot as plt
-import argparse
 from itertools import product
+import networkx as nx
+import lxml.etree
+import lxml.builder
+import gzip
+import argparse
 
+class ExperimentRun:
+    N = 1
+    T = 1
+    MC = 1
 
-class Experiment:
-    N = 50
-    T = 1000
-    MC = 10
+    COMPARING_DATA = ""
+    COMPARING_LABEL = "Comparing"
 
-    OUTPUT_DIRECTORY = "boltzman"
-    ALGORITHM = Boltzman
+    LABEL = "Invalid"
+    OUTPUT_DIRECTORY = "Invalid"
+
+    ALGORITHM = interbank_lenderchange.ShockedMarket
 
     config = {  # items should be iterable:
         # "µ": np.linspace(0.7,0.8,num=2),
@@ -34,13 +42,13 @@ class Experiment:
     }
 
     parameters = {  # items should be iterable:
-        "m": np.linspace(1, 1, num=1),
+        "p": np.linspace(0.001, 0.100, num=40),
     }
 
-    LENGTH_FILENAME_PARAMETER = 2
-    LENGTH_FILENAME_CONFIG = 0
+    LENGTH_FILENAME_PARAMETER = 5
+    LENGTH_FILENAME_CONFIG = 1
 
-    def plot(self, array_with_data, array_with_x_values, title_x, directory):
+    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
         # we plot only x labels 1 of each 10:
         plot_x_values = []
         for j in range(len(array_with_x_values)):
@@ -50,20 +58,21 @@ class Experiment:
             i = i.strip()
             if i != "t":
                 mean = []
-                standard_deviation = []
                 for j in array_with_data[i]:
                     # mean is 0, std is 1:
                     mean.append(j[0])
-                    ##standard_deviation.append(
-                    ##    abs(np.log(j[1]) / 2 if use_logarithm else j[1] / 2)
-                    ##)
                 plt.clf()
-                # plt.xlabel(title_x)
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
                 plt.title(title)
-                plt.plot(array_with_x_values, mean)
+                plt.plot(array_with_x_values, mean, "b-",
+                         label=self.ALGORITHM.__name__ if array_comparing else "")
+                if array_comparing and i in array_comparing:
+                    ax = plt.gca()
+                    ax.plot(0, array_comparing[i][0][0], "or", label=self.COMPARING_LABEL)
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
+                if array_comparing:
+                    plt.legend(loc='best')
                 plt.savefig(f"{directory}{i}.png", dpi=300)
 
     def load(self, directory):
@@ -78,17 +87,17 @@ class Experiment:
                     array_with_data[i] = []
             for i in array_with_data.keys():
                 for j in range(len(dataframe[i])):
-                    array_with_data[i].append([dataframe[i][j], dataframe['std_'+i][j]])
+                    array_with_data[i].append([dataframe[i][j], dataframe['std_' + i][j]])
             for j in dataframe[name_for_x_column]:
                 array_with_x_values.append(f"{name_for_x_column}={j}")
             return array_with_data, array_with_x_values
         else:
             return {}, []
 
-    def save(self, array_with_data, array_with_x_values, directory):
+    def save_csv(self, array_with_data, array_with_x_values, directory):
         with open(f"{directory}results.csv", "w") as file:
             file.write(
-                f"# MC={self.MC} N={self.N} T={self.T}\n"
+                f"# MC={self.MC} N={self.N} T={self.T} {self.ALGORITHM.__name__}\n"
             )
             file.write(array_with_x_values[0].split("=")[0])
             for j in array_with_data:
@@ -102,11 +111,46 @@ class Experiment:
                     )
                 file.write("\n")
 
+    def save_gdt(self, array_with_data, array_with_x_values, directory):
+        E = lxml.builder.ElementMaker()
+        GRETLDATA = E.gretldata
+        DESCRIPTION = E.description
+        VARIABLES = E.variables
+        VARIABLE = E.variable
+        OBSERVATIONS = E.observations
+        OBS = E.obs
+        variables = VARIABLES(count=f"{2 * len(array_with_data) + 1}")
+        variables.append(VARIABLE(name=f"{array_with_x_values[0].split('=')[0]}"))
+        for j in array_with_data:
+            if j == "leverage":
+                j = "leverage_"
+            variables.append(VARIABLE(name=f"{j}"))
+            variables.append(VARIABLE(name=f"std_{j}"))
+
+        observations = OBSERVATIONS(count=f"{len(array_with_x_values)}", labels="false")
+        for i in range(len(array_with_x_values)):
+            string_obs = f"{array_with_x_values[i].split('=')[1]}  "
+            for j in array_with_data:
+                string_obs += f"{array_with_data[j][i][0]}  {array_with_data[j][i][1]}  "
+            observations.append(OBS(string_obs))
+        header_text = f"MC={self.MC} N={self.N} T={self.T} {self.ALGORITHM.__name__}"
+        gdt_result = GRETLDATA(
+            DESCRIPTION(header_text),
+            variables,
+            observations,
+            version="1.4", name='prueba', frequency="special:1", startobs="1",
+            endobs=f"{len(array_with_x_values)}", type="cross-section"
+        )
+        with gzip.open(f"{directory}results.gdt", 'w') as output_file:
+            output_file.write(
+                b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
+            output_file.write(
+                lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
+
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()
         model.export_datafile = filename
         model.config.lender_change = self.ALGORITHM()
-        # model.config.lender_change.set_parameter("m", int(execution_parameters["m"]))
         model.configure(T=self.T, N=self.N, **execution_config)
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
@@ -130,11 +174,11 @@ class Experiment:
         if value.endswith(".0"):
             # integer: 0 at left
             value = value[:-2]
-            last_digit = len(value)-1
+            last_digit = len(value) - 1
             while last_digit > 0 and value[last_digit].isdigit():
                 last_digit -= 1
             while len(value) <= max_length:
-                value = value[:last_digit+1]+'0'+value[last_digit+1:]
+                value = value[:last_digit + 1] + '0' + value[last_digit + 1:]
         else:
             # float: 0 at right
             value = value.replace(".", "")
@@ -175,8 +219,48 @@ class Experiment:
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
-    def do(self):
-        results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
+    def get_statistics_of_graphs(self, graph_files, results):
+        graph_clustering = []
+        communities = []
+        lengths = []
+        gcs = []
+        for graph_file in graph_files:
+            graph = interbank_lenderchange.load_graph_json(f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json")
+            graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
+            graph_clustering.append(interbank_lenderchange.GraphStatistics.clustering_coeff(graph))
+            gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
+            communities.append(len(graph_communities))
+            lengths += [len(i) for i in graph_communities]
+        if not 'grade_max' in results:
+            results['grade_max'] = []
+            results['grade_avg'] = []
+            results['communities'] = []
+            results['clustering_avg'] = []
+            results['gcs'] = []
+        try:
+            results['grade_max'].append([max(lengths), 0])
+        except ValueError:
+            results['grade_max'].append([0, 0])
+        results['grade_avg'].append([0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0])
+        results['communities'].append([(sum(communities)) / len(communities), 0])
+        results['clustering_avg'].append([(sum(graph_clustering)) / len(graph_clustering), 0])
+        results['gcs'].append([sum(gcs) / len(gcs), 0])
+
+    def load_comparing(self, results_to_plot, results_x_axis):
+        results_comparing = None
+        if self.COMPARING_DATA:
+            results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")
+            if len(results_x_comparing) != len(results_x_axis) and len(results_x_comparing)!=1:
+                results_comparing = None
+        return results_comparing
+
+    def do(self, clear_previous_results=False):
+        if clear_previous_results:
+            results_to_plot = results_comparing = {}
+            results_x_axis = []
+        else:
+            results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
+            results_comparing = self.load_comparing(results_to_plot, results_x_axis)
         if not results_to_plot:
             self.__verify_directories__()
             progress_bar = Bar(
@@ -186,19 +270,21 @@ class Experiment:
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
                     result_iteration = pd.DataFrame()
+                    graphs_iteration = []
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
                     for i in range(self.MC):
                         mc_iteration = random.randint(9999, 20000)
-                        if os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv"):
+                        if os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv") and not clear_previous_results:
                             result_mc = pd.read_csv(
                                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
-                        elif os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
+                        elif os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt") and not clear_previous_results:
                             result_mc = interbank.Statistics.read_gdt(
                                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
                         else:
                             result_mc = self.run_model(
                                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
                                 model_configuration, model_parameters, mc_iteration)
+                        graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
                         result_iteration = pd.concat([result_iteration, result_mc])
                     for k in result_iteration.keys():
                         if k.strip() == "t":
@@ -212,38 +298,48 @@ class Experiment:
                             results_to_plot[k].append([mean_estimated, std_estimated])
                         else:
                             results_to_plot[k] = [[mean_estimated, std_estimated]]
+                    if self.ALGORITHM.GRAPH_NAME:
+                        self.get_statistics_of_graphs(graphs_iteration, results_to_plot)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
                     progress_bar.next()
-            self.save(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
             progress_bar.finish()
+            print(f"Saving results in {self.OUTPUT_DIRECTORY}...")
+            self.save_csv(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
+            self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
         else:
-            print("Loaded data from previous work")
+            print(f"Loaded data from previous work from {self.OUTPUT_DIRECTORY}")
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
-                  f"{self.OUTPUT_DIRECTORY}/")
+                  f"{self.OUTPUT_DIRECTORY}/", results_comparing)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Executes the interbank model")
-    parser.add_argument(
-        "--do",
-        default=False,
-        action=argparse.BooleanOptionalAction,
-        help=f"Execute the experiment and saves the results in {Experiment.OUTPUT_DIRECTORY}",
-    )
-    parser.add_argument(
-        "--listnames",
-        default=False,
-        action=argparse.BooleanOptionalAction,
-        help="Print combinations to generate",
-    )
-    args = parser.parse_args()
-
-    experiment = Experiment()
-
-    if args.listnames:
-        experiment.listnames()
-    elif args.do:
-        experiment.do()
-    else:
-        parser.print_help()
+class Runner:
+    def do(self,experiment_runner):
+        parser = argparse.ArgumentParser(description="Executes interbank model using "+
+                                                     experiment_runner.__name__)
+        parser.add_argument(
+            "--do",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help=f"Execute the experiment and saves the results in {experiment_runner.OUTPUT_DIRECTORY}",
+        )
+        parser.add_argument(
+            "--listnames",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="Print combinations to generate",
+        )
+        parser.add_argument(
+            "--clear",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="Ignore generated files and create them again",
+        )
+        args = parser.parse_args()
+        experiment = experiment_runner()
+        if args.listnames:
+            experiment.listnames()
+        elif args.do:
+            experiment.do(args.clear)
+        else:
+            parser.print_help()
