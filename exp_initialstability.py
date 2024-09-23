@@ -17,11 +17,11 @@ class InitialStabilityRun(exp_runner.ExperimentRun):
 
     OUTPUT_DIRECTORY = "experiments\\initialstability"
     ALGORITHM = InitialStability
-    COMPARING_DATA = "exp_boltzman"
+    COMPARING_DATA = "experiments\\boltzman"
     COMPARING_LABEL = "Boltzman"
 
     parameters = {  # items should be iterable:
-        "m": np.linspace(1, 49, num=49),
+        "m": np.linspace(1, 1, num=1),
     }
 
     LENGTH_FILENAME_PARAMETER = 2

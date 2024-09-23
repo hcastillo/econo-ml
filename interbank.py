@@ -719,6 +719,7 @@ class Model:
                 attribute = attribute.replace("lc_", "")
                 if attribute == 'lc':
                     self.config.lender_change = lc.determine_algorithm(configuration[attribute])
+                    print(self.config.lender_change.__name__)
                 else:
                     self.config.lender_change.set_parameter(attribute, configuration["lc_" + attribute])
             elif hasattr(self.config, attribute):

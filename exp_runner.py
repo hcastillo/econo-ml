@@ -274,10 +274,12 @@ class ExperimentRun:
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
                     for i in range(self.MC):
                         mc_iteration = random.randint(9999, 20000)
-                        if os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv") and not clear_previous_results:
+                        if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+                                and not clear_previous_results):
                             result_mc = pd.read_csv(
                                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
-                        elif os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt") and not clear_previous_results:
+                        elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+                              and not clear_previous_results):
                             result_mc = interbank.Statistics.read_gdt(
                                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
                         else:

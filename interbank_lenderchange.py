@@ -575,229 +575,8 @@ class SmallWorld(ShockedMarket):
     
     GRAPH_NAME = 'small_world'
 
-    def __create_directed_graph_from_watts_strogatz(self, watts_strogatz):
-        result = watts_strogatz.to_directed()
-        for current_node in result:
-            edges_current_node = list(result.edges(current_node))
-            while len(edges_current_node) > 1:
-                selected = random.choice(edges_current_node)
-                edges_current_node.remove(selected)
-                result.remove_edge(selected[0],selected[1])
-        return result
-
-
     @staticmethod
-    def prueba(watts_strogatz, position=None):
-        if position is None:
-            result = nx.DiGraph()
-            # we look for the nodes with only one edge:
-            nodes_pending = []
-            for node in watts_strogatz.nodes():
-                edges = list(watts_strogatz.edges(node))
-                if len(edges)==1:
-                    result.add_edge(edges[0][0],edges[0][1])
-                else:
-                    nodes_pending.append(node)
-
-            # and now we follow with the other nodes:
-            for node in nodes_pending:
-                edges = list(watts_strogatz.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1], node):
-                        edges.remove((node, edge[1]))
-                if len(edges)==1:
-                    result.add_edge(edges[0][0], edges[0][1])
-                    nodes_pending.remove(node)
-            print(nodes_pending)
-        return result
-
-    @staticmethod
-    def prueba1(watts_strogatz):
-        result = nx.DiGraph()
-        # we look for the nodes with only one edge:
-        nodes_pending = []
-        for node in watts_strogatz.nodes():
-            edges = list(watts_strogatz.edges(node))
-            if len(edges) == 1:
-                result.add_edge(edges[0][0], edges[0][1])
-            else:
-                nodes_pending.append(node)
-        while nodes_pending:
-            for node in nodes_pending:
-                edges = list(watts_strogatz.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1], node):
-                        edges.remove((node, edge[1]))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1])
-                    nodes_pending.remove(node)
-                else:
-                    one_of_them = random.choice(edges)
-                    result.add_edge(one_of_them[0], one_of_them[1])
-                    nodes_pending.remove(node)
-        return result
-
-
-    def prueba2(watts_strogatz, pending_nodes):
-        result = nx.DiGraph()
-        # we look for the nodes with only one edge:
-        nodes_pending = []
-        for node in watts_strogatz.nodes():
-            edges = list(watts_strogatz.edges(node))
-            if len(edges) == 1:
-                result.add_edge(edges[0][0], edges[0][1])
-            else:
-                nodes_pending.append(node)
-        while nodes_pending:
-            for node in nodes_pending:
-                edges = list(watts_strogatz.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1], node):
-                        edges.remove((node, edge[1]))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1])
-                    nodes_pending.remove(node)
-                else:
-                    one_of_them = random.choice(edges)
-                    result.add_edge(one_of_them[0], one_of_them[1])
-                    nodes_pending.remove(node)
-        return result
-
-    @staticmethod
-    def prueba3(watts_strogatz, result=None, pending_nodes=None):
-        if pending_nodes is None:
-            result = nx.DiGraph()
-            pending_nodes = list(watts_strogatz.nodes())
-            # we put the edges in all the extremes of the graph:
-            for node in pending_nodes:
-                edges = list(watts_strogatz.edges(node))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1],fase="a")
-                    pending_nodes.remove(node)
-            # and now we analize the other situations:
-            SmallWorld.prueba3(watts_strogatz, result, pending_nodes)
-        else:
-            for node in pending_nodes:
-                edges = list(watts_strogatz.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1], node):
-                        edges.remove((node, edge[1]))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1],fase="b")
-                    pending_nodes.remove(node)
-            for node in pending_nodes:
-                edges = list(watts_strogatz.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1], node):
-                        edges.remove((node, edge[1]))
-                if len(edges) > 1:
-                    one_of_them = random.choice(edges)
-                    result.add_edge(one_of_them[0], one_of_them[1],fase="c")
-                    pending_nodes.remove(node)
-            if pending_nodes:
-                SmallWorld.prueba3(watts_strogatz, result, pending_nodes)
-        return result
-
-
-        # we look for the nodes with only one edge:
-        nodes_pending = []
-        for node in watts_strogatz.nodes():
-            edges = list(watts_strogatz.edges(node))
-            if len(edges) == 1:
-                result.add_edge(edges[0][0], edges[0][1])
-            else:
-                nodes_pending.append(node)
-        while nodes_pending:
-            for node in nodes_pending:
-                edges = list(watts_strogatz.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1], node):
-                        edges.remove((node, edge[1]))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1])
-                    nodes_pending.remove(node)
-                else:
-                    one_of_them = random.choice(edges)
-                    result.add_edge(one_of_them[0], one_of_them[1])
-                    nodes_pending.remove(node)
-        return result
-
-
-
-    @staticmethod
-    def prueba5_old(graph, result=None, current_node=None, pending=[]):
-        if current_node is None:
-            result = nx.DiGraph()
-            # a) nodes with only one option
-            for node in graph.nodes():
-                edges = list(graph.edges(node))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1])
-                else:
-                    pending.append(node)
-            # b) remove the outgoing edges with are also incoming from same node:
-            for node in pending:
-                edges = list(graph.edges(node))
-                for edge in edges:
-                    if result.has_edge(edge[1],edge[0]):
-                        edges.remove((edge[0],edge[1]))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1])
-            #for node in pending:
-            #    SmallWorld.prueba5(graph, result, node, pending)
-        else:
-            # b) remove the outgoin
-            # b) nodes with >1 option, after discarding all the outgoing that are also incoming
-            pass
-
-        return result
-
-
-    @staticmethod
-    def prueba5(graph, result=None, pending=None):
-        if current_node is None:
-            result = nx.DiGraph()
-            pending = []
-            # a) nodes with only one option
-            for node in graph.nodes():
-                edges = list(graph.edges(node))
-                if len(edges) == 1:
-                    destination = edges[0][1]
-                    if len(result.in_edges(destination)) == 0:
-                        result.add_edge(node, destination)
-                        if not destination in pending:
-                            pending.insert(0,destination)
-                else:
-                    pending.append(node)
-            if result.edges() == 0:
-                # no nodes with only one option: we need to break a relation to start
-                random_node = random.choice(graph.nodes())
-                result.add_edge(random_node, list(graph.edges(random_node))[0][1])
-                pending.remove(random_node)
-            SmallWorld.prueba5(graph, result, pending)
-        elif pending:
-            # b) take the first node with incoming link:
-            found = False
-            for (origin,destination) in result.in_edges():
-                if destination in pending:
-                    found = True
-
-            current_node = pending[0]
-            pending = pending[1:]
-            edges = list(graph.edges(current_node))
-            for edge in edges:
-                if result.has_edge(edge[1],edge[0]):
-                    edges.remove((edge[0],edge[1]))
-                if len(edges) == 1:
-                    result.add_edge(edges[0][0], edges[0][1])
-
-            #for node in pending:
-            #    SmallWorld.prueba5(graph, result, node, pending)
-        return result
-
-
-    @staticmethod
-    def prueba6(graph, result=None, pending=None, current_node=None):
+    def create_directed_graph_from_watts_strogatz(graph, result=None, pending=None, current_node=None):
         # a) first time: look for extremes of the graph and use current_node to create links from them:
         if result is None:
             result = nx.DiGraph()
@@ -806,13 +585,14 @@ class SmallWorld(ShockedMarket):
             for node in graph.nodes():
                 edges = list(graph.edges(node))
                 if len(edges) == 1:
-                    SmallWorld.prueba6(graph, result, pending, node)
+                    SmallWorld.create_directed_graph_from_watts_strogatz(graph, result, pending, node)
             # no nodes with only one option: we choose an arbitrary node to start:
             if result.edges() == 0:
                 random_node = random.choice(graph.nodes())
                 SmallWorld.prueba6(graph, result, pending, random_node)
-            SmallWorld.prueba6(graph, result, pending)
+            SmallWorld.create_directed_graph_from_watts_strogatz(graph, result, pending)
         elif current_node:
+            # b) nodes with an incoming link that we should follow (there's only that option)
             source = current_node
             destination = list(graph.edges(source))[0][1]
             while not destination is None:
@@ -829,13 +609,13 @@ class SmallWorld(ShockedMarket):
                 else:
                     destination = None
         elif pending:
-            # items with >1 node
+            # c) items with >1 node
             for source in pending:
                 edges = list(graph.edges(source))
                 if result.has_node(source):
-                  for inedges in result.in_edges(source):
-                    if (inedges[1],inedges[0]) in edges:
-                        edges.remove((inedges[1], inedges[0]))
+                  for in_edges in result.in_edges(source):
+                    if (in_edges[1],in_edges[0]) in edges:
+                        edges.remove((in_edges[1], in_edges[0]))
                 if edges:
                     new_link = random.choice(edges)
                     result.add_edge(new_link[0],new_link[1])
@@ -843,23 +623,34 @@ class SmallWorld(ShockedMarket):
                     result.add_node(source)
         return result
 
-def initialize_bank_relationships(self, this_model):
-        """ It creates a small world graph using Watts Strogatz. It's indirected and we directed it
-        """
-        if self.initial_graph_file:
-            self.banks_graph = load_graph_json(self.initial_graph_file)
-            description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
+
+    def check_parameter(self, name, value):
+        if name == 'p':
+            if isinstance(value, float) and 0 <= value <= 1:
+                return True
+            else:
+                print("value for 'p' should be a float number >= 0 and <= 1")
+                return False
         else:
-            self.banks_smallworld = nx.watts_strogatz_graph(this_model.config.N, 2, self.parameter['p'])
-            self.banks_graph = self.__create_directed_graph_from_watts_strogatz(self.banks_smallworld)
-            # self.banks_graph = nx.random_reference(self.banks_smallworld)
-            description = f"{self.GRAPH_NAME} p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
-        self.banks_graph.type = self.GRAPH_NAME
-        if this_model.export_datafile:
-            draw(self.banks_graph, new_guru_look_for=True, title=description)
-            plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
-            save_graph_json(self.banks_graph,
-                            this_model.statistics.get_export_path(this_model.export_datafile, 
-                                                                  f"_{self.GRAPH_NAME}.json"))
-        from_graph_to_array_banks(self.banks_graph, this_model)
-        return self.banks_graph
+            return False
+
+    def initialize_bank_relationships(self, this_model):
+            """ It creates a small world graph using Watts Strogatz. It's indirected and we directed it using an own
+                algorithm which guarantees 1 output link only for each node (only a lender for each bank)
+            """
+            if self.initial_graph_file:
+                self.banks_graph = load_graph_json(self.initial_graph_file)
+                description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
+            else:
+                self.banks_smallworld = nx.watts_strogatz_graph(this_model.config.N, 2, self.parameter['p'])
+                self.banks_graph = SmallWorld.create_directed_graph_from_watts_strogatz(self.banks_smallworld)
+                description = f"{self.GRAPH_NAME} p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
+            self.banks_graph.type = self.GRAPH_NAME
+            if this_model.export_datafile:
+                draw(self.banks_graph, new_guru_look_for=True, title=description)
+                plt.savefig(this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
+                save_graph_json(self.banks_graph,
+                                this_model.statistics.get_export_path(this_model.export_datafile,
+                                                                      f"_{self.GRAPH_NAME}.json"))
+            from_graph_to_array_banks(self.banks_graph, this_model)
+            return self.banks_graph
