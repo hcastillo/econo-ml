@@ -388,7 +388,7 @@ class Statistics:
             # children[1] = variables
             # children[2] = observations
             for variable in children[1].getchildren():
-                columns.append(variable.values()[0].strip().replace("leverage_", "leverage"))
+                columns.append(variable.values()[0].strip())
             for value in children[2].getchildren():
                 values.append(Statistics.__transform_line_from_string(value.text))
         if columns and values:
@@ -429,8 +429,6 @@ class Statistics:
                 return 'prob_change_lender'
             case 'B':
                 return 'bad_debt'
-            case 'leverage':
-                return 'leverage_'
         return variable
 
     def get_data(self):
