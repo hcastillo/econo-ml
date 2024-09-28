@@ -34,6 +34,7 @@ import lxml.builder
 import gzip
 from gooey import Gooey, GooeyParser
 
+
 class Config:
     """
     Configuration parameters for the interbank network
@@ -102,7 +103,7 @@ class Statistics:
     loans = []
     asset_i = []
     asset_j = []
-    asset_equity = []
+    equity = []
     P = []
     B = []
     model = None
@@ -126,7 +127,6 @@ class Statistics:
         if gif_graph:
             self.create_gif = True
 
-
     def reset(self):
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
@@ -136,7 +136,7 @@ class Statistics:
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
         self.asset_j = np.zeros(self.model.config.T, dtype=float)
-        self.asset_equity = np.zeros(self.model.config.T, dtype=float)
+        self.equity = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
@@ -169,33 +169,41 @@ class Statistics:
         # self.credit_channels is updated directly in the moment the credit channel is set up
         # during Model.do_loans()
 
-    def compute_interest(self):
+    def compute_interest_loans_leverage(self):
         num_of_banks_with_lenders = 0
         sum_of_interests_rates = 0
 
         sum_of_asset_i = 0
         sum_of_asset_j = 0
-        sum_of_asset_equity = 0
+        sum_of_equity = 0
+        sum_of_loans = 0
+        sum_of_leverage = 0
 
         for bank in self.model.banks:
-
             if not bank.getLoanInterest() is None:
                 sum_of_interests_rates += bank.getLoanInterest()
                 sum_of_asset_i += bank.asset_i
                 sum_of_asset_j += bank.asset_j
-                sum_of_asset_equity += bank.asset_equity
-
+                sum_of_equity += bank.E
                 num_of_banks_with_lenders += 1
+                sum_of_loans += bank.l
+                sum_of_leverage += (bank.l/bank.E)
+
         if num_of_banks_with_lenders:
             self.interest_rate[self.model.t] = sum_of_interests_rates / num_of_banks_with_lenders
             self.asset_i[self.model.t] = sum_of_asset_i / num_of_banks_with_lenders
             self.asset_j[self.model.t] = sum_of_asset_j / num_of_banks_with_lenders
-            self.asset_equity[self.model.t] = sum_of_asset_equity / num_of_banks_with_lenders
+            self.equity[self.model.t] = sum_of_equity / num_of_banks_with_lenders
+            self.loans[self.model.t] = sum_of_loans / num_of_banks_with_lenders
+            self.leverage[self.model.t] = sum_of_leverage / num_of_banks_with_lenders
+
         else:
-            self.interest_rate[self.model.t] = np.inf
-            self.asset_j[self.model.t] = np.inf
-            self.asset_j[self.model.t] = np.inf
-            self.asset_equity[self.model.t] = np.inf
+            self.interest_rate[self.model.t] = np.nan
+            self.asset_j[self.model.t] = np.nan
+            self.asset_j[self.model.t] = np.nan
+            self.equity[self.model.t] = np.nan
+            self.loans[self.model.t] = np.nan
+            self.leverage[self.model.t] = np.nan
 
     def compute_liquidity(self):
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
@@ -211,12 +219,6 @@ class Statistics:
 
     def compute_rationing(self):
         self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
-
-    def compute_leverage(self):
-        self.leverage[self.model.t] = sum(map(lambda x: (x.l / x.E), self.model.banks)) / self.model.config.N
-
-    def compute_loans(self):
-        self.loans[self.model.t] = sum(map(lambda x: x.l, self.model.banks)) / self.model.config.N
 
     def compute_probability_of_lender_change(self):
         probabilities = [bank.P for bank in self.model.banks]
@@ -342,6 +344,8 @@ class Statistics:
         OBS = E.obs
         variables = VARIABLES(count=f"{sum(1 for _ in self.enumerate_results())}")
         for variable_name, _ in self.enumerate_results():
+            if variable_name == 'leverage':
+                variable_name += "_"
             variables.append(VARIABLE(name=f"{variable_name}"))
 
         observations = OBSERVATIONS(count=f"{self.model.config.T}", labels="false")
@@ -415,7 +419,7 @@ class Statistics:
                 self.__generate_gdt(self.get_export_path(export_datafile), header)
 
     def enumerate_results(self):
-        for element in ('policy', 'fitness', 'liquidity', 'interest_rate', 'asset_i','asset_j','asset_equity',
+        for element in ('policy', 'fitness', 'liquidity', 'interest_rate', 'asset_i', 'asset_j', 'equity',
                         'bankruptcy',
                         'best_lender', 'best_lender_clients', 'credit_channels', 'rationing',
                         'leverage', 'P', 'B', 'loans'):
@@ -457,7 +461,8 @@ class Statistics:
         plt.close()
 
     def get_plots(self, export_datafile):
-        for variable in ('bankruptcy', 'liquidity', 'credit_channels', 'interest_rate', 'asset_i','asset_j','asset_equity', 'B'):
+        for variable in ('bankruptcy', 'liquidity', 'credit_channels', 'interest_rate',
+                         'asset_i', 'asset_j', 'equity', 'B'):
             self.plot_result(variable, self.get_name(variable), export_datafile)
         self.plot_best_lender(export_datafile)
         self.plot_P(export_datafile)
@@ -769,12 +774,10 @@ class Model:
             self.log.progress_bar.next()
         self.statistics.compute_liquidity()
         self.statistics.compute_credit_channels_and_best_lender()
-        self.statistics.compute_interest()
+        self.statistics.compute_interest_loans_leverage()
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
         self.statistics.compute_bad_debt()
-        self.statistics.compute_loans()
-        self.statistics.compute_leverage()
         self.statistics.compute_rationing()
         self.setup_links()
         self.statistics.compute_probability_of_lender_change()
@@ -1073,14 +1076,13 @@ class Model:
         # (equation 6)
         minr = sys.maxsize
         lines = []
-        
+
         for bank_i in self.banks:
             line1 = ""
             line2 = ""
 
             bank_i.asset_i = 0
             bank_i.asset_j = 0
-            bank_i.asset_equity = 0
 
             for j in range(self.config.N):
                 try:
@@ -1115,12 +1117,10 @@ class Model:
             else:
                 lines.append("c=|" + line2[:-1] + "| r=|" +
                              line1[:-1] + f"| {bank_i.getId(short=True)} h={bank_i.h:.3f},λ={bank_i._lambda:.3f} ")
-            
-            
+
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
-            bank_i.asset_i = bank_i.asset_i  /  (self.config.N - 1)
+            bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
-            bank_i.asset_equity = bank_i.asset_equity / (self.config.N - 1) #TODO
 
             if bank_i.r < minr:
                 minr = bank_i.r
@@ -1195,8 +1195,6 @@ class Bank:
         self.activeBorrowers = {}
         self.asset_i = 0
         self.asset_j = 0
-        self.asset_equity = 0
-
 
     def replaceBank(self):
         self.failures += 1
@@ -1263,6 +1261,7 @@ class Bank:
 
 class Gui:
     gooey = False
+
     def __init__(self):
         try:
             import tkinter as tk
@@ -1284,7 +1283,7 @@ class Gui:
 
     def next(self):
         self.current += 1
-        print("progress: {}%".format(self.current/self.maximum*100))
+        print("progress: {}%".format(self.current / self.maximum * 100))
         sys.stdout.flush()
 
     def parser(self):
@@ -1300,7 +1299,6 @@ class Utils:
     Auxiliary class to encapsulate the use of the model
     """
 
-
     @staticmethod
     def __extract_t_values_from_arg__(param):
         if param is None:
@@ -1315,7 +1313,6 @@ class Utils:
                     if t[-1] > Config.T or t[-1] < 0:
                         raise ValueError(f"{t[-1]} greater than Config.T or below 0")
                 return t
-
 
     @staticmethod
     def run_interactive():
@@ -1370,8 +1367,7 @@ class Utils:
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
-                  interactive=(args.log == 'ERROR' or not args.logfile is None))
-
+                  interactive=(args.log == 'ERROR' or args.logfile is not None))
 
     def run(save=None, save_graph_instants=None, interactive=False):
         global model
