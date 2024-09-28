@@ -213,7 +213,7 @@ class Statistics:
         self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
 
     def compute_leverage(self):
-        self.leverage[self.model.t] = sum(map(lambda x: (x.L / x.E), self.model.banks)) / self.model.config.N
+        self.leverage[self.model.t] = sum(map(lambda x: (x.l / x.E), self.model.banks)) / self.model.config.N
 
     def compute_loans(self):
         self.loans[self.model.t] = sum(map(lambda x: x.l, self.model.banks)) / self.model.config.N
@@ -773,8 +773,8 @@ class Model:
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
         self.statistics.compute_bad_debt()
-        self.statistics.compute_leverage()
         self.statistics.compute_loans()
+        self.statistics.compute_leverage()
         self.statistics.compute_rationing()
         self.setup_links()
         self.statistics.compute_probability_of_lender_change()
@@ -1055,12 +1055,12 @@ class Model:
         maxC = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
             bank.p = bank.E / maxE
-            bank._lambda = bank.L / bank.E
+            bank._lambda = bank.l / bank.E
             bank.incrD = 0
 
         max_lambda = max(self.banks, key=lambda k: k._lambda)._lambda
         for bank in self.banks:
-            bank.h = bank._lambda / max_lambda
+            bank.h = bank._lambda / max_lambda if max_lambda > 0 else 0
             bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
 
         # determine c (lending capacity) for all other banks (to whom give loans):
@@ -1120,7 +1120,7 @@ class Model:
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             bank_i.asset_i = bank_i.asset_i  /  (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
-            bank_i.asset_equity = bank_i.asset_equity / (self.config.N - 1)
+            bank_i.asset_equity = bank_i.asset_equity / (self.config.N - 1) #TODO
 
             if bank_i.r < minr:
                 minr = bank_i.r
@@ -1141,7 +1141,7 @@ class Model:
         if self.config.N <= 10:
             self.log.debug("links", f"μ=[{loginfo[:-1]}] r=[{loginfo1[:-1]}]")
 
-        self.config.lender_change.finish_step(self)
+        self.config.lender_change.step_setup_links(self)
         for bank in self.banks:
             self.log.debug("links", self.config.lender_change.change_lender(self, bank, self.t))
 
