@@ -14,7 +14,7 @@ class BoltzmanRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 10
 
-    OUTPUT_DIRECTORY = "experiments\\boltzman"
+    OUTPUT_DIRECTORY = "experiments/boltzman"
     ALGORITHM = Boltzman
     COMPARING_DATA = None
 

@@ -15,7 +15,7 @@ class SmallWorldRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 10
 
-    OUTPUT_DIRECTORY = "experiments\\smallworld"
+    OUTPUT_DIRECTORY = "experiments/smallworld"
     ALGORITHM = SmallWorld
 
     parameters = {  # items should be iterable:
