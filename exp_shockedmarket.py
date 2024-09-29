@@ -15,10 +15,10 @@ class ShockedMarketRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 10
 
-    COMPARING_DATA = "experiments\\boltzman"
+    COMPARING_DATA = "experiments/boltzman"
     COMPARING_LABEL = "Boltzman"
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "experiments\\shockedmarket"
+    OUTPUT_DIRECTORY = "experiments/shockedmarket"
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.001, 0.100, num=200),

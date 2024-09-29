@@ -32,8 +32,6 @@ import pandas as pd
 import lxml.etree
 import lxml.builder
 import gzip
-from gooey import Gooey, GooeyParser
-
 
 class Config:
     """
@@ -392,7 +390,10 @@ class Statistics:
             # children[1] = variables
             # children[2] = observations
             for variable in children[1].getchildren():
-                columns.append(variable.values()[0].strip())
+                column_name = variable.values()[0].strip()
+                if column_name == 'leverage_':
+                    column_name = 'leverage'
+                columns.append(column_name)
             for value in children[2].getchildren():
                 values.append(Statistics.__transform_line_from_string(value.text))
         if columns and values:
@@ -1262,20 +1263,6 @@ class Bank:
 class Gui:
     gooey = False
 
-    def __init__(self):
-        try:
-            import tkinter as tk
-            tk.Tk().destroy()
-        except:
-            self.graphical = False
-        else:
-            self.graphical = True
-
-    @Gooey
-    def generate_gui(self):
-        self.gooey = True
-        pass
-
     def progress_bar(self, message, maximum):
         print(message)
         self.maximum = maximum
@@ -1287,11 +1274,16 @@ class Gui:
         sys.stdout.flush()
 
     def parser(self):
-        if not sys.argv[1:] and self.graphical:
-            self.generate_gui()
-            return GooeyParser(description="Interbank model")
+        try:
+            import interbank_gui
+            parser = interbank_gui.get_interactive_parser()
+        except:
+            parser = None
+        if parser is None:
+            parser = argparse.ArgumentParser()
         else:
-            return argparse.ArgumentParser()
+            self.gooey = True
+        return parser
 
 
 class Utils:
