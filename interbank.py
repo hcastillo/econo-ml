@@ -212,7 +212,7 @@ class Statistics:
         if num_of_banks_with_lenders:
             avg_prob_bankruptcy = 0
             num_elements = 0
-            if maxE > 0:  #TODO
+            if maxE > 0:
                 for bank in self.model.banks:
                     if bank.getLoanInterest() is not None and bank.l > 0:
                         avg_prob_bankruptcy += (1 - bank.E / maxE)
@@ -339,7 +339,7 @@ class Statistics:
                     continue
                 images.append(Image.open(image_file))
             images[0].save(fp=filename_output, format='GIF', append_images=images[1:],
-                           save_all=True, duration=100, loop=0)
+                           save_all=True, duration=100, logit op=0)
 
     def get_export_path(self, filename, ending_name=''):
         # we ensure that the output goes to OUTPUT_DIRECTORY:
@@ -777,7 +777,7 @@ class Model:
 
     def configure(self, **configuration):
         for attribute in configuration:
-            if attribute.startswith('lc'): #TODO
+            if attribute.startswith('lc'):
                 attribute = attribute.replace("lc_", "")
                 if attribute == 'lc':
                     self.config.lender_change = lc.determine_algorithm(configuration[attribute])
