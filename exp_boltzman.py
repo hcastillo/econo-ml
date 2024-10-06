@@ -12,7 +12,7 @@ import exp_runner
 class BoltzmanRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 10
+    MC = 1
 
     OUTPUT_DIRECTORY = "experiments/boltzman"
     ALGORITHM = Boltzman

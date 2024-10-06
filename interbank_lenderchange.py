@@ -299,7 +299,8 @@ class Boltzman(LenderChange):
         if self.initial_graph_file:
             graph = load_graph_json(self.initial_graph_file)
             from_graph_to_array_banks(graph, this_model)
-        this_model.statistics.get_graph(0)
+        if this_model.export_datafile:
+            this_model.statistics.get_graph(0)
 
     def change_lender(self, this_model, bank, t):
         """ It uses γ but only after t=20, at the beginning only Boltzmann"""
@@ -443,7 +444,8 @@ class RestrictedMarket(LenderChange):
                                                                   f"_{self.GRAPH_NAME}.json"))
 
         from_graph_to_array_banks(self.banks_graph, this_model)
-        # this_model.statistics.get_graph(0)
+        if this_model.export_datafile:
+            this_model.statistics.get_graph(0)
         return self.banks_graph
 
     def new_lender(self, this_model, bank):
@@ -598,7 +600,8 @@ class ShockedMarket(LenderChange):
                                                                   f"_{self.GRAPH_NAME}.json"))
 
         from_graph_to_array_banks(self.banks_graph, this_model)
-        # this_model.statistics.get_graph(0)
+        if this_model.export_datafile:
+            this_model.statistics.get_graph(0)
         return self.banks_graph
 
     def new_lender(self, this_model, bank):
