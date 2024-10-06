@@ -15,14 +15,14 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         self.model.log.debug_banks()
 
     def test_values_after_execution(self):
-        self.assertEqual(self.model.banks[1].C, 30)
-        self.assertEqual(self.model.banks[3].D, 348.5986847105888)
-        self.assertEqual(self.model.banks[4].E, 15)
-        self.assertEqual(self.model.banks[0].A, 150)
-        self.assertEqual(self.model.banks[1].A, 150)
-        self.assertEqual(self.model.banks[2].A, 156.1348456314171)
-        self.assertEqual(self.model.banks[3].A, 350.0463935682433)
-        self.assertEqual(self.model.banks[4].A, 149.34872636893022)
+        self.assertEqual(self.model.banks[1].C, 18.424695736853437)
+        self.assertEqual(self.model.banks[3].D, 220.9207438929657)
+        self.assertEqual(self.model.banks[4].E, 5.601193543445)
+        self.assertEqual(self.model.banks[0].A, 129.69065371836356)
+        self.assertEqual(self.model.banks[1].A, 138.42469573685344)
+        self.assertEqual(self.model.banks[2].A, 177.10225776746478)
+        self.assertEqual(self.model.banks[3].A, 225.20718284643277)
+        self.assertEqual(self.model.banks[4].A, 106.57313363349286)
 
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ class Balance2TestCase(tests.interbank_testclass.InterbankTest):
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[0], C=16.94, L=15.0, D=22.0, E=9.94, paidloan=3)
+        self.assertBank(bank=self.model.banks[0], C=16.94, L=15.0, D=22.0, E=9.94, paid_loan=3)
         self.assertBank(bank=self.model.banks[1], C=3.06, L=15.0, D=8.0, E=10.06, s=20)
 
 

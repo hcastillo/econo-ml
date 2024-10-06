@@ -27,7 +27,6 @@ import os
 from PIL import Image
 import matplotlib.pyplot as plt
 import interbank_lenderchange as lc
-from progress.bar import Bar
 import pandas as pd
 import lxml.etree
 import lxml.builder
@@ -623,6 +622,7 @@ class Log:
             self.progress_bar = Gui()
             self.progress_bar.progress_bar(message, maximum)
         else:
+            from progress.bar import Bar
             self.progress_bar = Bar(message, max=maximum)
 
     @staticmethod
@@ -777,7 +777,7 @@ class Model:
 
     def configure(self, **configuration):
         for attribute in configuration:
-            if attribute.startswith('lc'):
+            if attribute.startswith('lc'): #TODO
                 attribute = attribute.replace("lc_", "")
                 if attribute == 'lc':
                     self.config.lender_change = lc.determine_algorithm(configuration[attribute])
@@ -1388,7 +1388,7 @@ class Utils:
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
         parser.add_argument("--lc_p", type=float, default=None,
                             help=f"For Erdos-Renyi bank lender's change value of p=0.0x")
-        parser.add_argument("--lc_m", type=int, default=None,
+        parser.add_argument("--lc_m", type=int, default=None, #todo
                             help=f"For Preferential bank lender's change value of graph grade m")
         parser.add_argument("--lc", type=str, default="default",
                             help="Bank lender's change method (?=list)")
@@ -1455,9 +1455,14 @@ class Utils:
 
 model = Model()
 if Utils.is_notebook():
+    model.statistics.OUTPUT_DIRECTORY = '/content'
+    model.statistics.output_format = 'csv'
     # if we are running in a Notebook:
-    Utils.run()
+    Utils.run(save="results")
 else:
     # if we are running interactively:
     if __name__ == "__main__":
         Utils.run_interactive()
+
+# %%
+

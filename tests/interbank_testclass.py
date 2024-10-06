@@ -50,7 +50,7 @@ class InterbankTest(unittest.TestCase):
         bank.D = D
 
     def assertBank(self, bank: interbank.Bank, C: float=None, L: float=None, D: float=None, E: float=None,
-                                              paidloan:float=None, s:float=None, d:float=None,
+                                              paid_loan:float=None, s:float=None, d:float=None,
                                               B:float=None, bankrupted:bool=False ):
         if L:
             self.assertEqual(bank.L, L)
@@ -60,8 +60,8 @@ class InterbankTest(unittest.TestCase):
             self.assertEqual(bank.C, C)
         if D:
             self.assertEqual(bank.D, D)
-        if paidloan:
-            self.assertEqual(bank.paidloan,paidloan)
+        if paid_loan:
+            self.assertEqual(bank.paid_loan,paid_loan)
         if d:
             self.assertEqual(bank.d,d)
         if s:
