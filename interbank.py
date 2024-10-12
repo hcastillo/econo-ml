@@ -1032,7 +1032,6 @@ class Model:
             self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
-        self.firesalesL = 0
         for bank in self.banks:
             # decrement in which we should borrow
             if bank.d > 0:
@@ -1119,7 +1118,7 @@ class Model:
         for bank in self.banks:
             bank.activeBorrowers = {}
             if bank.failed:
-                bank.replaceBank()
+                bank.replace_bank()
         self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
                        f"failures={self.statistics.bankruptcy[self.t]}")
 
@@ -1281,11 +1280,11 @@ class Bank:
         self.asset_i = 0
         self.asset_j = 0
 
-    def replaceBank(self):
+    def replace_bank(self):
         self.failures += 1
         self.__assign_defaults__()
 
-    def __doBankruptcy__(self, phase):
+    def __do_bankruptcy__(self, phase):
         self.failed = True
         self.model.statistics.bankruptcy[self.model.t] += 1
         recovered_in_fire_sales = self.L * self.model.config.ro  # we firesale what we have
@@ -1323,7 +1322,7 @@ class Bank:
         if costOfSell > self.L:
             self.model.log.debug(phase,
                                  f"{self.getId()} impossible fire sale sellL={costOfSell:.3f} > L={self.L:.3f}: {reason}")
-            return self.__doBankruptcy__(phase)
+            return self.__do_bankruptcy__(phase)
         else:
             self.L -= costOfSell
             self.E -= recoveredE
@@ -1331,12 +1330,12 @@ class Bank:
             if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,
                                      f"{self.getId()} new L={self.L:.3f} makes bankruptcy of bank: {reason}")
-                return self.__doBankruptcy__(phase)
+                return self.__do_bankruptcy__(phase)
             else:
                 if self.E <= self.model.config.alfa:
                     self.model.log.debug(phase,
                                          f"{self.getId()} new E={self.E:.3f} makes bankruptcy of bank: {reason}")
-                    return self.__doBankruptcy__(phase)
+                    return self.__do_bankruptcy__(phase)
                 else:
                     self.model.log.debug(phase,
                                          f"{self.getId()} fire sale sellL={amountToSell:.3f} at cost {costOfSell:.3f} reducing" +
