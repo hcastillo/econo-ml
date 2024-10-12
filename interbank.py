@@ -80,8 +80,8 @@ class Config:
     ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate': True, 'asset_i': True, 'asset_j': True,
                            'equity': True, 'bankruptcy': True, 'credit_channels': True, 'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
-                           'rationing': False, 'leverage': False, 'loans': False, 'num_lenders': False,
-                           'num_borrowers': False, 'prob_bankruptcy': False}
+                           'rationing_shock1': True, 'rationing_shock2' : True, 'leverage': False, 'loans': False,
+                           'num_lenders': False, 'num_borrowers': False, 'prob_bankruptcy': False}
 
     def __str__(self):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -104,7 +104,8 @@ class Statistics:
     interest_rate = []
     incrementD = []
     fitness = []
-    rationing = []
+    rationing_shock1 = []
+    rationing_shock2 = []
     leverage = []
     loans = []
     asset_i = []
@@ -153,7 +154,8 @@ class Statistics:
         self.equity = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
-        self.rationing = np.zeros(self.model.config.T, dtype=float)
+        self.rationing_shock1 = np.zeros(self.model.config.T, dtype=float)
+        self.rationing_shock2 = np.zeros(self.model.config.T, dtype=float)
         self.leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
         self.P = np.zeros(self.model.config.T, dtype=float)
@@ -251,7 +253,8 @@ class Statistics:
         self.B[self.model.t] = sum(map(lambda x: x.B, self.model.banks))
 
     def compute_rationing(self):
-        self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
+        self.rationing_shock1[self.model.t] = sum(map(lambda x: x.rationing_shock1, self.model.banks))
+        self.rationing_shock2[self.model.t] = sum(map(lambda x: x.rationing_shock2, self.model.banks))
 
     def compute_probability_of_lender_change(self):
         probabilities = [bank.P for bank in self.model.banks]
@@ -339,7 +342,7 @@ class Statistics:
                     continue
                 images.append(Image.open(image_file))
             images[0].save(fp=filename_output, format='GIF', append_images=images[1:],
-                           save_all=True, duration=100, logit op=0)
+                           save_all=True, duration=100, loop=0)
 
     def get_export_path(self, filename, ending_name=''):
         # we ensure that the output goes to OUTPUT_DIRECTORY:
@@ -560,6 +563,25 @@ class Statistics:
                          'prob_change_lender', "Prob of change lender " + self.model.config.lender_change.describe(),
                          export_datafile, 'Time', '')
 
+
+    # def plot_rationing_shock1(self, export_datafile=None):
+    #     pass
+    #
+    # def plot_rationing_shock2(self, export_datafile=None):
+    #     xx = []
+    #     yy = []
+    #     yy2 = []
+    #     for i in range(self.model.config.T):
+    #         xx.append(i)
+    #         yy.append(self.rationing_shock1[i] / self.model.config.N)
+    #         yy2.append(self.rationing_shock2[i] / self.model.config.N)
+    #     self.plot_pyplot(xx, [(yy, 'blue', '-', 'After shock1'),
+    #                           (yy2, "red", '-', "After shock2")
+    #                           ],
+    #                      'rationing', "Average rationing of credit",
+    #                      export_datafile.replace('_shock2',''),
+    #                      f"Time",
+    #                      "Average of rationing per bank in each phase")
 
     def plot_best_lender(self, export_datafile=None):
         xx = []
@@ -1010,25 +1032,27 @@ class Model:
             self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
+        self.firesalesL = 0
         for bank in self.banks:
             # decrement in which we should borrow
             if bank.d > 0:
                 if bank.getLender() is None:
                     bank.l = 0
+                    bank.rationing_shock1 = bank.d
                     # new situation: the bank has no borrower, so we should firesale or die:
-                    bank.doFiresalesL(bank.d, f"no lender for this bank", "loans")
-                    bank.rationing = bank.d
+                    bank.do_firesales(bank.rationing_shock1, f"no lender for this bank", "loans")
                 elif bank.getLender().d > 0:
                     # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
-                    bank.doFiresalesL(bank.d, f"lender {bank.getLender().getId(short=True)} has no money", "loans")
-                    bank.rationing = bank.d
+                    bank.rationing_shock1 = bank.d
+                    bank.do_firesales(bank.rationing_shock1,
+                                      f"lender {bank.getLender().getId(short=True)} has no money", "loans")
                     bank.l = 0
                 else:
                     # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
                     if bank.d > bank.getLender().s:
-                        bank.doFiresalesL(bank.d - bank.getLender().s,
+                        bank.rationing_shock1 = bank.d - bank.getLender().s
+                        bank.do_firesales(bank.rationing_shock1,
                                           f"lender.s={bank.getLender().s:.3f} but need d={bank.d:.3f}", "loans")
-                        bank.rationing = bank.d - bank.getLender().s
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.getLender().s > 0:
                             bank.l = bank.getLender().s  # amount of loan (wrote in the borrower)
@@ -1066,10 +1090,10 @@ class Model:
                 loan_to_return = bank.l + loan_profits
                 # (equation 3)
                 if loan_to_return > bank.C:
-                    we_need_to_sell = loan_to_return - bank.C
+                    bank.rationing_shock2 = loan_to_return - bank.C
                     bank.C = 0
-                    bank.paid_loan = bank.doFiresalesL(
-                        we_need_to_sell,
+                    bank.paid_loan = bank.do_firesales(
+                        bank.rationing_shock2,
                         f"to return loan and interest {loan_to_return:.3f} > C={bank.C:.3f}",
                         "repay")
                 # the firesales of line above could bankrupt the bank, if not, we pay "normally" the loan:
@@ -1090,7 +1114,7 @@ class Model:
         # (now we have the loans cancelled, or the bank bankrputed):
         for bank in self.banks:
             if bank.d > 0 and not bank.failed:
-                bank.doFiresalesL(bank.d, f"fire sales due to not enough C", "repay")
+                bank.do_firesales(bank.d, f"fire sales due to not enough C", "repay")
 
         for bank in self.banks:
             bank.activeBorrowers = {}
@@ -1102,7 +1126,8 @@ class Model:
     def initialize_step(self):
         for bank in self.banks:
             bank.B = 0
-            bank.rationing = 0
+            bank.rationing_shock1 = 0
+            bank.rationing_shock2 = 0
         # self.config.lender_change.initialize_step(self)
         if self.t == 0:
             self.log.debug_banks()
@@ -1235,7 +1260,8 @@ class Bank:
         self.id = new_id
         self.model = bank_model
         self.failures = 0
-        self.rationing = 0
+        self.rationing_shock1 = 0
+        self.rationing_shock2 = 0
         self.lender = None
         self.__assign_defaults__()
 
@@ -1291,7 +1317,7 @@ class Bank:
             self.getLender().s -= self.l
             del self.getLender().activeBorrowers[self.id]
 
-    def doFiresalesL(self, amountToSell, reason, phase):
+    def do_firesales(self, amountToSell, reason, phase):
         costOfSell = amountToSell / self.model.config.ro
         recoveredE = costOfSell * (1 - self.model.config.ro)
         if costOfSell > self.L:

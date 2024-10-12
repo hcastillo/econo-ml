@@ -4,7 +4,7 @@ LenderChange is a class used from interbank.py to control the change of lender i
    It contains different
     - Boltzman           using Boltzman probability to change
     - InitialStability   using a Barabási–Albert graph to initially assign relationships between banks
-    - Preferential       using a Barabási-Albert with degree m to set up only a set o possible links between
+    - Preferential       using a Barabási-Albert with m edges for each new nde to set up only a set o links between
                             banks. In each step, new links between are set up based on the initial graph
     - RestrictedMarket   using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
                             lender for each bank, it replicates the situation after a crisis when banks do not credit
