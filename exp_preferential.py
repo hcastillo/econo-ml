@@ -15,10 +15,10 @@ class PreferentialRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 1
 
-    OUTPUT_DIRECTORY = "experiments/preferential"
+    OUTPUT_DIRECTORY = "../experiments/preferential"
     ALGORITHM = Preferential
-    COMPARING_DATA = "experiments/boltzman"
-    COMPARING_LABEL = "Boltzman"
+    COMPARING_DATA = "experiments/boltzmann"
+    COMPARING_LABEL = "Boltzmann"
 
     parameters = {  # items should be iterable:
         "m": np.linspace(1, 49, num=49),

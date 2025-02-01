@@ -27,7 +27,7 @@ class InterbankTest(unittest.TestCase):
     def __check_values__(self,bank,name,value):
         if value<0:
             self.model.log.debug("******",
-                                  f"{bank.getId()} value {name}={value} <0 is not valid: I changed it to 0")
+                                  f"{bank.get_id()} value {name}={value} <0 is not valid: I changed it to 0")
             return 0
         else:
             return value
@@ -43,7 +43,7 @@ class InterbankTest(unittest.TestCase):
             if E<0:
                 E = 0
             self.model.log.debug("******",
-                                  f"{bank.getId()}  L+C must be equal to D+E => E modified to {E:.3f}")
+                                  f"{bank.get_id()}  L+C must be equal to D+E => E modified to {E:.3f}")
         bank.L = L
         bank.E = E
         bank.C = C
@@ -81,7 +81,7 @@ def mockedShock(model,whichShock):
         if bank.D + bank.incrD < 0:
             bank.incrD = bank.D + bank.incrD if bank.D > 0 else 0
             model.log.debug("******",
-                        f"{bank.getId()} modified simulated ΔD={bank.incrD:.3f} because we had only D={bank.D:.3f}")
+                        f"{bank.get_id()} modified simulated ΔD={bank.incrD:.3f} because we had only D={bank.D:.3f}")
         bank.D += bank.incrD
         if bank.incrD >= 0:
             bank.C += bank.incrD
@@ -89,7 +89,7 @@ def mockedShock(model,whichShock):
                 bank.s = bank.C  # lender capital to borrow
             bank.d = 0  # it will not need to borrow
             if bank.incrD > 0:
-                model.log.debug(whichShock, f"{bank.getId()} wins ΔD={bank.incrD:.3f}")
+                model.log.debug(whichShock, f"{bank.get_id()} wins ΔD={bank.incrD:.3f}")
 
         else:
             if whichShock == "shock1":
@@ -98,10 +98,10 @@ def mockedShock(model,whichShock):
                 bank.d = 0  # it will not need to borrow
                 bank.C += bank.incrD
                 model.log.debug(whichShock,
-                                     f"{bank.getId()} loses ΔD={bank.incrD:.3f}, covered by capital, now C={bank.C:.3f}")
+                                     f"{bank.get_id()} loses ΔD={bank.incrD:.3f}, covered by capital, now C={bank.C:.3f}")
             else:
                 bank.d = abs(bank.incrD + bank.C)  # it will need money
                 model.log.debug(whichShock,
-                                     f"{bank.getId()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}, now C=0")
+                                     f"{bank.get_id()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}, now C=0")
                 bank.C = 0  # we run out of capital
         model.statistics.incrementD[model.t] += bank.incrD

@@ -313,6 +313,7 @@ class ExperimentRun:
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
                   f"{self.OUTPUT_DIRECTORY}/", results_comparing)
+        return results_to_plot, results_x_axis
 
 
 class Runner:
@@ -343,5 +344,6 @@ class Runner:
             experiment.listnames()
         elif args.do:
             experiment.do(args.clear)
+            return experiment
         else:
             parser.print_help()

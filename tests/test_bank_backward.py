@@ -21,7 +21,7 @@ class BankTestCase(unittest.TestCase):
         for i in range(10):
             before_C.append( self.model.banks[i].C )
             before_D.append( self.model.banks[i].D )
-            banks_ids.append( self.model.banks[i].getId() )
+            banks_ids.append(self.model.banks[i].get_id())
 
         self.model.forward()
         # self.model.log.debug_banks()
@@ -31,8 +31,8 @@ class BankTestCase(unittest.TestCase):
         self.model.backward()
         self.model.log.debug_banks()
         for i in range(10):
-            if banks_ids[i] == self.model.banks[i].getId():
-                bankd_id = self.model.banks[i].getId()
+            if banks_ids[i] == self.model.banks[i].get_id():
+                bankd_id = self.model.banks[i].get_id()
                 self.assertNotEqual(before_D[i], temporary_D[i],
                                     f"r of #{bankd_id} should change from t={self.model.t} to t={self.model.t+1}")
                 self.assertEqual(before_D[i], self.model.banks[i].D,

@@ -15,8 +15,8 @@ class ShockedMarketRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 10
 
-    COMPARING_DATA = "experiments/boltzman"
-    COMPARING_LABEL = "Boltzman"
+    COMPARING_DATA = "../experiments/boltzmann"
+    COMPARING_LABEL = "Boltzmann"
     ALGORITHM = ShockedMarket
     OUTPUT_DIRECTORY = "experiments/shockedmarket"
 
@@ -28,7 +28,7 @@ class ShockedMarketRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_CONFIG = 1
 
     seed = 988994
-    seed_offset = 0
+    seed_offset = 1
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()

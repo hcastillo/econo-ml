@@ -111,7 +111,7 @@ def save_graph_png(graph, description, filename, add_info=False):
     if add_info:
         if not description:
             description = ""
-        description += " "+GraphStatistics.describe(graph)
+        description += " " + GraphStatistics.describe(graph)
 
     fig = plt.figure(layout="constrained")
     gs = gridspec.GridSpec(4, 4, figure=fig)
@@ -230,13 +230,19 @@ def get_graph_from_guru(input_graph):
 
 def from_graph_to_array_banks(banks_graph, this_model):
     """ From the graph to a lender for each possible bank (or None if no links in the graph)"""
+    if not banks_graph.is_directed():
+        banks_graph = banks_graph.to_directed()
     for node in banks_graph:
-        if banks_graph.out_edges(node):
-            edges = list(banks_graph.out_edges(node))
-            edge_selected = random.randrange(len(edges))
-            this_model.banks[node].lender = edges[edge_selected][1]
-        else:
-            this_model.banks[node].lender = None
+        this_model.banks[node].lender = get_new_out_edge(banks_graph, node)
+
+
+def get_new_out_edge(banks_graph, node):
+    if banks_graph.out_edges(node):
+        edges = list(banks_graph.out_edges(node))
+        edge_selected = random.randrange(len(edges))
+        return edges[edge_selected][1]
+    else:
+        return None
 
 
 # ---------------------------------------------------------
@@ -254,7 +260,11 @@ class LenderChange:
 
     def step_setup_links(self, this_model):
         """ Call at the end of each step """
-        pass
+        # if we remove banks from the array of banks, and there is no step_setup_links() code itself defined
+        # in the LenderChange() class, we should at least call initialize_bank_relationships() to be sure
+        # there are no links to removed banks:
+        if not this_model.config.allow_replacement_of_bankrupted:
+            self.initialize_bank_relationships(this_model)
 
     def change_lender(self, this_model, bank, t):
         """ Call at the end of each step before going to the next"""
@@ -287,8 +297,8 @@ class LenderChange:
 # ---------------------------------------------------------
 
 
-class Boltzman(LenderChange):
-    """It chooses randomly a lender for each bank and in each step changes using Boltzman's probability
+class Boltzmann(LenderChange):
+    """It chooses randomly a lender for each bank and in each step changes using Boltzmann's probability
          Also it has parameter γ to control the change [0..1], 0=Boltzmann only, 1 everyone will move randomly
     """
     # parameter to control the change of guru: 0 then Boltzmann only, 1 everyone will move randomly
@@ -309,10 +319,10 @@ class Boltzman(LenderChange):
             possible_lender_mi = 0
         else:
             possible_lender_mi = this_model.banks[possible_lender].mu
-        if bank.getLender() is None:
+        if bank.get_lender() is None:
             current_lender_mi = 0
         else:
-            current_lender_mi = bank.getLender().mu
+            current_lender_mi = bank.get_lender().mu
 
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)
@@ -331,10 +341,10 @@ class Boltzman(LenderChange):
             bank.P = self.gamma * bank.P_yesterday + (1 - self.gamma) * boltzmann
 
         if bank.P >= self.CHANGE_LENDER_IF_HIGHER:
-            text_to_return = f"{bank.getId()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}"
+            text_to_return = f"{bank.get_id()} new lender is #{possible_lender} from #{bank.lender} with %{bank.P:.3f}"
             bank.lender = possible_lender
         else:
-            text_to_return = f"{bank.getId()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}"
+            text_to_return = f"{bank.get_id()} maintains lender #{bank.lender} with %{1 - bank.P:.3f}"
         return text_to_return
 
     def new_lender(self, this_model, bank):
@@ -342,7 +352,7 @@ class Boltzman(LenderChange):
         # r_i0 is used the first time the bank is created:
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-            bank.rij[bank.id] = 0
+            bank.rij[bank.get_pos()] = 0
             bank.r = this_model.config.r_i0
             bank.mu = 0
             bank.asset_i = 0
@@ -357,14 +367,14 @@ class Boltzman(LenderChange):
         if this_model.config.N == 2:
             new_value = 1 if bank.id == 0 else 0
         else:
-            if new_value >= bank.id:
+            if new_value >= bank.get_pos():
                 new_value += 1
                 if bank.lender is not None and new_value >= bank.lender:
                     new_value += 1
             else:
                 if bank.lender is not None and new_value >= bank.lender:
                     new_value += 1
-                    if new_value >= bank.id:
+                    if new_value >= bank.get_pos():
                         new_value += 1
         return new_value
 
@@ -372,7 +382,7 @@ class Boltzman(LenderChange):
         return f"($\\gamma={self.gamma} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
 
 
-class InitialStability(Boltzman):
+class InitialStability(Boltzmann):
     """ We define a Barabási–Albert graph with 1 edges for each node, and we convert it to a directed graph.
           It is used for initially have more stable links between banks
     """
@@ -409,60 +419,7 @@ class InitialStability(Boltzman):
         return self.banks_graph
 
 
-class RestrictedMarket(LenderChange):
-    """ Using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
-          lender for each bank, it replicates the situation after a crisis when banks do not credit
-
-    """
-
-    GRAPH_NAME = "erdos_renyi"
-
-    def check_parameter(self, name, value):
-        if name == 'p':
-            if isinstance(value, float) and 0 <= value <= 1:
-                return True
-            else:
-                print("value for 'p' should be a float number >= 0 and <= 1")
-                return False
-        else:
-            return False
-
-    def initialize_bank_relationships(self, this_model):
-        """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""
-        if self.initial_graph_file:
-            self.banks_graph = load_graph_json(self.initial_graph_file)
-            description = f"erdos_renyi from file {self.initial_graph_file}"
-        else:
-            self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
-            description = f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
-        self.banks_graph.type = self.GRAPH_NAME
-        if this_model.export_datafile:
-            save_graph_png(self.banks_graph, description,
-                           this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
-            save_graph_json(self.banks_graph,
-                            this_model.statistics.get_export_path(this_model.export_datafile,
-                                                                  f"_{self.GRAPH_NAME}.json"))
-
-        from_graph_to_array_banks(self.banks_graph, this_model)
-        if this_model.export_datafile:
-            this_model.statistics.get_graph(0)
-        return self.banks_graph
-
-    def new_lender(self, this_model, bank):
-        """ In this LenderChange we never change of lender """
-        bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-        bank.rij[bank.id] = 0
-        bank.r = this_model.config.r_i0
-        bank.mu = 0
-        return bank.lender
-
-    def change_lender(self, this_model, bank, t):
-        """ In this LenderChange we never change of lender """
-        bank.P = 0
-        return f"{bank.getId()} maintains lender #{bank.lender} with %1 (ShockedMarket)"
-
-
-class Preferential(Boltzman):
+class Preferential(Boltzmann):
     """ Using a Barabasi with grade m we restrict to those relations the possibilities to obtain an outgoing link
           (a lender). To improve the specialization of banks, granting 3*C0 to the guru, 2*C0 to its neighbours
           and C to the others. To balance those with 2C0 and 3C0, we will reduce D
@@ -516,7 +473,6 @@ class Preferential(Boltzman):
     def step_setup_links(self, this_model):
         self.full_barabasi_extract_random_directed(this_model)
 
-
     def full_barabasi_extract_random_directed(self, this_model, current_node=None):
         if current_node is None:
             self.banks_graph = nx.DiGraph()
@@ -547,11 +503,11 @@ class Preferential(Boltzman):
     def new_lender(self, this_model, bank):
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-            bank.rij[bank.id] = 0
+            bank.rij[bank.get_pos()] = 0
             bank.r = this_model.config.r_i0
             bank.mu = 0
-        if self.banks_graph and self.banks_graph.out_edges() and self.banks_graph.out_edges(bank.id):
-            return list(self.banks_graph.out_edges(bank.id))[0][1]
+        if self.banks_graph and self.banks_graph.out_edges() and self.banks_graph.out_edges(bank.get_pos()):
+            return list(self.banks_graph.out_edges(bank.get_pos()))[0][1]
         else:
             return None
 
@@ -559,38 +515,35 @@ class Preferential(Boltzman):
         return f"($\\gamma={self.gamma} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
 
 
-class ShockedMarket(LenderChange):
-    """ Using an Erdos Renyi graph with p=parameter['p']. This method replicate RestrictedMarket
-        but using a new network relationship between banks, but always with same p. So the links
-        in t=i are destroyed and new aleatory links in t=i+1 are created using a new Erdos Renyi
-        graph.
+class RestrictedMarket(LenderChange):
+    """ Using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
+          lender for each bank, it replicates the situation after a crisis when banks do not credit
+
     """
 
     GRAPH_NAME = "erdos_renyi"
+
+    def generate_banks_graph(self, this_model):
+        result = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
+        return result, f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
 
     def check_parameter(self, name, value):
         if name == 'p':
             if isinstance(value, float) and 0 <= value <= 1:
                 return True
             else:
-                print(f"value for 'p' should be a float number >= 0 and <= 1: {value}")
+                print("value for 'p' should be a float number >= 0 and <= 1")
                 return False
         else:
             return False
 
-    def step_setup_links(self, this_model):
-        self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
-        self.banks_graph.type = self.GRAPH_NAME
-        from_graph_to_array_banks(self.banks_graph, this_model)
-
     def initialize_bank_relationships(self, this_model):
-        """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships till the end"""
+        """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""
         if self.initial_graph_file:
             self.banks_graph = load_graph_json(self.initial_graph_file)
-            description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
+            description = f"from file {self.initial_graph_file}"
         else:
-            self.banks_graph = nx.erdos_renyi_graph(this_model.config.N, self.parameter['p'], directed=True)
-            description = f"{self.GRAPH_NAME} p={self.parameter['p']:5.3} {GraphStatistics.describe(self.banks_graph)}"
+            self.banks_graph, description = self.generate_banks_graph(this_model)
         self.banks_graph.type = self.GRAPH_NAME
         if this_model.export_datafile:
             save_graph_png(self.banks_graph, description,
@@ -607,18 +560,35 @@ class ShockedMarket(LenderChange):
     def new_lender(self, this_model, bank):
         """ In this LenderChange we never change of lender """
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-        bank.rij[bank.id] = 0
+        bank.rij[bank.get_pos()] = 0
         bank.r = this_model.config.r_i0
-        bank.asset_i = 0
-        bank.asset_j = 0
-        bank.asset_equity = 0
         bank.mu = 0
         return bank.lender
 
     def change_lender(self, this_model, bank, t):
         """ In this LenderChange we never change of lender """
         bank.P = 0
-        return f"{bank.getId()} maintains lender #{bank.lender} with %1 (ShockedMarket)"
+        return f"{bank.get_id()} maintains lender #{bank.lender} with %1"
+
+
+class ShockedMarket(RestrictedMarket):
+    """ Using an Erdos Renyi graph with p=parameter['p']. This method replicate RestrictedMarket
+        but using a new network relationship between banks, but always with same p. So the links
+        in t=i are destroyed and new aleatory links in t=i+1 are created using a new Erdos Renyi
+        graph.
+    """
+
+    def new_lender(self, this_model, bank):
+        bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
+        bank.rij[bank.get_pos()] = 0
+        bank.r = this_model.config.r_i0
+        bank.asset_i = 0
+        bank.asset_j = 0
+        bank.asset_equity = 0
+        bank.mu = 0
+        if bank.lender is not None and bank.lender >= this_model.config.N:
+            bank.lender = get_new_out_edge(self.banks_graph, bank.get_pos())
+        return bank.lender
 
 
 class SmallWorld(ShockedMarket):
@@ -713,3 +683,27 @@ class SmallWorld(ShockedMarket):
                                                                   f"_{self.GRAPH_NAME}.json"))
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
+
+
+class SmallWorld1(ShockedMarket):
+    """ SmallWorld implementation using Watts Strogatz with random connections each step from a fixed
+        initial graph
+    """
+    GRAPH_NAME = 'watts_strogatz'
+    K = 6
+
+    def generate_banks_graph(self, this_model):
+        result = nx.watts_strogatz_graph(this_model.config.N, self.K, self.parameter['p'])
+        return result, f"watts_strogatz p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
+
+
+class SmallWorld2(RestrictedMarket):
+    """ SmallWorld implementation using Watts Strogatz with random connections each step from a random
+        graph each step
+    """
+    GRAPH_NAME = 'watts_strogatz'
+    K = 4
+
+    def generate_banks_graph(self, this_model):
+        result = nx.watts_strogatz_graph(this_model.config.N, self.K, self.parameter['p'])
+        return result, f"watts_strogatz p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"

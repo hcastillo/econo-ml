@@ -15,7 +15,7 @@ class RestrictedMarketRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 2
 
-    OUTPUT_DIRECTORY = "experiments/restrictedmarket2"
+    OUTPUT_DIRECTORY = "../experiments/restrictedmarket"
     ALGORITHM = RestrictedMarket
 
     parameters = {  # items should be iterable:
