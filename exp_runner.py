@@ -17,7 +17,6 @@ from progress.bar import Bar
 import os
 import matplotlib.pyplot as plt
 from itertools import product
-import networkx as nx
 import lxml.etree
 import lxml.builder
 import gzip

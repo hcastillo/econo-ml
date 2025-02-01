@@ -17,13 +17,13 @@ import matplotlib.pyplot as plt
 class ShockedMarketSurvivingRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 1
+    MC = 20
 
     ALGORITHM = ShockedMarket
     OUTPUT_DIRECTORY = "../experiments/surviving"
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.05, 0.3, num=2),
+        "p": np.linspace(0.05, 0.3, num=4),
     }
 
     LENGTH_FILENAME_PARAMETER = 5

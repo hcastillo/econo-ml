@@ -293,7 +293,7 @@ class Statistics:
             self.graphs[t] = nx.DiGraph(directed=True)
             for bank in self.model.banks:
                 if bank.lender is not None:
-                    self.graphs[t].add_edge(bank.get_pos(), bank.lender)
+                    self.graphs[t].add_edge(bank.lender, bank.get_pos())
             lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
             if Utils.is_spyder():
                 plt.show()
