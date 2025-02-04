@@ -13,15 +13,16 @@ import exp_runner
 class ShockedMarketRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 20
+    MC = 50
 
     COMPARING_DATA = "../experiments/boltzmann"
     COMPARING_LABEL = "Boltzmann"
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "experiments/shockedmarket"
+    OUTPUT_DIRECTORY = "../experiments/shockedmarket"
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.001, 0.100, num=200),
+        # "p": np.linspace(0.001, 0.100, num=200),
+        "p" : { 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 1 }
     }
 
     LENGTH_FILENAME_PARAMETER = 5

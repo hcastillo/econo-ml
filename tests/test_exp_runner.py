@@ -1,0 +1,54 @@
+# -*- coding: utf-8 -*-
+
+import unittest
+import exp_runner
+import interbank
+import interbank_lenderchange
+import numpy as np
+import pandas as pd
+from mock import patch
+from pathlib import Path
+
+
+def get_statistics_of_graphs_mocked(_, _b, _c):
+    pass
+
+
+class ExpRunnerTestCase(unittest.TestCase):
+
+    @patch.object(exp_runner.ExperimentRun, "get_statistics_of_graphs", get_statistics_of_graphs_mocked)
+    def setUp(self):
+        #self.runner = exp_runner.Runner()
+        #self.runner.do(MockedRunner)
+        self.runner = MockedRunner()
+        self.runner.do()
+
+    def test_values_after_execution(self):
+        self.assertIsInstance(self.runner, exp_runner.ExperimentRun)
+        self.assertEqual(len(self.runner.parameters['p']), 10)
+        self.assertEqual(self.runner.parameters['p'][1], 0.11111111111111112)
+        self.assertTrue(Path("output/test_rationing.png").is_file())
+        #self.assertEqual(self.runner.get_models()[-2], 'p01880')
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class MockedRunner(exp_runner.ExperimentRun):
+    N = 5
+    T = 100
+    MC = 1
+
+    ALGORITHM = interbank_lenderchange.RestrictedMarket
+    OUTPUT_DIRECTORY = "output"
+
+    parameters = {  # items should be iterable:
+        "p": np.linspace(0.1, 0.2, num=10),
+    }
+
+    def run_model(self, filename, execution_config, execution_parameters, seed_random):
+        model = interbank.Model()
+        model.config.lender_change = self.ALGORITHM()
+        model.config.lender_change.set_parameter("p", execution_parameters["p"])
+        return pd.DataFrame({'seed': [seed_random]})

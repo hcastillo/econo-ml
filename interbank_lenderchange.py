@@ -175,6 +175,38 @@ def find_guru(graph):
     return guru_node, guru_node_edges
 
 
+class WattsStrogatzGraph:
+    def ring_lattice_edges(self, nodes, k):
+        half = k // 2
+        n = len(nodes)
+        for i, v in enumerate(nodes):
+            for j in range(i + 1, i + half + 1):
+                w = nodes[j % n]
+                yield v, w
+
+    def make_ring_lattice(self, n, k):
+        G = nx.DiGraph()
+        nodes = range(n)
+        G.add_nodes_from(nodes)
+        edges = self.ring_lattice_edges(nodes, k)
+        G.add_edges_from(edges)
+        return G
+
+    def rewire(self, G, p):
+        for v, w in G.copy().edges():
+            if random.random() < p:
+                G.remove_edge(v, w)
+                choices = set(G) - {v} - set(G[v])
+                new_w = random.choice(list(choices))
+                G.add_edge(v, new_w)
+
+    def new(self, n, p):
+        G = self.make_ring_lattice(n=n, k=2)
+        self.rewire(G, p)
+        return G
+
+
+
 class GraphStatistics:
     @staticmethod
     def giant_component_size(graph):
@@ -288,7 +320,7 @@ class LenderChange:
     def set_parameter(self, name, value):
         if not value is None:
             if self.check_parameter(name, value):
-                self.parameter[name] = value
+                self.parameter[name] = float(value)
             else:
                 print(f"error with parameter '{name}' for {self.__class__.__name__}")
                 sys.exit(-1)
@@ -434,7 +466,7 @@ class Preferential(Boltzmann):
             if isinstance(value, int) and 1 <= value:
                 return True
             else:
-                print("value for 'm' should be an integer >= 1")
+                print("value for 'm' should be an integer >= 1: %s" % value)
                 return False
         else:
             return False
@@ -534,15 +566,17 @@ class RestrictedMarket(LenderChange):
 
     def check_parameter(self, name, value):
         if name == 'p':
+            if isinstance(value, int):
+                value = float(value)
             if isinstance(value, float) and 0 <= value <= 1:
                 return True
             else:
-                print("value for 'p' should be a float number >= 0 and <= 1")
+                print("value for 'p' should be a float number >= 0 and <= 1: %s" % value)
                 return False
         else:
             return False
 
-    def initialize_bank_relationships(self, this_model):
+    def initialize_bank_relationships(self, this_model, save_graph=True):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""
         if self.initial_graph_file:
             self.banks_graph = load_graph_json(self.initial_graph_file)
@@ -550,7 +584,7 @@ class RestrictedMarket(LenderChange):
         else:
             self.banks_graph, description = self.generate_banks_graph(this_model)
         self.banks_graph.type = self.GRAPH_NAME
-        if this_model.export_datafile:
+        if this_model.export_datafile and save_graph:
             save_graph_png(self.banks_graph, description,
                            this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
             save_graph_json(self.banks_graph,
@@ -586,99 +620,50 @@ class ShockedMarket(RestrictedMarket):
 
     def step_setup_links(self, this_model):
         """ At the end of each step, a new graph is generated """
-        self.initialize_bank_relationships(this_model)
+        self.initialize_bank_relationships(this_model, save_graph=False)
 
 
 class SmallWorld(ShockedMarket):
     """ SmallWorld implementation using Watts Strogatz
     """
+    GRAPH_NAME = "watts_strogatz"
 
-    GRAPH_NAME = 'small_world'
-    # Each node is joined with its k nearest neighbors in a ring topology (Watts Strogatz parameter):
-    K = 5
+    def generate_banks_graph(self, this_model):
+        generator = WattsStrogatzGraph()
+        result = generator.new(n=this_model.config.N, p=self.parameter['p'])
+        return result, f"watts_strogatz p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
 
-    @staticmethod
-    def create_directed_graph_from_watts_strogatz(graph, result=None, pending=None, current_node=None):
-        # a) first time: look for extremes of the graph and use current_node to create links from them:
-        if result is None:
-            result = nx.DiGraph()
-            pending = list(graph.nodes())
-            # in each node with only one link, we start from it:
-            for node in graph.nodes():
-                edges = list(graph.edges(node))
-                if len(edges) == 1:
-                    SmallWorld.create_directed_graph_from_watts_strogatz(graph, result, pending, node)
-            # no nodes with only one option: we choose an arbitrary node to start:
-            if result.edges() == 0:
-                random_node = random.choice(graph.nodes())
-                SmallWorld.create_directed_graph_from_watts_strogatz(graph, result, pending, random_node)
-            SmallWorld.create_directed_graph_from_watts_strogatz(graph, result, pending)
-        elif current_node:
-            # b) nodes with an incoming link that we should follow (there's only that option)
-            source = current_node
-            destination = list(graph.edges(source))[0][1]
-            while not destination is None:
-                if destination not in result or len(result.in_edges(destination)) == 0:
-                    result.add_edge(source, destination)
-                    pending.remove(source)
-                    edges = list(graph.edges(destination))
-                    edges.remove((destination, source))
-                    source = destination
-                    if len(edges) == 1:
-                        destination = edges[0][1]
-                    else:
-                        destination = None
-                else:
-                    destination = None
-        elif pending:
-            # c) items with >1 node
-            for source in pending:
-                edges = list(graph.edges(source))
-                if result.has_node(source):
-                    for in_edges in result.in_edges(source):
-                        if (in_edges[1], in_edges[0]) in edges:
-                            edges.remove((in_edges[1], in_edges[0]))
-                if edges:
-                    new_link = random.choice(edges)
-                    result.add_edge(new_link[0], new_link[1])
-                else:
-                    result.add_node(source)
-        return result
 
-    def check_parameter(self, name, value):
-        if name == 'p':
-            if isinstance(value, float) and 0 <= value <= 1:
-                return True
-            else:
-                print("value for 'p' should be a float number >= 0 and <= 1")
-                return False
-        else:
-            return False
-
-    def step_setup_links(self, this_model):
-        self.banks_graph = SmallWorld.create_directed_graph_from_watts_strogatz(self.banks_smallworld)
-        self.banks_graph.type = self.GRAPH_NAME
-        from_graph_to_array_banks(self.banks_graph, this_model)
-
-    def initialize_bank_relationships(self, this_model):
-        """ It creates a small world graph using Watts Strogatz. It's indirected and we directed it using an own
-                algorithm which guarantees 1 output link only for each node (only a lender for each bank)
-            """
+    def initialize_bank_relationships(self, this_model, save_graph=True):
+        """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""
         if self.initial_graph_file:
-            self.banks_smallworld = load_graph_json(self.initial_graph_file)
-            self.description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
+            self.banks_graph = load_graph_json(self.initial_graph_file)
+            description = f"from file {self.initial_graph_file}"
         else:
-            self.banks_smallworld = nx.watts_strogatz_graph(this_model.config.N, self.K, self.parameter['p'])
-            self.description = f"{self.GRAPH_NAME} p={self.parameter['p']:5.3}"
-        self.banks_graph = SmallWorld.create_directed_graph_from_watts_strogatz(self.banks_smallworld)
-        self.description += f"{GraphStatistics.describe(self.banks_graph)}"
+            self.banks_graph, description = self.generate_banks_graph(this_model)
         self.banks_graph.type = self.GRAPH_NAME
-        if this_model.export_datafile:
-            save_graph_png(self.banks_graph, self.description,
+        if this_model.export_datafile and save_graph:
+            save_graph_png(self.banks_graph, description,
                            this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
             save_graph_json(self.banks_graph,
                             this_model.statistics.get_export_path(this_model.export_datafile,
                                                                   f"_{self.GRAPH_NAME}.json"))
-        from_graph_to_array_banks(self.banks_graph, this_model)
+        for (borrower, lender_for_borrower) in self.banks_graph.edges():
+            this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
 
+    def new_lender(self, this_model, bank):
+        """ We return the same lender we have created in self.banks_graph """
+        bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
+        bank.rij[bank.get_pos()] = 0
+        bank.r = this_model.config.r_i0
+        bank.mu = 0
+        bank.asset_i = 0
+        bank.asset_j = 0
+        bank.asset_equity = 0
+        return bank.lender
+
+    def change_lender(self, this_model, bank, t):
+        """ We return the same lender we have created in self.banks_graph """
+        bank.P = 0
+        return f"{bank.get_id()} maintains lender #{bank.lender} with %1"
