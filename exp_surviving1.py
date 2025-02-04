@@ -92,14 +92,14 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
                 total += another
             result_this_iteration = total / len(data_of_failures_rationed[iteration])
             # now we have in result_this_iteration the average for each t, but we need to have the surviving, so we do a
-            # substraction starting in t=0 with RestrictedMarketSurvivingRun.N
+            # subtraction starting in t=0 with RestrictedMarketSurvivingRun.N
             surviving_minus_failures_rationed = RestrictedMarketSurvivingRun.N
             for j in range(len(result_this_iteration)):
                 surviving_minus_failures_rationed -= result_this_iteration[j]
                 result_this_iteration[j] = surviving_minus_failures_rationed
             data_of_failures_rationed_avg[iteration] = result_this_iteration
         for iteration in data_of_failures_not_rationed:
-            # we should do the average of each MC serie (an array):
+            # we should do the average of each MC series (an array):
             total = data_of_failures_not_rationed[iteration][0]
             for another in data_of_failures_not_rationed[iteration][1:]:
                 total += another

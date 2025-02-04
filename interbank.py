@@ -9,7 +9,7 @@ Generates a simulation of an interbank network following the rules described in 
     #   # step by step:
     #   model.enable_backward()
     #   model.forward() # t=0 -> t=1
-    #   model.backward() : reverts the last step (when executed
+    #   model.backward() : reverts the last step (when executed)
     #   # all in a loop:
     #   model.simulate_full()
 
@@ -83,7 +83,8 @@ class Config:
     # what elements are in the results.csv file, and also which are plot.
     # 1 if also plot, 0 not to plot:
     ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate': True, 'asset_i': True, 'asset_j': True,
-                           'equity': True, 'equity_borrowers': True, 'bankruptcy': True, 'credit_channels': True, 'P': True, 'best_lender': True,
+                           'equity': True, 'equity_borrowers': True, 'bankruptcy': True, 'credit_channels': True,
+                           'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'loans': False,
                            'num_lenders': False, 'num_borrowers': False, 'prob_bankruptcy': False,
@@ -238,7 +239,8 @@ class Statistics:
             self.asset_i[self.model.t] = sum_of_asset_i / num_of_banks_with_lenders
             self.asset_j[self.model.t] = sum_of_asset_j / num_of_banks_with_lenders
             self.equity[self.model.t] = sum_of_equity / num_of_banks_with_lenders
-            self.equity_borrowers[self.model.t] = sum_of_equity_borrowers / num_of_banks_with_borrowers if num_of_banks_with_borrowers else 0
+            self.equity_borrowers[self.model.t] = sum_of_equity_borrowers / num_of_banks_with_borrowers\
+                if num_of_banks_with_borrowers else 0
             self.loans[self.model.t] = sum_of_loans / num_of_banks_with_lenders
             self.leverage[self.model.t] = sum_of_leverage / num_of_banks_with_lenders
             self.num_lenders[self.model.t] = num_of_banks_with_lenders
@@ -504,7 +506,7 @@ class Statistics:
         graph.title.text = title.capitalize().replace("_", ' ')
         for (yy, color, ticks, title_y) in yy_s:
             data = []
-            if type(yy) == type(()):
+            if isinstance(yy, tuple):
                 for i in range(len(yy[0])):
                     data.append((yy[0][i], yy[1][i]))
             else:
@@ -527,7 +529,7 @@ class Statistics:
             plt.clf()
             plt.figure(figsize=(14, 6))
             for (yy, color, ticks, title_y) in yy_s:
-                if type(yy) == type(()):
+                if isinstance(yy,tuple):
                     plt.plot(yy[0], yy[1], ticks, color=color, label=title_y, linewidth=0.2)
                 else:
                     plt.plot(xx, yy, ticks, color=color, label=title_y)
@@ -635,8 +637,8 @@ class Log:
     progress_bar = None
     graphical = False
 
-    def __init__(self, model):
-        self.model = model
+    def __init__(self, its_model):
+        self.model = its_model
 
     def define_gui(self, gui):
         self.graphical = gui.gooey
@@ -1050,7 +1052,7 @@ class Model:
                 if bank.get_lender() is None:
                     bank.l = 0
                     bank.rationing = bank.d
-                    # new situation: the bank has no borrower, so we should firesale or die:
+                    # new situation: the bank has no borrower, so we should fire sale or die:
                     bank.do_fire_sales(bank.rationing, f"no lender for this bank", "loans")
                 elif bank.get_lender().d > 0:
                     # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
@@ -1122,7 +1124,7 @@ class Model:
                         f" {bank.get_lender().get_id()} (ΔE={loan_profits:.3f},ΔC={bank.l:.3f})")
 
         # now  when ΔD<0 it's time to use Capital or sell L again
-        # (now we have the loans cancelled, or the bank bankrputed):
+        # (now we have the loans cancelled, or the bank bankrupted):
         for bank in self.banks:
             if bank.d > 0 and not bank.failed:
                 bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
@@ -1176,12 +1178,12 @@ class Model:
         for bank in self.banks:
             bank.p = bank.E / maxE
             # leverage
-            bank._lambda = bank.l / bank.E
+            bank.lambda_ = bank.l / bank.E
             bank.incrD = 0
 
-        max_lambda = max(self.banks, key=lambda k: k._lambda)._lambda
+        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
         for bank in self.banks:
-            bank.h = bank._lambda / max_lambda if max_lambda > 0 else 0
+            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
             bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
 
         # determine c (lending capacity) for all other banks (to whom give loans):
@@ -1222,7 +1224,7 @@ class Model:
                         if bank_i.rij[j] < 0:
                             bank_i.rij[j] = self.config.r_i0
                 # the first t=1, maybe t=2, the shocks have not affected enough to use L (only C), so probably
-                # L and E are equal for all banks, and so max_lambda=anyλ and h=1 , so cij=(1-1)A=0, and r division
+                # L and E are equal for all banks, and so max_lambda=any λ and h=1 , so cij=(1-1)A=0, and r division
                 # by zero -> solution then is to use still r_i0:
                 except ZeroDivisionError:
                     bank_i.rij[j] = self.config.r_i0
@@ -1230,8 +1232,7 @@ class Model:
                 line1 += f"{bank_i.rij[j]:.3f},"
                 line2 += f"{bank_i.c[j]:.3f},"
             lines.append('  |' if lines else "c=|" + line2[:-1] + "| r=|" +
-                                             line1[
-                                             :-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i._lambda:.3f} ")
+                              line1[:-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
@@ -1242,7 +1243,7 @@ class Model:
             for line in lines:
                 self.log.debug("links", f"{line}")
         self.log.debug("links",
-                       f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
+              f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
 
         # (equation 7)
         log_info_1 = log_info_2 = ""
@@ -1360,7 +1361,7 @@ class Bank:
             self.get_lender().s -= self.l
             try:
                 del self.get_lender().active_borrowers[self.get_pos()]
-            except:
+            except IndexError:
                 pass
 
     def do_fire_sales(self, amount_to_sell, reason, phase):
@@ -1510,6 +1511,7 @@ class Utils:
         model.simulate_full(interactive=interactive)
         return model.finish()
 
+    # noinspection PyStatementEffect
     @staticmethod
     def is_notebook():
         try:

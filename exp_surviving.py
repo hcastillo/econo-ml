@@ -23,7 +23,8 @@ class ShockedMarketSurvivingRun(exp_runner.ExperimentRun):
     OUTPUT_DIRECTORY = "../experiments/surviving"
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.05, 0.3, num=4),
+        # "p": np.linspace(0.05, 0.3, num=4),
+        "p": {0.05, 0.3333333, 0.66666666, 0.99999999}
     }
 
     LENGTH_FILENAME_PARAMETER = 5
