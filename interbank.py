@@ -1267,7 +1267,7 @@ class Bank:
     """
 
     def get_lender(self):
-        if self.lender is None or self.lender >= len(self.model.banks):  # TODO #>=self.model.config.N:
+        if self.lender is None or self.lender >= len(self.model.banks):
             return None
         else:
             return self.model.banks[self.lender]
