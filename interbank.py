@@ -300,7 +300,7 @@ class Statistics:
             self.graphs[t] = nx.DiGraph(directed=True)
             for bank in self.model.banks:
                 if bank.lender is not None:
-                    self.graphs[t].add_edge(bank.lender, bank.get_pos())
+                    self.graphs[t].add_edge(bank.lender, bank.id)
             lc.draw(self.graphs[t], new_guru_look_for=True, title=f"t={t}")
             if Utils.is_spyder():
                 plt.show()
@@ -1086,7 +1086,7 @@ class Model:
             # the shock can be covered by own capital
             else:
                 bank.l = 0
-                if len(bank.active_borrowers) > 0:
+                if bank.active_borrowers:
                     list_borrowers = ""
                     amount_borrowed = 0
                     for bank_i in bank.active_borrowers:
@@ -1123,40 +1123,53 @@ class Model:
                         f"{bank.get_id()} pays loan {loan_to_return:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
                         f" {bank.get_lender().get_id()} (ΔE={loan_profits:.3f},ΔC={bank.l:.3f})")
 
-        # now  when ΔD<0 it's time to use Capital or sell L again
+        # now  when ΔD<0 it's time to use capital or sell L again
         # (now we have the loans cancelled, or the bank bankrupted):
         for bank in self.banks:
             if bank.d > 0 and not bank.failed:
                 bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
+
         self.statistics.bankruptcy_not_rationed[self.t] = self.replace_bankrupted_banks()
 
     def replace_bankrupted_banks(self):
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
         num_banks_failed_but_not_rationed = 0
-        for bank in self.banks:
-            bank.active_borrowers = {}
-            if bank.failed:
+        for bank_removed in self.banks:
+            if bank_removed.failed:
                 if self.config.allow_replacement_of_bankrupted:
-                    bank.replace_bank()
+                    bank_removed.replace_bank()
                 else:
-                    if bank.rationing == 0:
+                    if bank_removed.rationing == 0:
                         num_banks_failed_but_not_rationed += 1
-                    lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(bank)
+                    lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(bank_removed)
         self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
                        f"failures={self.statistics.bankruptcy[self.t]}")
         if not self.config.allow_replacement_of_bankrupted:
             # we update the number of banks we have:
             self.config.N -= len(lists_to_remove_because_replacement_of_bankrupted_is_disabled)
             # we remove the bank from the array:
-            for bank in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
-                self.log.debug("repay", f"{bank.get_id()} bankrupted and removed")
-                self.banks.remove(bank)
-            # we update the lenders of the banks (maybe is bankrupted the current):
-            for bank in self.banks:
-                if bank.lender is not None and bank.lender >= self.config.N:
-                    self.log.debug("repay", f"{bank.get_id()} changes of lender "
-                                            f"because previous bankrupted and was removed")
-                    bank.lender = self.config.lender_change.new_lender(self, bank)
+            for bank_removed in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
+                self.banks.remove(bank_removed)
+                self.log.debug("repay", f"{bank_removed.get_id()} bankrupted and removed")
+                for bank_i in self.banks:
+                    # we check the borrowers:
+                    for bank_j in list(bank_i.active_borrowers):
+                        # if the bankrupted is a borrower, simply remove it
+                        if bank_j == bank_removed.id:
+                            del bank_i.active_borrowers[bank_j]
+                        # if it is greater, it means that #n position now is #n-1
+                        elif bank_j > bank_removed.id:
+                            bank_i.active_borrowers[bank_j-1]=bank_i.active_borrowers[bank_j]
+                            del bank_i.active_borrowers[bank_j]
+                    # we check now if the disappeared is the lender:
+                    if bank_i.lender is None:
+                        pass
+                    elif bank_i.lender == bank_removed.id:
+                        # the lender has disappeared: a new one is needed
+                        bank_i.lender = self.config.lender_change.new_lender(self, bank_removed)
+                    elif bank_i.lender > bank_removed.id:
+                        # the lender #n is going to be #n-1 because the removed is before
+                        bank_i.lender -= 1
             self.log.debug("repay", f"now we have {self.config.N} banks")
         return num_banks_failed_but_not_rationed
 
@@ -1164,6 +1177,7 @@ class Model:
         for bank in self.banks:
             bank.B = 0
             bank.rationing = 0
+            bank.active_borrowers = {}
         # self.config.lender_change.initialize_step(self)
         if self.t == 0:
             self.log.debug_banks()
@@ -1190,7 +1204,7 @@ class Model:
         for bank in self.banks:
             bank.c = []
             for i in range(self.config.N):
-                c = 0 if i == bank.get_pos() else (1 - self.banks[i].h) * self.banks[i].A
+                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c.append(c)
 
         # (equation 6)
@@ -1278,7 +1292,7 @@ class Bank:
             return None
         else:
             # only we take in account if the bank has a lender active, so the others will return always None
-            return self.model.banks[self.lender].rij[self.get_pos()]
+            return self.model.banks[self.lender].rij[self.id]
 
     def get_id(self, short: bool = False):
         init = "bank#" if not short else "#"
@@ -1286,18 +1300,6 @@ class Bank:
             return f"{init}{self.id}.{self.failures}"
         else:
             return f"{init}{self.id}"
-
-    def get_pos(self):
-        if self.model.config.allow_replacement_of_bankrupted:
-            # if banks are the same number always, id==pos
-            return self.id
-        else:
-            # if we are removing banks, id is not the same as the position in array
-            # model.banks:
-            for i in range(len(self.model.banks)):
-                if self.model.banks[i].id == self.id:
-                    return i
-            return None
 
     def __init__(self, new_id, bank_model):
         self.id = new_id
@@ -1360,7 +1362,7 @@ class Bank:
         if self.get_lender() and self.id in self.get_lender().active_borrowers:
             self.get_lender().s -= self.l
             try:
-                del self.get_lender().active_borrowers[self.get_pos()]
+                del self.get_lender().active_borrowers[self.id]
             except IndexError:
                 pass
 

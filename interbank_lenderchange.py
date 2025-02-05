@@ -384,7 +384,7 @@ class Boltzmann(LenderChange):
         # r_i0 is used the first time the bank is created:
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-            bank.rij[bank.get_pos()] = 0
+            bank.rij[bank.id] = 0
             bank.r = this_model.config.r_i0
             bank.mu = 0
             bank.asset_i = 0
@@ -399,14 +399,14 @@ class Boltzmann(LenderChange):
         if this_model.config.N == 2:
             new_value = 1 if bank.id == 0 else 0
         else:
-            if new_value >= bank.get_pos():
+            if new_value >= bank.id:
                 new_value += 1
                 if bank.lender is not None and new_value >= bank.lender:
                     new_value += 1
             else:
                 if bank.lender is not None and new_value >= bank.lender:
                     new_value += 1
-                    if new_value >= bank.get_pos():
+                    if new_value >= bank.id:
                         new_value += 1
         return new_value
 
@@ -535,11 +535,11 @@ class Preferential(Boltzmann):
     def new_lender(self, this_model, bank):
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-            bank.rij[bank.get_pos()] = 0
+            bank.rij[bank.id] = 0
             bank.r = this_model.config.r_i0
             bank.mu = 0
-        if self.banks_graph and self.banks_graph.out_edges() and self.banks_graph.out_edges(bank.get_pos()):
-            return list(self.banks_graph.out_edges(bank.get_pos()))[0][1]
+        if self.banks_graph and self.banks_graph.out_edges() and self.banks_graph.out_edges(bank.id):
+            return list(self.banks_graph.out_edges(bank.id))[0][1]
         else:
             return None
 
@@ -597,7 +597,7 @@ class RestrictedMarket(LenderChange):
     def new_lender(self, this_model, bank):
         """ We return the same lender we have created in self.banks_graph """
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-        bank.rij[bank.get_pos()] = 0
+        bank.rij[bank.id] = 0
         bank.r = this_model.config.r_i0
         bank.mu = 0
         bank.asset_i = 0
@@ -653,9 +653,9 @@ class SmallWorld(ShockedMarket):
         return self.banks_graph
 
     def new_lender(self, this_model, bank):
-        """ We return the same lender we have created in self.banks_graph """
+        """ Same lender we have created in self.banks_graph """
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
-        bank.rij[bank.get_pos()] = 0
+        bank.rij[bank.id] = 0
         bank.r = this_model.config.r_i0
         bank.mu = 0
         bank.asset_i = 0
@@ -664,6 +664,6 @@ class SmallWorld(ShockedMarket):
         return bank.lender
 
     def change_lender(self, this_model, bank, t):
-        """ We return the same lender we have created in self.banks_graph """
+        """ Lender is not changing in this model """
         bank.P = 0
         return f"{bank.get_id()} maintains lender #{bank.lender} with %1"

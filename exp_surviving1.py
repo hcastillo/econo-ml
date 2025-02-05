@@ -25,13 +25,13 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
 
     parameters = {  # items should be iterable:
         # "p": np.linspace(0.05, 0.3, num=2),
-        "p": {0.001, 0.333, 0.66, 1}
+        "p": {0.0001, 0.3333, 0.6666, 0.9999}
     }
 
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 988994
+    seed = 918994
     seed_offset = 1
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):

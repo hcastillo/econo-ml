@@ -164,9 +164,7 @@ class ExperimentRun:
         return models_for_config * models_for_parameters
 
     def get_models(self, parameters):
-        result = (dict(zip(parameters.keys(), values)) for values in product(*parameters.values()))
-        return result
-
+        return (dict(zip(parameters.keys(), values)) for values in product(*parameters.values()))
 
     def __filename_clean(self, value, max_length):
         value = str(value)
