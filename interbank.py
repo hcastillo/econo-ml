@@ -239,7 +239,7 @@ class Statistics:
             self.asset_i[self.model.t] = sum_of_asset_i / num_of_banks_with_lenders
             self.asset_j[self.model.t] = sum_of_asset_j / num_of_banks_with_lenders
             self.equity[self.model.t] = sum_of_equity / num_of_banks_with_lenders
-            self.equity_borrowers[self.model.t] = sum_of_equity_borrowers / num_of_banks_with_borrowers\
+            self.equity_borrowers[self.model.t] = sum_of_equity_borrowers / num_of_banks_with_borrowers \
                 if num_of_banks_with_borrowers else 0
             self.loans[self.model.t] = sum_of_loans / num_of_banks_with_lenders
             self.leverage[self.model.t] = sum_of_leverage / num_of_banks_with_lenders
@@ -529,7 +529,7 @@ class Statistics:
             plt.clf()
             plt.figure(figsize=(14, 6))
             for (yy, color, ticks, title_y) in yy_s:
-                if isinstance(yy,tuple):
+                if isinstance(yy, tuple):
                     plt.plot(yy[0], yy[1], ticks, color=color, label=title_y, linewidth=0.2)
                 else:
                     plt.plot(xx, yy, ticks, color=color, label=title_y)
@@ -1151,25 +1151,10 @@ class Model:
             for bank_removed in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
                 self.banks.remove(bank_removed)
                 self.log.debug("repay", f"{bank_removed.get_id()} bankrupted and removed")
-                for bank_i in self.banks:
-                    # we check the borrowers:
-                    for bank_j in list(bank_i.active_borrowers):
-                        # if the bankrupted is a borrower, simply remove it
-                        if bank_j == bank_removed.id:
-                            del bank_i.active_borrowers[bank_j]
-                        # if it is greater, it means that #n position now is #n-1
-                        elif bank_j > bank_removed.id:
-                            bank_i.active_borrowers[bank_j-1]=bank_i.active_borrowers[bank_j]
-                            del bank_i.active_borrowers[bank_j]
-                    # we check now if the disappeared is the lender:
-                    if bank_i.lender is None:
-                        pass
-                    elif bank_i.lender == bank_removed.id:
-                        # the lender has disappeared: a new one is needed
-                        bank_i.lender = self.config.lender_change.new_lender(self, bank_removed)
-                    elif bank_i.lender > bank_removed.id:
-                        # the lender #n is going to be #n-1 because the removed is before
-                        bank_i.lender -= 1
+            for bank_i in self.banks:
+                bank_i.active_borrowers = {}
+                if bank_i.lender and bank_i.lender >= len(self.banks):
+                    bank_i.lender = None
             self.log.debug("repay", f"now we have {self.config.N} banks")
         return num_banks_failed_but_not_rationed
 
@@ -1246,7 +1231,8 @@ class Model:
                 line1 += f"{bank_i.rij[j]:.3f},"
                 line2 += f"{bank_i.c[j]:.3f},"
             lines.append('  |' if lines else "c=|" + line2[:-1] + "| r=|" +
-                              line1[:-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
+                                             line1[
+                                             :-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
@@ -1257,7 +1243,7 @@ class Model:
             for line in lines:
                 self.log.debug("links", f"{line}")
         self.log.debug("links",
-              f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
+                       f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
 
         # (equation 7)
         log_info_1 = log_info_2 = ""
