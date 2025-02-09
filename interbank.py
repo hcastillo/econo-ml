@@ -48,6 +48,7 @@ class Config:
 
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
+    allow_replace_of_non_rationed = True
 
     # shocks parameters:
     mi: float = 0.7  # mi µ
@@ -821,7 +822,7 @@ class Model:
                     else:
                         raise Exception(f"type of config {attribute} not allowed: {type(current_value)}")
             else:
-                raise LookupError("attribute in config not found")
+                raise LookupError("attribute in config not found: %s " % attribute)
         self.initialize()
 
     def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None,
@@ -1134,29 +1135,46 @@ class Model:
     def replace_bankrupted_banks(self):
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
         num_banks_failed_but_not_rationed = 0
-        for bank_removed in self.banks:
-            if bank_removed.failed:
+        total_removed = 0
+        for possible_removed_bank in self.banks:
+            if possible_removed_bank.failed:
+                total_removed += 1
                 if self.config.allow_replacement_of_bankrupted:
-                    bank_removed.replace_bank()
+                    possible_removed_bank.replace_bank()
                 else:
-                    if bank_removed.rationing == 0:
-                        num_banks_failed_but_not_rationed += 1
-                    lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(bank_removed)
+                    if possible_removed_bank.rationing == 0:
+                        if self.config.allow_replace_of_non_rationed:
+                            possible_removed_bank.replace_bank()
+                        else:
+                            num_banks_failed_but_not_rationed += 1
+                            lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(possible_removed_bank)
         self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
-                       f"failures={self.statistics.bankruptcy[self.t]}")
+                       f"failures={total_removed}")
         if not self.config.allow_replacement_of_bankrupted:
+            for bank_to_remove in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
+                self.__remove_without_replace_failed_bank(bank_to_remove)
+
             # we update the number of banks we have:
             self.config.N -= len(lists_to_remove_because_replacement_of_bankrupted_is_disabled)
-            # we remove the bank from the array:
-            for bank_removed in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
-                self.banks.remove(bank_removed)
-                self.log.debug("repay", f"{bank_removed.get_id()} bankrupted and removed")
-            for bank_i in self.banks:
-                bank_i.active_borrowers = {}
-                if bank_i.lender and bank_i.lender >= len(self.banks):
-                    bank_i.lender = None
             self.log.debug("repay", f"now we have {self.config.N} banks")
         return num_banks_failed_but_not_rationed
+
+    def __remove_without_replace_failed_bank(self, bank_to_remove):
+        self.banks.remove(bank_to_remove)
+        self.log.debug("repay", f"{bank_to_remove.get_id()} bankrupted and removed")
+        for bank_i in self.banks:
+            if bank_i.lender is None or bank_i.lender == bank_to_remove.id:
+                bank_i.lender = None
+            elif bank_i.lender > bank_to_remove.id:
+                bank_i.lender -= 1
+            if bank_i.id > bank_to_remove.id:
+                bank_i.id -= 1
+            for borrower in list(bank_i.active_borrowers):
+                if borrower > bank_to_remove.id:
+                    bank_i.active_borrowers[borrower-1] = bank_i.active_borrowers[borrower]
+                    del bank_i.active_borrowers[borrower]
+                elif borrower == bank_to_remove.id:
+                    del bank_i.active_borrowers[borrower]
 
     def initialize_step(self):
         for bank in self.banks:
@@ -1465,6 +1483,8 @@ class Utils:
                             help="Directory where to store the results")
         parser.add_argument("--no_replace", action='store_true', default=False,
                             help="No replace banks when they go bankrupted")
+        parser.add_argument("--seed", type=int, default=None,
+                            help="seed used for random generator")
         args = parser.parse_args()
         if args.t != model.config.T:
             model.config.T = args.t
@@ -1486,16 +1506,16 @@ class Utils:
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
-                  output_directory=args.output,
+                  output_directory=args.output, seed=args.seed,
                   interactive=(args.log == 'ERROR' or args.logfile is not None))
 
     @staticmethod
-    def run(save=None, save_graph_instants=None, interactive=False, output_directory=None):
+    def run(save=None, save_graph_instants=None, interactive=False, output_directory=None, seed=None):
         global model
         if not save_graph_instants and Config.GRAPHS_MOMENTS:
             save_graph_instants = Config.GRAPHS_MOMENTS
         model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants,
-                         output_directory=output_directory)
+                         output_directory=output_directory, seed=seed)
         model.simulate_full(interactive=interactive)
         return model.finish()
 

@@ -6,7 +6,7 @@ import interbank
 import tests.interbank_testclass
 
 
-# 3. bank does firesale but it is covered ok
+# 3. bank does fire sales but it is covered ok
 # -------------------
 
 class Balance3TestCase(tests.interbank_testclass.InterbankTest):

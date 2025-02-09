@@ -17,19 +17,16 @@ class Balance3TestCase(tests.interbank_testclass.InterbankTest):
 
     @patch.object(interbank.Model, "do_shock", tests.interbank_testclass.mockedShock)
     def setUp(self):
-        self.configureTest( N=2,T=1,
-                            shocks=[
-                                {"shock1": [-15, 5], "shock2": [-3, 3], },
-                            ])
+        self.configureTest(N=2, T=1,
+                           shocks=[
+                               {"shock1": [-15, 5], "shock2": [-3, 3], },
+                           ])
         self.initialValues()
         self.doTest()
 
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=True)
         self.assertBank(bank=self.model.banks[1], C=13, L=20, D=28, E=5, B=5)
-
-
-
 
 
 if __name__ == '__main__':

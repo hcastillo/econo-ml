@@ -31,7 +31,7 @@ def determine_algorithm(given_name: str = "default"):
     DEFAULT_METHOD = "Boltzmann"
 
     if given_name == "default":
-        warnings.warn(f"selected default method {DEFAULT_METHOD}")
+        print(f"selected default method {DEFAULT_METHOD}")
         given_name = DEFAULT_METHOD
     if given_name == '?':
         for name, obj in inspect.getmembers(sys.modules[__name__]):
@@ -43,7 +43,7 @@ def determine_algorithm(given_name: str = "default"):
             if name.lower() == given_name.lower():
                 if inspect.isclass(obj) and obj.__doc__:
                     return obj()
-        print(f"not found lenderchange algorithm with name '{given_name}'")
+        print(f"not found LenderChange algorithm with name '{given_name}'")
         sys.exit(-1)
 
 
@@ -138,6 +138,7 @@ def save_graph_png(graph, description, filename, add_info=False):
     ax5.set_ylabel('')
 
     plt.rcParams.update(plt.rcParamsDefault)
+    warnings.filterwarnings("ignore", category=UserWarning)
     plt.savefig(filename)
     plt.close('all')
     return guru

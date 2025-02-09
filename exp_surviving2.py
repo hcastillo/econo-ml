@@ -21,11 +21,10 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     MC = 20
 
     ALGORITHM = RestrictedMarket
-    OUTPUT_DIRECTORY = "../experiments/surviving1"
+    OUTPUT_DIRECTORY = "../experiments/surviving2"
 
     parameters = {  # items should be iterable:
-        # "p": np.linspace(0.05, 0.3, num=2),
-        "p": {0.0001, 0.3333, 0.6666, 0.9999}
+        "p": np.linspace(0.0001, 0.9999, num=10)
     }
 
     LENGTH_FILENAME_PARAMETER = 5
@@ -62,7 +61,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     @staticmethod
     def plot_surviving(experiment):
         print("Plotting surviving...")
-        # now we open all the .gdt files, and we obtain the plot with only the num banks:
+        # now we open all the .gdt files and we obtain the plot with only the num banks:
         data_of_surviving_banks = {}
         data_of_failures_rationed = {}
         data_of_failures_not_rationed = {}
@@ -128,7 +127,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         for i, iteration in enumerate(data_of_surviving_banks_avg):
             plt.plot(data_of_surviving_banks_avg[iteration], "-",
                      color=RestrictedMarketSurvivingRun.get_color(all_models[i]['p']),
-                     label=str(all_models[i]['p'])[:5])
+                     label=str(all_models[i]['p']))
             if len(data_of_surviving_banks_avg[iteration]) > max_t:
                 max_t = len(data_of_surviving_banks_avg[iteration])
         plt.legend(loc='best', title="p")

@@ -39,23 +39,27 @@ class BankruptedTestCase(unittest.TestCase):
         self.model.replace_bankrupted_banks()
 
     def test_values_after_execution(self):
-        # 10 banks - 3 = 7 still active
+        # 10 banks - 2 = 8 still active
+        # it fails #0 and #3
         self.assertEqual(len(self.model.banks),8)
         # #1 now is #0, borrowers were #2 and #3 and now it is #1 (#3 was failed):
+        self.assertEqual(self.model.banks[0].id, 0)
         self.assertEqual(self.model.banks[0].C, 100)
-        #self.assertEqual(len(self.model.banks[0].active_borrowers), 1)
-        #self.assertEqual(self.model.banks[0].active_borrowers.keys()[0], 1)
+        self.assertEqual(len(self.model.banks[0].active_borrowers), 1)
+        self.assertEqual(list(self.model.banks[0].active_borrowers.keys()), [1])
         # #2 now is #1,
+        self.assertEqual(self.model.banks[1].id, 1)
         self.assertEqual(self.model.banks[1].C, 200)
-        #self.assertEqual(self.model.banks[1].lender, 0)
+        self.assertEqual(self.model.banks[1].lender, 0)
         # #4 now is #2
+        self.assertEqual(self.model.banks[2].id, 2)
         self.assertEqual(self.model.banks[2].C, 400)
         # #8 and #9 are now #6 and #7:
         self.assertEqual(self.model.banks[6].C, 800)
         self.assertEqual(self.model.banks[7].C, 900)
-        #self.assertEqual(len(self.model.banks[6].active_borrowers), 1)
-        #self.assertEqual(self.model.banks[7].active_borrowers.keys()[0], 6)
-        #self.assertEqual(self.model.banks[6].lender, 7)
+        self.assertEqual(len(self.model.banks[6].active_borrowers), 0)
+        self.assertEqual(list(self.model.banks[7].active_borrowers.keys()), [6])
+        self.assertEqual(self.model.banks[6].lender, 7)
 
 
 if __name__ == '__main__':

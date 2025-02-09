@@ -21,7 +21,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     MC = 20
 
     ALGORITHM = RestrictedMarket
-    OUTPUT_DIRECTORY = "../experiments/surviving1"
+    OUTPUT_DIRECTORY = "../experiments/surviving_rationed_only"
 
     parameters = {  # items should be iterable:
         # "p": np.linspace(0.05, 0.3, num=2),
@@ -40,7 +40,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         model.config.lender_change = self.ALGORITHM()
         model.config.lender_change.set_parameter("p", execution_parameters["p"])
         model.configure(T=self.T, allow_replacement_of_bankrupted=False,
-                        allow_replace_of_non_rationed=False,
+                        allow_replace_of_non_rationed=True,
                         N=self.N, **execution_config)
         RestrictedMarketSurvivingRun.seed_offset += 1
         model.initialize(seed=(self.seed + RestrictedMarketSurvivingRun.seed_offset), save_graphs_instants=None,
