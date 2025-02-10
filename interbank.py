@@ -1362,7 +1362,7 @@ class Bank:
                                             f"(lender{self.get_lender().get_id(short=True)}"
                                             f".ΔB=0,ΔC={recovered:.3f}) (paidD={self.l:.3f})")
         self.D = 0
-        # the loan is not paid correctly, but we remove it
+        # the loan is not paid correctly, but we remove it now
         if self.get_lender() and self.id in self.get_lender().active_borrowers:
             self.get_lender().s -= self.l
             try:
