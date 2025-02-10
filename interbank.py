@@ -48,7 +48,6 @@ class Config:
 
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
-    allow_replace_of_non_rationed = True
 
     # shocks parameters:
     mi: float = 0.7  # mi µ
@@ -281,7 +280,7 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
         # only if we don't replace banks makes sense to report how many banks we have in each step, but we save always:
-        self.num_banks[self.model.t] = self.model.config.N
+        self.num_banks[self.model.t] = len(self.model.banks)
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
         if export_datafile:
@@ -1143,11 +1142,8 @@ class Model:
                     possible_removed_bank.replace_bank()
                 else:
                     if possible_removed_bank.rationing == 0:
-                        if self.config.allow_replace_of_non_rationed:
-                            possible_removed_bank.replace_bank()
-                        else:
-                            num_banks_failed_but_not_rationed += 1
-                            lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(possible_removed_bank)
+                        num_banks_failed_but_not_rationed += 1
+                        lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(possible_removed_bank)
         self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
                        f"failures={total_removed}")
         if not self.config.allow_replacement_of_bankrupted:

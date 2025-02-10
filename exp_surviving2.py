@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 
 
 class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
-    N = 50
+    N = 500
     T = 1000
-    MC = 20
+    MC = 5
 
     ALGORITHM = RestrictedMarket
     OUTPUT_DIRECTORY = "../experiments/surviving2"
@@ -39,7 +39,6 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         model.config.lender_change = self.ALGORITHM()
         model.config.lender_change.set_parameter("p", execution_parameters["p"])
         model.configure(T=self.T, allow_replacement_of_bankrupted=False,
-                        allow_replace_of_non_rationed=False,
                         N=self.N, **execution_config)
         RestrictedMarketSurvivingRun.seed_offset += 1
         model.initialize(seed=(self.seed + RestrictedMarketSurvivingRun.seed_offset), save_graphs_instants=None,
