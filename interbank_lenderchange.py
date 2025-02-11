@@ -472,6 +472,14 @@ class Preferential(Boltzmann):
         else:
             return False
 
+    def set_parameter(self, name, value):
+        if not value is None:
+            if self.check_parameter(name, value):
+                self.parameter[name] = int(value)
+            else:
+                print(f"error with parameter '{name}' for {self.__class__.__name__}")
+                sys.exit(-1)
+
     def initialize_bank_relationships(self, this_model):
 
         if self.initial_graph_file:
