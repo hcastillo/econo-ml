@@ -39,16 +39,13 @@ class Config:
     T: int = 1000  # time (1000)
     N: int = 50  # number of banks (50)
 
-    # not used in this implementation:
-    # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
-    # đ: int    = 1        # number of outgoing links allowed
+    reserves: float  = 0.02
 
     # seed applied for random values (set during initialize)
     seed = None
 
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
-    allow_replace_of_non_rationed = True
 
     # shocks parameters:
     mi: float = 0.7  # mi µ
@@ -69,9 +66,11 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
-    # L + C + (R) = D + E
+    # L + C + R = D + E
+    # but R = 0.02*D and C_i0= 30-2.7=27.3 and R=2.7
     L_i0: float = 120  # long term assets
-    C_i0: float = 30  # capital
+    C_i0: float = 30  # capital BEFORE RESERVES ESTIMATION, after it will be 27.3
+    # R_i0=2.7
     D_i0: float = 135  # deposits
     E_i0: float = 15  # equity
     r_i0: float = 0.02  # initial rate
@@ -89,7 +88,7 @@ class Config:
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'loans': False,
                            'num_lenders': False, 'num_borrowers': False, 'prob_bankruptcy': False,
-                           'num_banks': True, 'bankruptcy_not_rationed': True}
+                           'num_banks': True, 'bankruptcy_rationed': True}
 
     def __str__(self):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -126,7 +125,7 @@ class Statistics:
 
     # only used if config.allow_replacement_of_bankrupted is false
     num_banks = []
-    bankruptcy_not_rationed = []
+    bankruptcy_rationed = []
 
     model = None
     graphs = {}
@@ -176,7 +175,7 @@ class Statistics:
         self.loans = np.zeros(self.model.config.T, dtype=float)
         self.num_banks = np.zeros(self.model.config.T, dtype=int)
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
-        self.bankruptcy_not_rationed = np.zeros(self.model.config.T, dtype=int)
+        self.bankruptcy_rationed = np.zeros(self.model.config.T, dtype=int)
 
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
@@ -280,8 +279,9 @@ class Statistics:
         self.P_max[self.model.t] = max(probabilities)
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
-        # only if we don't replace banks makes sense to report how many banks we have in each step, but we save always:
-        self.num_banks[self.model.t] = self.model.config.N
+        # only if we don't replace banks makes sense to report how many banks we have in each step:
+        #if not self.config.allow_replacement_of_bankrupted:
+        self.num_banks[self.model.t] = len(self.model.banks)
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
         if export_datafile:
@@ -498,7 +498,7 @@ class Statistics:
         result = pd.DataFrame()
         for variable_name, variable in self.enumerate_results():
             result[variable_name] = np.array(variable)
-        return result
+        return result.iloc[0:self.model.t]
 
     def plot_pygrace(self, xx, yy_s, variable, title, export_datafile, x_label, y_label):
         from pygrace.project import Project
@@ -662,7 +662,7 @@ class Log:
         return result
 
     def __get_string_debug_banks__(self, details, bank):
-        text = f"{bank.get_id():10} C={Log.__format_number__(bank.C)} L={Log.__format_number__(bank.L)}"
+        text = f"{bank.get_id(short=True):6} C={Log.__format_number__(bank.C)} R={Log.__format_number__(bank.R)} L={Log.__format_number__(bank.L)}"
         amount_borrowed = 0
         list_borrowers = " borrows=["
         for bank_i in bank.active_borrowers:
@@ -729,7 +729,7 @@ class Log:
 
     def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = "%(module)s"):
         self.modules = modules.split(",") if modules else []
-        formatter = logging.Formatter('%(levelname)s-' + script_name + '- %(message)s')
+        formatter = logging.Formatter('%(levelname)s-'  + '- %(message)s')
         self.logLevel = Log.get_level(log.upper())
         self.logger.setLevel(self.logLevel)
         if logfile:
@@ -1130,11 +1130,15 @@ class Model:
             if bank.d > 0 and not bank.failed:
                 bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
 
-        self.statistics.bankruptcy_not_rationed[self.t] = self.replace_bankrupted_banks()
+        self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
+
+        # Now we balance the reserves: 0.02*D, money that is extracted from capital:
+        for bank in self.banks:
+            bank.determine_reserves()
 
     def replace_bankrupted_banks(self):
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
-        num_banks_failed_but_not_rationed = 0
+        num_banks_failed_rationed = 0
         total_removed = 0
         for possible_removed_bank in self.banks:
             if possible_removed_bank.failed:
@@ -1142,22 +1146,18 @@ class Model:
                 if self.config.allow_replacement_of_bankrupted:
                     possible_removed_bank.replace_bank()
                 else:
-                    if possible_removed_bank.rationing == 0:
-                        if self.config.allow_replace_of_non_rationed:
-                            possible_removed_bank.replace_bank()
-                        else:
-                            num_banks_failed_but_not_rationed += 1
-                            lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(possible_removed_bank)
+                    if possible_removed_bank.rationing == 0 and possible_removed_bank.lender is not None:
+                        num_banks_failed_rationed += 1
+                    lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(possible_removed_bank)
         self.log.debug("repay", f"this step ΔD={self.statistics.incrementD[self.t]:.3f} and " +
                        f"failures={total_removed}")
         if not self.config.allow_replacement_of_bankrupted:
             for bank_to_remove in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
                 self.__remove_without_replace_failed_bank(bank_to_remove)
-
             # we update the number of banks we have:
             self.config.N -= len(lists_to_remove_because_replacement_of_bankrupted_is_disabled)
             self.log.debug("repay", f"now we have {self.config.N} banks")
-        return num_banks_failed_but_not_rationed
+        return num_banks_failed_rationed
 
     def __remove_without_replace_failed_bank(self, bank_to_remove):
         self.banks.remove(bank_to_remove)
@@ -1315,9 +1315,11 @@ class Bank:
 
     def __assign_defaults__(self):
         self.L = self.model.config.L_i0
-        self.C = self.model.config.C_i0
+        self.C = self.model.config.C_i0*(1-self.model.config.reserves)
         self.D = self.model.config.D_i0
         self.E = self.model.config.E_i0
+        self.R = 0
+        self.determine_reserves()
         self.mu = 0  # fitness of the bank:  estimated later
         self.l = 0  # amount of loan done:  estimated later
         self.s = 0  # amount of loan received: estimated later
@@ -1332,6 +1334,15 @@ class Bank:
     def replace_bank(self):
         self.failures += 1
         self.__assign_defaults__()
+
+
+    def determine_reserves(self):
+        previous_R = self.R
+        self.R = self.model.config.reserves * self.D
+        if previous_R > 0:
+            self.C -= (self.R-previous_R)
+            self.model.log.debug("reser",
+                                 f"{self.get_id()} reserves variation in {self.R-previous_R} generate change in C")
 
     def __do_bankruptcy__(self, phase):
         self.failed = True

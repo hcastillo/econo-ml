@@ -5,7 +5,7 @@ old/
 quarto/interbank_files/
 logs/
 output/*
-models/*
+models/td3.zip
 lenders/*
 experiments/*
 ppo/*
