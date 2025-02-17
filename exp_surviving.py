@@ -19,13 +19,13 @@ import matplotlib.pyplot as plt
 class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 5
+    MC = 3
 
     ALGORITHM = RestrictedMarket
     OUTPUT_DIRECTORY = "../experiments/surviving"
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.05, 0.999, num=4),
+        "p": np.linspace(0.05, 0.5, num=4),
         #"p": {0.0001, 0.3333, 0.6666, 0.9999}
 
     }
