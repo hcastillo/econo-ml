@@ -27,8 +27,9 @@ class Balance3TestCase(tests.interbank_testclass.InterbankTest):
         interbank.Config.ro = 0.3 # fire sale cost
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[0], C=0, L=0.5, D=0, E=0.5, paid_loan=0, bankrupted=False)
-        self.assertBank(bank=self.model.banks[1], C=12.3, L=20, D=20, E=10)
+        self.assertBank(bank=self.model.banks[0], C=0, L=0.35000000000000053, D=0, E=0.41000000000000014,
+                        paid_loan=0, bankrupted=False)
+        self.assertBank(bank=self.model.banks[1], C=9.6, L=20, D=20, E=10)
 
 
 

@@ -32,14 +32,13 @@ class InterbankTest(unittest.TestCase):
             return value
 
     def setBank(self, bank: interbank.Bank, C: float, L: float, D: float, E: float):
-        C = self.__check_values__(bank, 'C', C)
         D = self.__check_values__(bank, 'D', D)
         L = self.__check_values__(bank, 'L', L)
         E = self.__check_values__(bank, 'E', E)
-        bank.determine_reserves()
-        R = bank.R
+        R = D*self.model.config.reserves
+        C = self.__check_values__(bank, 'C', C) - R
         if L + C + R != D + E:
-            E = L + C - D
+            E = L + C + R - D
             if E < 0:
                 E = 0
             self.model.log.debug("******",
@@ -48,6 +47,7 @@ class InterbankTest(unittest.TestCase):
         bank.E = E
         bank.C = C
         bank.D = D
+        bank.R = R
 
     def assertBank(self, bank: interbank.Bank, C: float = None, L: float = None, R: float = None, D: float = None,
                    E: float = None,
@@ -76,6 +76,9 @@ class InterbankTest(unittest.TestCase):
         else:
             self.assertEqual(bank.failures, 0)
 
+
+def determine_shock_value_mocked(model, bank, whichShock):
+    return bank.D + InterbankTest.shocks[model.t][whichShock][bank.id]
 
 def mockedShock(model, whichShock):
     for bank in model.banks:

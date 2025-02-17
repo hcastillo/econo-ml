@@ -852,12 +852,10 @@ class Model:
         if self.backward_enabled:
             self.banks_backward_copy = copy.deepcopy(self.banks)
         self.do_shock("shock1")
-        #TODO balance reserves
         self.do_loans()
         self.log.debug_banks()
         self.statistics.compute_interest_loans_leverage()
         self.do_shock("shock2")
-        #TODO balance reserves
         self.do_repayments()
         self.log.debug_banks()
         if self.log.progress_bar:
@@ -1017,10 +1015,14 @@ class Model:
         """
         return self.statistics.bankruptcy[self.t - 1 if self.t > 0 else 0]
 
+
+    def determine_shock_value(self, bank, _shock):
+        return bank.D * (self.config.mi + self.config.omega * random.random())
+
     def do_shock(self, which_shock):
         # (equation 2)
         for bank in self.banks:
-            bank.newD = bank.D * (self.config.mi + self.config.omega * random.random())
+            bank.newD = self.determine_shock_value(bank, which_shock)
             bank.incrD = bank.newD - bank.D
             bank.D = bank.newD
             bank.newR = self.config.reserves * bank.D
@@ -1028,7 +1030,7 @@ class Model:
             bank.R = bank.newR
 
             if bank.incrD >= 0:
-                bank.C += bank.incrD
+                bank.C += bank.incrD - bank.incrR
                 # if "shock1" then we can be a lender:
                 if which_shock == "shock1":
                     bank.s = bank.C
@@ -1050,7 +1052,7 @@ class Model:
                     self.log.debug(which_shock,
                                    f"{bank.get_id()} loses ΔD={bank.incrD - bank.incrR:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
-            self.statistics.incrementD[self.t] += bank.incrD - bank.incrR
+            self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
         for bank_index, bank in enumerate(self.banks):
@@ -1321,8 +1323,7 @@ class Bank:
         self.C = self.model.config.C_i0*(1-self.model.config.reserves)
         self.D = self.model.config.D_i0
         self.E = self.model.config.E_i0
-        self.R = 0
-        self.determine_reserves()
+        self.R = self.model.config.reserves * self.D
         self.mu = 0  # fitness of the bank:  estimated later
         self.l = 0  # amount of loan done:  estimated later
         self.s = 0  # amount of loan received: estimated later
@@ -1337,15 +1338,6 @@ class Bank:
     def replace_bank(self):
         self.failures += 1
         self.__assign_defaults__()
-
-
-    def determine_reserves(self):
-        previous_R = self.R
-        self.R = self.model.config.reserves * self.D
-        if previous_R > 0:
-            self.C -= (self.R-previous_R)
-            self.model.log.debug("reser",
-                                 f"{self.get_id()} reserves variation in {self.R-previous_R} generate change in C")
 
     def __do_bankruptcy__(self, phase):
         self.failed = True
@@ -1510,7 +1502,7 @@ class Utils:
             model.config.allow_replacement_of_bankrupted = False
         if args.debug:
             model.do_debug(args.debug)
-        model.config.lender_change = lc.determine_algorithm(args.lc)
+        model.config.lender_change = lc.falgorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
