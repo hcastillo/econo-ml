@@ -852,10 +852,12 @@ class Model:
         if self.backward_enabled:
             self.banks_backward_copy = copy.deepcopy(self.banks)
         self.do_shock("shock1")
+        #TODO balance reserves
         self.do_loans()
         self.log.debug_banks()
         self.statistics.compute_interest_loans_leverage()
         self.do_shock("shock2")
+        #TODO balance reserves
         self.do_repayments()
         self.log.debug_banks()
         if self.log.progress_bar:
@@ -1021,6 +1023,10 @@ class Model:
             bank.newD = bank.D * (self.config.mi + self.config.omega * random.random())
             bank.incrD = bank.newD - bank.D
             bank.D = bank.newD
+            bank.newR = self.config.reserves * bank.D
+            bank.incrR = bank.newR - bank.R
+            bank.R = bank.newR
+
             if bank.incrD >= 0:
                 bank.C += bank.incrD
                 # if "shock1" then we can be a lender:
@@ -1034,17 +1040,17 @@ class Model:
                 # if "shock1" then we cannot be a lender: we have lost deposits
                 if which_shock == "shock1":
                     bank.s = 0
-                if bank.incrD + bank.C >= 0:
+                if bank.incrD - bank.incrR + bank.C >= 0:
                     bank.d = 0  # it will not need to borrow
-                    bank.C += bank.incrD
+                    bank.C += bank.incrD - bank.incrR
                     self.log.debug(which_shock,
-                                   f"{bank.get_id()} loses ΔD={bank.incrD:.3f}, covered by capital")
+                                   f"{bank.get_id()} loses ΔD={bank.incrD - bank.incrR:.3f}, covered by capital")
                 else:
-                    bank.d = abs(bank.incrD + bank.C)  # it will need money
+                    bank.d = abs(bank.incrD - bank.incrR + bank.C )  # it will need money
                     self.log.debug(which_shock,
-                                   f"{bank.get_id()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}")
+                                   f"{bank.get_id()} loses ΔD={bank.incrD - bank.incrR:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
-            self.statistics.incrementD[self.t] += bank.incrD
+            self.statistics.incrementD[self.t] += bank.incrD - bank.incrR
 
     def do_loans(self):
         for bank_index, bank in enumerate(self.banks):
@@ -1132,9 +1138,6 @@ class Model:
 
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
 
-        # Now we balance the reserves: 0.02*D, money that is extracted from capital:
-        for bank in self.banks:
-            bank.determine_reserves()
 
     def replace_bankrupted_banks(self):
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
