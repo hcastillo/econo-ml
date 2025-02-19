@@ -25,7 +25,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     OUTPUT_DIRECTORY = "../experiments/surviving1"
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.001, 0.9, num=40),
+        "p": np.linspace(0.0001, 0.6, num=4),
         # "p": {0.0001, 0.3333, 0.6666}
 
     }

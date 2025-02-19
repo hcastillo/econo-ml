@@ -1046,11 +1046,11 @@ class Model:
                     bank.d = 0  # it will not need to borrow
                     bank.C += bank.incrD - bank.incrR
                     self.log.debug(which_shock,
-                                   f"{bank.get_id()} loses ΔD={bank.incrD - bank.incrR:.3f}, covered by capital")
+                                   f"{bank.get_id()} loses ΔD={bank.incrD:.3f}, covered by capital")
                 else:
                     bank.d = abs(bank.incrD - bank.incrR + bank.C )  # it will need money
                     self.log.debug(which_shock,
-                                   f"{bank.get_id()} loses ΔD={bank.incrD - bank.incrR:.3f} but has only C={bank.C:.3f}")
+                                   f"{bank.get_id()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
             self.statistics.incrementD[self.t] += bank.incrD
 
@@ -1320,10 +1320,10 @@ class Bank:
 
     def __assign_defaults__(self):
         self.L = self.model.config.L_i0
-        self.C = self.model.config.C_i0*(1-self.model.config.reserves)
         self.D = self.model.config.D_i0
         self.E = self.model.config.E_i0
         self.R = self.model.config.reserves * self.D
+        self.C = self.D + self.E - self.L - self.R
         self.mu = 0  # fitness of the bank:  estimated later
         self.l = 0  # amount of loan done:  estimated later
         self.s = 0  # amount of loan received: estimated later
@@ -1502,7 +1502,7 @@ class Utils:
             model.config.allow_replacement_of_bankrupted = False
         if args.debug:
             model.do_debug(args.debug)
-        model.config.lender_change = lc.falgorithm(args.lc)
+        model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
