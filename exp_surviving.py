@@ -10,7 +10,7 @@ Executor for the interbank model using different values for the lc RestrictedMar
 import numpy as np
 import pandas as pd
 from interbank import Model, Statistics
-from interbank_lenderchange import RestrictedMarket
+from interbank_lenderchange import ShockedMarket
 import exp_runner
 import os
 import matplotlib.pyplot as plt
@@ -19,14 +19,14 @@ import matplotlib.pyplot as plt
 class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 3
+    MC = 5
 
-    ALGORITHM = RestrictedMarket
-    OUTPUT_DIRECTORY = "../experiments/surviving"
+    ALGORITHM = ShockedMarket
+    OUTPUT_DIRECTORY = "../experiments/surviving1"
 
     parameters = {  # items should be iterable:
-        "p": np.linspace(0.05, 0.5, num=4),
-        #"p": {0.0001, 0.3333, 0.6666, 0.9999}
+        "p": np.linspace(0.0001, 0.6, num=4),
+        # "p": {0.0001, 0.3333, 0.6666}
 
     }
 
@@ -65,7 +65,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     def determine_average_of_series(array_with_iterations_and_series):
         result_array = {}
         for iteration in array_with_iterations_and_series:  # iterations = p=0.0001, p=0.0002
-            result_array[iteration] = pd.concat(array_with_iterations_and_series[iteration],axis=1).agg("mean",1)
+            result_array[iteration] = pd.concat(array_with_iterations_and_series[iteration],axis=1).agg("mean", 1)
         return result_array
 
     @staticmethod

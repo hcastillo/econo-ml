@@ -30,6 +30,8 @@ class ExperimentRun:
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
 
+    XTICKS_DIVISOR = 4
+
     LABEL = "Invalid"
     OUTPUT_DIRECTORY = "Invalid"
 
@@ -51,7 +53,7 @@ class ExperimentRun:
         # we plot only x labels 1 of each 10:
         plot_x_values = []
         for j in range(len(array_with_x_values)):
-            plot_x_values.append(array_with_x_values[j] if (j % 10 == 0) else " ")
+            plot_x_values.append(array_with_x_values[j] if (j % ExperimentRun.XTICKS_DIVISOR == 0) else " ")
         plot_x_values[-1] = array_with_x_values[-1]
         for i in array_with_data:
             i = i.strip()

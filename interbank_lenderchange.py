@@ -288,7 +288,7 @@ class LenderChange:
         self.initial_graph_file = None
 
     def initialize_bank_relationships(self, this_model):
-        """ Call once at initilize() model """
+        """ Call once at initialize() model """
         pass
 
     def step_setup_links(self, this_model):
@@ -481,7 +481,6 @@ class Preferential(Boltzmann):
                 sys.exit(-1)
 
     def initialize_bank_relationships(self, this_model):
-
         if self.initial_graph_file:
             self.banks_graph_full = load_graph_json(self.initial_graph_file)
             description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
@@ -559,7 +558,6 @@ class Preferential(Boltzmann):
 class RestrictedMarket(LenderChange):
     """ Using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
           lender for each bank, it replicates the situation after a crisis when banks do not credit
-
     """
 
     GRAPH_NAME = "erdos_renyi"
@@ -602,6 +600,12 @@ class RestrictedMarket(LenderChange):
         for (lender_for_borrower, borrower) in self.banks_graph.edges():
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
+
+
+    def step_setup_links(self, this_model):
+        # if not declared, at each step it will generate a new graph:
+        pass
+
 
     def new_lender(self, this_model, bank):
         """ We return the same lender we have created in self.banks_graph """
