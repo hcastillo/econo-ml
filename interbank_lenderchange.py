@@ -218,6 +218,12 @@ class GraphStatistics:
         else:
             return len(max(nx.connected_components(graph), key=len))
 
+
+    @staticmethod
+    def get_all_credit_channels(graph):
+        return graph.number_of_edges()
+
+
     @staticmethod
     def clustering_coeff(graph):
         """clustering coefficient 0..1, 1 for totally connected graphs, and 0 for totally isolated
@@ -326,6 +332,11 @@ class LenderChange:
                 print(f"error with parameter '{name}' for {self.__class__.__name__}")
                 sys.exit(-1)
 
+    def get_credit_channels(self):
+        if hasattr(self,"banks_graph"):
+            return GraphStatistics.get_all_credit_channels(self.banks_graph)
+        else:
+            return None
 
 # ---------------------------------------------------------
 

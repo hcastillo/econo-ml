@@ -84,7 +84,7 @@ class Config:
     # 1 if also plot, 0 not to plot:
     ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate': True, 'asset_i': True, 'asset_j': True,
                            'equity': True, 'equity_borrowers': True, 'bankruptcy': True, 'credit_channels': True,
-                           'P': True, 'best_lender': True,
+                           'active_credit_channels': True, 'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'loans': False,
                            'num_lenders': False, 'num_borrowers': False, 'prob_bankruptcy': False,
@@ -106,6 +106,7 @@ class Statistics:
     best_lender = []
     best_lender_clients = []
     credit_channels = []
+    active_credit_channels = []
     liquidity = []
     policy = []
     interest_rate = []
@@ -153,6 +154,7 @@ class Statistics:
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
         self.best_lender_clients = np.zeros(self.model.config.T, dtype=int)
         self.credit_channels = np.zeros(self.model.config.T, dtype=int)
+        self.active_credit_channels = np.zeros(self.model.config.T, dtype=int)
         self.num_borrowers = np.zeros(self.model.config.T, dtype=int)
         self.prob_bankruptcy = np.zeros(self.model.config.T, dtype=float)
         self.num_lenders = np.zeros(self.model.config.T, dtype=int)
@@ -194,8 +196,11 @@ class Statistics:
 
         self.best_lender[self.model.t] = best
         self.best_lender_clients[self.model.t] = best_value
-        # self.credit_channels is updated directly at the moment the credit channel is set up
-        # during Model.do_loans()
+
+        # number of possible credit channels:
+        self.credit_channels[self.model.t] = self.model.config.lender_change.get_credit_channels()
+        if not self.credit_channels[self.model.t]:
+            self.credit_channels[self.model.t] = len(self.model.banks) #TODO
 
     def compute_interest_loans_leverage(self):
         num_of_banks_with_lenders = 0
@@ -949,14 +954,14 @@ class Model:
         """
         return self.statistics.fitness[self.t - 1 if self.t > 0 else 0]
 
-    def get_current_credit_channels(self):
+    def get_current_active_credit_channels(self):
         """
         Determines the number of credits channels USED (each bank has a possible lender, but only if
         it needs it borrows money. This number represents how many banks have set up a credit with a lender
         :return:
         int
         """
-        return self.statistics.credit_channels[self.t - 1 if self.t > 0 else 0]
+        return self.statistics.active_credit_channels[self.t - 1 if self.t > 0 else 0]
 
     def get_current_liquidity(self):
         """
@@ -1078,14 +1083,14 @@ class Model:
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.get_lender().s > 0:
                             bank.l = bank.get_lender().s  # amount of loan (wrote in the borrower)
-                            self.statistics.credit_channels[self.t] += 1
+                            self.statistics.active_credit_channels[self.t] += 1
                             # amount of loan (wrote in the lender)
                             bank.get_lender().active_borrowers[bank_index] = bank.get_lender().s
                             bank.get_lender().C -= bank.l  # amount of loan that reduces lender capital
                             bank.get_lender().s = 0
                     else:
                         bank.l = bank.d  # amount of loan (wrote in the borrower)
-                        self.statistics.credit_channels[self.t] += 1
+                        self.statistics.active_credit_channels[self.t] += 1
                         bank.get_lender().active_borrowers[bank_index] = bank.d  # amount of loan (wrote in the lender)
                         bank.get_lender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
                         bank.get_lender().C -= bank.d  # amount of loan that reduces lender capital
