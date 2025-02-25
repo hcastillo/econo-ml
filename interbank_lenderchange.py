@@ -207,7 +207,6 @@ class WattsStrogatzGraph:
         return G
 
 
-
 class GraphStatistics:
     @staticmethod
     def giant_component_size(graph):
@@ -218,11 +217,9 @@ class GraphStatistics:
         else:
             return len(max(nx.connected_components(graph), key=len))
 
-
     @staticmethod
     def get_all_credit_channels(graph):
         return graph.number_of_edges()
-
 
     @staticmethod
     def clustering_coeff(graph):
@@ -333,10 +330,11 @@ class LenderChange:
                 sys.exit(-1)
 
     def get_credit_channels(self):
-        if hasattr(self,"banks_graph"):
+        if hasattr(self, "banks_graph"):
             return GraphStatistics.get_all_credit_channels(self.banks_graph)
         else:
             return None
+
 
 # ---------------------------------------------------------
 
@@ -577,9 +575,17 @@ class RestrictedMarket(LenderChange):
         result = nx.DiGraph()
         result.add_nodes_from(list(range(this_model.config.N)))
         for u in range(this_model.config.N):
-            for v in range(u + 1, this_model.config.N):
-                if random.random() < self.parameter['p'] and not result.in_edges(v):
-                    result.add_edge(u, v)
+            if random.random() < self.parameter['p']:
+                not_connected = True
+                while not_connected:
+                    lender = random.randrange(this_model.config.N)
+                    if lender != u:
+                        result.add_edge(lender, u)
+                        not_connected = False
+        #for u in range(this_model.config.N):
+        #    for v in range(u + 1, this_model.config.N):
+        #        if random.random() < self.parameter['p'] and not result.in_edges(v):
+        #            result.add_edge(u, v)
         return result, f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
 
     def check_parameter(self, name, value):
@@ -612,11 +618,9 @@ class RestrictedMarket(LenderChange):
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
 
-
     def step_setup_links(self, this_model):
         # if not declared, at each step it will generate a new graph:
         pass
-
 
     def new_lender(self, this_model, bank):
         """ We return the same lender we have created in self.banks_graph """
@@ -656,7 +660,6 @@ class SmallWorld(ShockedMarket):
         generator = WattsStrogatzGraph()
         result = generator.new(n=this_model.config.N, p=self.parameter['p'])
         return result, f"watts_strogatz p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
-
 
     def initialize_bank_relationships(self, this_model, save_graph=True):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""

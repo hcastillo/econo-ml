@@ -13,7 +13,7 @@ import exp_runner
 class ShockedMarketRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 1
+    MC = 2
 
     COMPARING_DATA = "../experiments/boltzmann"
     COMPARING_LABEL = "Boltzmann"

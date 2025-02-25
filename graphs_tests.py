@@ -7,7 +7,10 @@ import os
 
 NUMBER_ELEMENTS = 10
 NUMBER_OF_BANKS = 50
-TYPES_OF_GRAPHS = ('barabasi', 'erdos_renyi', 'smallworld')
+TYPES_OF_GRAPHS = ( #'barabasi',
+                   'erdos_renyi',
+                   #'smallworld'
+                  )
 OUTPUT = "../graphs_tests/"
 model = interbank.Model()
 progress_bar = Bar("Getting graphs", max=NUMBER_ELEMENTS*len(TYPES_OF_GRAPHS))
