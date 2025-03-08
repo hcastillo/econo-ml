@@ -45,8 +45,6 @@ for i in range(NUMBER_ELEMENTS):
                     p = i / NUMBER_ELEMENTS
                     if p == 0:
                         p = 0.003
-                    elif p == 1:
-                        p = 0.999
                     if type_of_graph == 'erdos_renyi':
                         model.config.lender_change = interbank_lenderchange.ShockedMarket()
                         origin1 = nx.erdos_renyi_graph(n=NUMBER_OF_BANKS, p=p)

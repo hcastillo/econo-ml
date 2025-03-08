@@ -207,9 +207,12 @@ class Statistics:
         self.best_lender_clients[self.model.t] = best_value
 
         # number of possible credit channels:
-        self.potential_credit_channels[self.model.t] = self.model.config.lender_change.get_credit_channels()
-        if self.potential_credit_channels[self.model.t] is None:
+        credit_channels = self.model.config.lender_change.get_credit_channels()
+        if credit_channels is None:
             self.potential_credit_channels[self.model.t] = len(self.model.banks)
+        else:
+            self.potential_credit_channels[self.model.t] = credit_channels
+
 
     def compute_interest_loans_leverage(self):
         num_of_banks_that_are_lenders = 0
@@ -1412,7 +1415,7 @@ class Bank:
             return self.__do_bankruptcy__(phase)
         else:
             self.L -= cost_of_sell
-            self.E -= recovered_E
+            self.E -= recovered_E #TODO
 
             if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,

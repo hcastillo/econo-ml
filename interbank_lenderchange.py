@@ -19,7 +19,7 @@ import random
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+# import matplotlib.gridspec as gridspec
 import networkx as nx
 import sys
 import inspect
@@ -113,9 +113,9 @@ def save_graph_png(graph, description, filename, add_info=False):
             description = ""
         description += " " + GraphStatistics.describe(graph)
 
-    fig = plt.figure(layout="constrained")
-    gs = gridspec.GridSpec(4, 4, figure=fig)
-    fig.add_subplot(gs[:, :])
+    #fig = plt.figure(layout="constrained")
+    #gs = gridspec.GridSpec(4, 4, figure=fig)
+    #fig.add_subplot(gs[:, :])
     guru = draw(graph, new_guru_look_for=True, title=description)
     plt.rcParams.update({'font.size': 6})
 
@@ -129,13 +129,13 @@ def save_graph_png(graph, description, filename, add_info=False):
     # ax4.set_xlabel('')
     # ax4.set_ylabel('')
 
-    ax5 = fig.add_subplot(gs[-1, 0])
-    aux_y = nx.degree_histogram(graph)
-    aux_y.sort(reverse=True)
-    aux_x = np.arange(0, len(aux_y)).tolist()
-    ax5.loglog(aux_x, aux_y, 'o')
-    ax5.set_xlabel('')
-    ax5.set_ylabel('')
+    # ax5 = fig.add_subplot(gs[-1, 0])
+    # aux_y = nx.degree_histogram(graph)
+    # aux_y.sort(reverse=True)
+    # aux_x = np.arange(0, len(aux_y)).tolist()
+    # ax5.loglog(aux_x, aux_y, 'o')
+    # ax5.set_xlabel('')
+    # ax5.set_ylabel('')
 
     plt.rcParams.update(plt.rcParamsDefault)
     warnings.filterwarnings("ignore", category=UserWarning)
@@ -222,7 +222,7 @@ class GraphStatistics:
         return graph.number_of_edges()
 
     @staticmethod
-    def clustering_coeff(graph):
+    def avg_clustering_coef(graph):
         """clustering coefficient 0..1, 1 for totally connected graphs, and 0 for totally isolated
            if ~0 then a small world"""
         try:
@@ -233,11 +233,11 @@ class GraphStatistics:
     @staticmethod
     def communities(graph):
         """number of communities using greedy modularity maximization"""
-        return nx.community.greedy_modularity_communities(graph)
+        return nx.community.greedy_modularity_communities(graph,resolution=0.5)
 
     @staticmethod
     def describe(graph):
-        clustering = GraphStatistics.clustering_coeff(graph)
+        clustering = GraphStatistics.avg_clustering_coef(graph)
         if clustering > 0 and clustering < 1:
             clustering = f"clus_coef={clustering:5.3f}"
         else:
@@ -574,18 +574,12 @@ class RestrictedMarket(LenderChange):
     def generate_banks_graph(self, this_model):
         result = nx.DiGraph()
         result.add_nodes_from(list(range(this_model.config.N)))
-        for u in range(this_model.config.N):
+        for i in range(this_model.config.N):
             if random.random() < self.parameter['p']:
-                not_connected = True
-                while not_connected:
-                    lender = random.randrange(this_model.config.N)
-                    if lender != u:
-                        result.add_edge(lender, u)
-                        not_connected = False
-        #for u in range(this_model.config.N):
-        #    for v in range(u + 1, this_model.config.N):
-        #        if random.random() < self.parameter['p'] and not result.in_edges(v):
-        #            result.add_edge(u, v)
+                j = random.randrange(this_model.config.N)
+                while j == i:
+                    j = random.randrange(this_model.config.N)
+                result.add_edge(i, j)
         return result, f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
 
     def check_parameter(self, name, value):
@@ -614,7 +608,7 @@ class RestrictedMarket(LenderChange):
             save_graph_json(self.banks_graph,
                             this_model.statistics.get_export_path(this_model.export_datafile,
                                                                   f"_{self.GRAPH_NAME}.json"))
-        for (lender_for_borrower, borrower) in self.banks_graph.edges():
+        for (borrower, lender_for_borrower) in self.banks_graph.edges():
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
 

@@ -29,9 +29,9 @@ class RestrictedMarketTestCase(unittest.TestCase):
 
         for t in range(T):
             self.assertEqual(self.graphs[t].is_directed(), True)
-            # only one incoming link for each node: only one lender, so 0 or 1 the value:
+            # only one outgoing link for each node: only one lender, so 0 or 1 the value:
             for i in range(BANKS):
-                self.assertLessEqual(len(self.graphs[t].in_edges(i)), 1)
+                self.assertLessEqual(len(self.graphs[t].out_edges(i)), 1)
             # the graph should be different in each step:
             self.assertNotEqual(self.graphs[t], self.graphs[t-1])
 

@@ -228,7 +228,7 @@ class ExperimentRun:
         for graph_file in graph_files:
             graph = interbank_lenderchange.load_graph_json(f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json")
             graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
-            graph_clustering.append(interbank_lenderchange.GraphStatistics.clustering_coeff(graph))
+            graph_clustering.append(interbank_lenderchange.GraphStatistics.avg_clustering_coef(graph))
             gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
             communities.append(len(graph_communities))
             lengths += [len(i) for i in graph_communities]
