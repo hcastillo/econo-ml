@@ -230,20 +230,40 @@ class GraphStatistics:
         except ZeroDivisionError:
             return 0
 
+
     @staticmethod
     def communities(graph):
-        """number of communities using greedy modularity maximization"""
-        return nx.community.greedy_modularity_communities(graph,resolution=0.5)
+        """Communities using greedy modularity maximization"""
+        return nx.community.greedy_modularity_communities(graph, resolution=0.5)
+
+
+    @staticmethod
+    def communities_not_alone(graph):
+        """Number of communities that are not formed only with an isolated node"""
+        total = 0
+        for community in GraphStatistics.communities(graph):
+            total += len(community) > 1
+        return total
+
 
     @staticmethod
     def describe(graph):
-        clustering = GraphStatistics.avg_clustering_coef(graph)
-        if clustering > 0 and clustering < 1:
-            clustering = f"clus_coef={clustering:5.3f}"
-        else:
-            clustering = f"clus_coef={clustering}"
+        if isinstance(graph, str):
+            try:
+                graph = load_graph_json(graph)
+            except FileNotFoundError:
+                print("json file does not exist: %s" % graph)
+                sys.exit(0)
+            except:
+                print("json file does not contain a valid graph: %s" % graph)
+                sys.exit(0)
+        # clustering = GraphStatistics.avg_clustering_coef(graph)
+        # if clustering > 0 and clustering < 1:
+        #     clustering = f"clus_coef={clustering:5.3f}"
+        # else:
+        #     clustering = f"clus_coef={clustering}"
         return (f"giant={GraphStatistics.giant_component_size(graph)} " +
-                clustering +
+                f" comm_not_alone={GraphStatistics.communities_not_alone(graph)}" +
                 f" comm={len(GraphStatistics.communities(graph))}")
 
 
@@ -311,8 +331,7 @@ class LenderChange:
         pass
 
     def set_initial_graph_file(self, lc_ini_graph_file):
-        if lc_ini_graph_file:
-            self.initial_graph_file = lc_ini_graph_file
+        self.initial_graph_file = lc_ini_graph_file
 
     def describe(self):
         return ""

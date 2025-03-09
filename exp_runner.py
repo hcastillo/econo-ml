@@ -221,14 +221,14 @@ class ExperimentRun:
         return result.strip()
 
     def get_statistics_of_graphs(self, graph_files, results):
-        graph_clustering = []
+        communities_not_alone = []
         communities = []
         lengths = []
         gcs = []
         for graph_file in graph_files:
             graph = interbank_lenderchange.load_graph_json(f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json")
             graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
-            graph_clustering.append(interbank_lenderchange.GraphStatistics.avg_clustering_coef(graph))
+            communities_not_alone.append(interbank_lenderchange.GraphStatistics.communities_not_alone(graph))
             gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
             communities.append(len(graph_communities))
             lengths += [len(i) for i in graph_communities]
@@ -236,7 +236,7 @@ class ExperimentRun:
             results['grade_max'] = []
             results['grade_avg'] = []
             results['communities'] = []
-            results['clustering_avg'] = []
+            results['communities_not_alone'] = []
             results['gcs'] = []
         try:
             results['grade_max'].append([max(lengths), 0])
@@ -244,7 +244,7 @@ class ExperimentRun:
             results['grade_max'].append([0, 0])
         results['grade_avg'].append([0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0])
         results['communities'].append([(sum(communities)) / len(communities), 0])
-        results['clustering_avg'].append([(sum(graph_clustering)) / len(graph_clustering), 0])
+        results['communities_not_alone'].append([(sum(communities_not_alone)) / len(communities_not_alone), 0])
         results['gcs'].append([sum(gcs) / len(gcs), 0])
 
     def load_comparing(self, results_to_plot, results_x_axis):

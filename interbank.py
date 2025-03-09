@@ -1488,6 +1488,8 @@ class Utils:
         global model
         gui = Gui()
         parser = gui.parser()
+        parser.add_argument("--debug", type=int, default=None,
+                            help="Stop and enter in debug mode after at this time")
         parser.add_argument("--log", default='ERROR', help="Log level messages (ERROR,DEBUG,INFO...)")
         parser.add_argument("--modules", default=None, help=f"Log only this modules (separated by ,)")
         parser.add_argument("--logfile", default=None, help="File to send logs to")
@@ -1497,9 +1499,9 @@ class Utils:
         parser.add_argument("--gif_graph", default=False,
                             type=bool,
                             help=f"If --graph, then also an animated gif with all graphs ")
+        parser.add_argument("--graph_stats", default=False,
+                            type=str, help=f"Load a json of a graph and give us statistics of it")
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
-        parser.add_argument("--debug", type=int, default=None,
-                            help="Stop and enter in debug mode after at this time")
         parser.add_argument("--eta", type=float, default=Model.eta, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
         parser.add_argument("--lc_p", type=float, default=None,
@@ -1521,6 +1523,9 @@ class Utils:
         parser.add_argument("--seed", type=int, default=None,
                             help="seed used for random generator")
         args = parser.parse_args()
+        if args.graph_stats:
+            print(lc.GraphStatistics.describe(args.graph_stats))
+            sys.exit(0)
         if args.t != model.config.T:
             model.config.T = args.t
         if args.n != model.config.N:
