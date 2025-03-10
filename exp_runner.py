@@ -27,6 +27,9 @@ class ExperimentRun:
     T = 1
     MC = 1
 
+    LIMIT_MEAN = 3
+    LIMIT_STD = 20
+
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
 
@@ -255,6 +258,23 @@ class ExperimentRun:
                 results_comparing = None
         return results_comparing
 
+    def data_seems_ok(self, iteration_name:str,
+                      new_data:pd.core.frame.DataFrame, array_all_data:pd.core.frame.DataFrame):
+        # if 'interest_rate' not in array, means that it's the first execution, so nothing to compare:
+        if 'interest_rate' in array_all_data.keys():
+            # we obtain the average and std:
+            mean_new_data = new_data.interest_rate.mean()
+            std_new_data = new_data.interest_rate.std()
+            mean_all_data = array_all_data.interest_rate.mean()
+            std_all_data = array_all_data.interest_rate.std()
+            if mean_new_data > self.LIMIT_MEAN * mean_all_data:
+                print(f"\n discarded {iteration_name}: mean {mean_new_data} > {self.LIMIT_MEAN}*{mean_all_data}")
+                return False
+            elif std_new_data > self.LIMIT_STD * std_all_data:
+                print(f"\n discarded {iteration_name}: std {std_new_data} > {self.LIMIT_STD}*{std_all_data}")
+                return False
+        return True
+
     def do(self, clear_previous_results=False):
         if clear_previous_results:
             results_to_plot = results_comparing = {}
@@ -287,8 +307,11 @@ class ExperimentRun:
                             result_mc = self.run_model(
                                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
                                 model_configuration, model_parameters, mc_iteration)
-                        graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
-                        result_iteration = pd.concat([result_iteration, result_mc])
+
+                        # time to decide what to do with result_mc: let's see the mean() and std():
+                        if self.data_seems_ok(f"{filename_for_iteration}_{i}", result_mc, result_iteration):
+                            graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+                            result_iteration = pd.concat([result_iteration, result_mc])
                     for k in result_iteration.keys():
                         if k.strip() == "t":
                             continue

@@ -19,10 +19,13 @@ import matplotlib.pyplot as plt
 class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 10
+    MC = 15
+
+    LIMIT_MEAN = 5
+    LIMIT_STD = 20
 
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "../experiments/surviving"
+    OUTPUT_DIRECTORY = "../experiments/surviving.10"
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.0001, 1, num=10),
@@ -33,7 +36,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 918994
+    seed = 318994
     seed_offset = 1
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
@@ -69,7 +72,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         return result_array
 
     @staticmethod
-    def generate_plot(title, output_file, data_to_plot, all_models, max_t):
+    def generate_plot(title, output_file, data_to_plot, all_models, max_t, logarithm=False):
         plt.clf()
         plt.title(f"{title} with RestrictedMarket p (MC={RestrictedMarketSurvivingRun.MC})")
         max_t = 0
@@ -82,6 +85,9 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         plt.legend(loc='best', title="p")
         # max of ticks we want in x range: 10
         plt.xticks(range(0, max_t, divmod(max_t, 10)[0]))
+        if logarithm:
+            plt.yscale('log')
+            plt.xscale('log')
         plt.savefig(f"{RestrictedMarketSurvivingRun.OUTPUT_DIRECTORY}/{output_file}")
 
     @staticmethod
@@ -108,7 +114,9 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         # now we open all the .gdt files:
         data_of_surviving_banks = {}
         data_of_failures_rationed = {}
+        data_of_failures_rationed_acum = {}
         data_of_failures = {}
+        data_of_failures_acum = {}
 
         all_models = []
         for model_configuration in experiment.get_models(RestrictedMarketSurvivingRun.parameters):
@@ -116,7 +124,9 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
             filename_for_iteration = experiment.get_filename_for_iteration(model_configuration, {})
             data_of_surviving_banks[filename_for_iteration] = []
             data_of_failures[filename_for_iteration] = []
+            data_of_failures_acum[filename_for_iteration] = []
             data_of_failures_rationed[filename_for_iteration] = []
+            data_of_failures_rationed_acum[filename_for_iteration] = []
             for i in range(RestrictedMarketSurvivingRun.MC):
                 if os.path.isfile(f"{RestrictedMarketSurvivingRun.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
                     result_mc = Statistics.read_gdt(
@@ -124,25 +134,44 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
                     data_of_surviving_banks[filename_for_iteration].append(result_mc['num_banks'])
                     # bankruptcies and bankruptcies rationed are accumulated data:
                     # [1,2,1,0,1] -> [1,3,4,4,5]
-                    data_of_failures[filename_for_iteration].append(
+                    data_of_failures[filename_for_iteration].append(result_mc['bankruptcies'])
+                    data_of_failures_acum[filename_for_iteration].append(
                         RestrictedMarketSurvivingRun.accumulated_data(result_mc['bankruptcies']))
-                    data_of_failures_rationed[filename_for_iteration].append(
+                    data_of_failures_rationed[filename_for_iteration].append(result_mc['bankruptcy_rationed'])
+                    data_of_failures_rationed_acum[filename_for_iteration].append(
                         RestrictedMarketSurvivingRun.accumulated_data(result_mc['bankruptcy_rationed']))
 
         # we have now MC different series for each iteration, so let's estimate the average of all the MonteCarlos:
         data_of_surviving_banks_avg = RestrictedMarketSurvivingRun.determine_average_of_series(data_of_surviving_banks)
         data_of_failures_avg = RestrictedMarketSurvivingRun.determine_average_of_series(data_of_failures)
+        data_of_failures_acum_avg = RestrictedMarketSurvivingRun.determine_average_of_series(data_of_failures_acum)
         data_of_failures_rationed_avg =\
             RestrictedMarketSurvivingRun.determine_average_of_series(data_of_failures_rationed)
+        data_of_failures_rationed_acum_avg =\
+            RestrictedMarketSurvivingRun.determine_average_of_series(data_of_failures_rationed_acum)
 
         max_t = RestrictedMarketSurvivingRun.determine_max_t([data_of_surviving_banks_avg,data_of_failures_avg,
                                                               data_of_failures_rationed_avg])
         RestrictedMarketSurvivingRun.generate_plot("Surviving banks", "_surviving.png",
                                                    data_of_surviving_banks_avg, all_models, max_t)
+        RestrictedMarketSurvivingRun.generate_plot("Surviving banks log", "_surviving_log.png",
+                                                   data_of_surviving_banks_avg, all_models, max_t, logarithm=True)
         RestrictedMarketSurvivingRun.generate_plot("Failures", "_failures.png",
                                                    data_of_failures_avg, all_models, max_t)
-        RestrictedMarketSurvivingRun.generate_plot("Failures rationed acum", "_rationed.png",
+        RestrictedMarketSurvivingRun.generate_plot("Failures log", "_failures_log.png",
+                                                   data_of_failures_avg, all_models, max_t, logarithm=True)
+        RestrictedMarketSurvivingRun.generate_plot("Failures acum", "_rationed_acum.png",
+                                                   data_of_failures_acum_avg, all_models, max_t)
+        RestrictedMarketSurvivingRun.generate_plot("Failures acum log", "_rationed_acum_log.png",
+                                                   data_of_failures_acum_avg, all_models, max_t, logarithm=True)
+        RestrictedMarketSurvivingRun.generate_plot("Failures rationed", "_rationed.png",
                                                    data_of_failures_rationed_avg, all_models, max_t)
+        RestrictedMarketSurvivingRun.generate_plot("Failures rationed", "_rationed_log.png",
+                                                   data_of_failures_rationed_avg, all_models, max_t, logarithm=True)
+        RestrictedMarketSurvivingRun.generate_plot("Failures rationed acum", "_rationed_acum.png",
+                                                   data_of_failures_rationed_acum_avg, all_models, max_t)
+        RestrictedMarketSurvivingRun.generate_plot("Failures rationed acum log", "_rationed_acum_log.png",
+                                                   data_of_failures_rationed_acum_avg, all_models, max_t, logarithm=True)
         return [data_of_surviving_banks_avg,
                 data_of_failures_rationed_avg,
                 data_of_failures_avg], all_models, max_t
