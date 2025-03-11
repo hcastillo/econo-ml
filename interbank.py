@@ -217,14 +217,14 @@ class Statistics:
     def compute_interest_loans_leverage(self):
         num_of_banks_that_are_lenders = 0
         num_of_banks_that_are_borrowers = 0
-        sum_of_interests_rates = 0
+        interests_rates_of_borrowers = []
 
         sum_of_asset_i = 0
         sum_of_asset_j = 0
         sum_of_equity = 0
         sum_of_equity_borrowers = 0
         sum_of_loans = 0
-        sum_of_leverage = 0
+        leverage_of_borrowers = []
         maxE = 0
 
         sum_of_potential_lenders = 0
@@ -241,12 +241,12 @@ class Statistics:
                 sum_of_asset_j += bank.asset_j
 
             if bank.get_loan_interest() is not None and bank.l > 0:
-                sum_of_interests_rates += bank.get_loan_interest()
-
+                interests_rates_of_borrowers.append(bank.get_loan_interest())
                 sum_of_loans += bank.l
-                sum_of_leverage += bank.l / bank.E
+                leverage_of_borrowers.append( bank.l / bank.E )
                 if bank.E > maxE:
                     maxE = bank.E
+
             if bank.active_borrowers:
                 num_of_banks_that_are_borrowers += len(bank.active_borrowers)
                 num_of_banks_that_are_lenders += 1
@@ -263,14 +263,15 @@ class Statistics:
                         num_elements += 1
                 avg_prob_bankruptcy = avg_prob_bankruptcy / num_elements
 
-            self.interest_rate[self.model.t] = sum_of_interests_rates / num_of_banks_that_are_lenders
+            self.interest_rate[self.model.t] = (sum(map(lambda x: x, interests_rates_of_borrowers)) /
+                                                len(interests_rates_of_borrowers))
             self.asset_i[self.model.t] = sum_of_asset_i / sum_of_potential_lenders
             self.asset_j[self.model.t] = sum_of_asset_j / sum_of_potential_borrowers
 
             self.equity[self.model.t] = sum_of_equity
             self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
             self.loans[self.model.t] = sum_of_loans / num_of_banks_that_are_lenders
-            self.leverage[self.model.t] = sum_of_leverage / num_of_banks_that_are_lenders
+            self.leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(leverage_of_borrowers)
             self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
             self.prob_bankruptcy[self.model.t] = avg_prob_bankruptcy
         else:
@@ -494,7 +495,7 @@ class Statistics:
         if columns and values:
             return pd.DataFrame(columns=columns, data=values)
         else:
-            return pd.Dataframe()
+            return pd.DataFrame()
 
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
