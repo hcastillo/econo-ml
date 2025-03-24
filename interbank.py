@@ -228,7 +228,8 @@ class Statistics:
                 asset_j.append(bank.asset_j)
             if bank.active_borrowers:
                 num_of_banks_that_are_lenders += 1
-                sum_of_loans += bank.l
+                for bank_that_is_borrower in bank.active_borrowers:
+                    sum_of_loans += bank.active_borrowers[bank_that_is_borrower]
             elif bank.l > 0:
                 num_of_banks_that_are_borrowers += 1
                 interests_rates_of_borrowers.append(bank.get_loan_interest())
@@ -253,7 +254,7 @@ class Statistics:
         leverage_of_borrowers = []
         for bank in self.model.banks:
             sum_of_equity += bank.E
-            if bank.get_loan_interest() is not None and bank.l > 0:
+            if bank.get_loan_interest() is not None and bank.l > 0:  #TODO
                 leverage_of_borrowers.append(bank.l / bank.E)
             if bank.active_borrowers:
                 for borrower in bank.active_borrowers:
@@ -1144,7 +1145,7 @@ class Model:
                     bank.get_lender().s -= bank.l  # we reduce the  's' => the lender could have more loans
                     bank.get_lender().C += bank.l  # we return the loan and it's profits
                     bank.get_lender().E += loan_profits  # the profits are paid as E
-                bank.E -= loan_profits
+                bank.E -= loan_profits #TODO
 
 
                 # now we have in bank.paid_loan or l
@@ -1235,7 +1236,7 @@ class Model:
         max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
         for bank in self.banks:
             bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
-            bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
+            bank.A = bank.C + bank.L + bank.R
 
         # determine c (lending capacity) for all other banks (to whom give loans):
         for bank in self.banks:
@@ -1386,6 +1387,9 @@ class Bank:
             self.paid_loan = recovered
             self.get_lender().B += bad_debt
             self.get_lender().E -= bad_debt
+            if self.get_lender().E < 0:
+                self.get_lender().failed = True
+            #TODO: hay que quebrar el lender si E<0
             self.get_lender().C += recovered
             self.model.log.debug(phase, f"{self.get_id()} bankrupted (fire sale={recovered_in_fire_sales:.3f},"
                                         f"recovers={recovered:.3f},paidD={self.D:.3f})"
