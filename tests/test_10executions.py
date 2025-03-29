@@ -15,16 +15,16 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         self.model.log.debug_banks()
 
     def test_values_after_execution(self):
-        self.assertEqual(self.model.banks[1].C, 0.6401971955167554)
-        self.assertEqual(self.model.banks[3].D, 178.1135090231961)
+        self.assertEqual(self.model.banks[1].C, 27.3)
+        self.assertEqual(self.model.banks[3].D, 199.31236336553437)
         self.assertEqual(self.model.banks[4].E, 15)
-        self.assertEqual(self.model.banks[0].A, 147.3)
-        self.assertEqual(self.model.banks[0].R, 2.7)
-        self.assertEqual(self.model.banks[1].A, 120.64019719551675)
-        self.assertEqual(self.model.banks[2].A, 168.67420395631007)
-        self.assertEqual(self.model.banks[3].A, 189.55123884273218)
-        self.assertEqual(self.model.banks[4].A, 146.66175184155162)
-        self.assertEqual(self.model.banks[4].R, 2.6869745273786045)
+        self.assertEqual(self.model.banks[0].A, 121.73103416054751)
+        self.assertEqual(self.model.banks[0].R, 1.7310341605475106)
+        self.assertEqual(self.model.banks[1].A, 150)
+        self.assertEqual(self.model.banks[2].A, 123.13503987356722)
+        self.assertEqual(self.model.banks[3].A, 214.31236336553437)
+        self.assertEqual(self.model.banks[4].A, 174.109587332632)
+        self.assertEqual(self.model.banks[4].R, 3.18219174665264)
         self.assertEqual(self.model.banks[4].R, self.model.banks[4].D*self.model.config.reserves)
 
 

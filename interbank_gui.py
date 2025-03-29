@@ -1,19 +1,21 @@
-from gooey import Gooey, GooeyParser
 import sys
+import gooey
 
 
 def graphical():
     try:
         import tkinter as tk
         tk.Tk().destroy()
-    except:
+    except ModuleNotFoundError:
         return False
     else:
         return True
 
-@Gooey
+
+@gooey.Gooey
 def create_gooey():
     return gooey.GooeyParser(description="Interbank model")
+
 
 def get_interactive_parser():
     if not sys.argv[1:] and graphical():

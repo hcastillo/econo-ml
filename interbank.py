@@ -93,13 +93,36 @@ class Config:
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
                            'num_banks': True, 'bankruptcy_rationed': True}
 
-    def __str__(self):
+    def __str__(self, separator=""):
         description = sys.argv[0] if __name__ == '__main__' else ''
         for attr in dir(self):
             value = getattr(self, attr)
             if isinstance(value, int) or isinstance(value, float):
-                description += f" {attr}={value}"
+                description += f" {attr}={value}{separator}"
         return description + " "
+
+    def define_values_from_args(self, config_list):
+        if config_list:
+            config_list.sort()
+            for item in config_list:
+                if item == '?':
+                    print(self.__str__(separator="\n"))
+                    sys.exit(0)
+                try:
+                    name_config, value_config = item.split("=")
+                except ValueError:
+                    logging.error("A config value should be passed as parameter=value")
+                    sys.exit(-1)
+                try:
+                    getattr(self, name_config)
+                except AttributeError:
+                    logging.error(f"Configuration has no '{name_config}' parameter")
+                    sys.exit(-1)
+                try:
+                    setattr(self, name_config, float(value_config))
+                except ValueError:
+                    logging.error(f"Value given for {value_config} is not valid")
+                    sys.exit(-1)
 
 
 # %%
@@ -123,8 +146,12 @@ class Statistics:
     asset_i = []
     asset_j = []
     equity = []
+    equity_borrowers = []
     P = []
     B = []
+    P_max = []
+    P_min = []
+    P_std = []
     active_borrowers = []
     active_lenders = []
     prob_bankruptcy = []
@@ -294,7 +321,6 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
         # only if we don't replace banks makes sense to report how many banks we have in each step:
-        #if not self.config.allow_replacement_of_bankrupted:
         self.num_banks[self.model.t] = len(self.model.banks)
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
@@ -409,7 +435,7 @@ class Statistics:
 
     def __generate_gdt(self, export_datafile, header):
         E = lxml.builder.ElementMaker()
-        GRETLDATA = E.gretldata
+        gretl_data = E.gretldata
         DESCRIPTION = E.description
         VARIABLES = E.variables
         VARIABLE = E.variable
@@ -430,7 +456,7 @@ class Statistics:
         header_text = ""
         for item in header:
             header_text += item + " "
-        gdt_result = GRETLDATA(
+        gdt_result = gretl_data(
             DESCRIPTION(header_text),
             variables,
             observations,
@@ -676,7 +702,8 @@ class Log:
         return result
 
     def __get_string_debug_banks__(self, details, bank):
-        text = f"{bank.get_id(short=True):6} C={Log.__format_number__(bank.C)} R={Log.__format_number__(bank.R)} L={Log.__format_number__(bank.L)}"
+        text = (f"{bank.get_id(short=True):6} C={Log.__format_number__(bank.C)} "
+                f"R={Log.__format_number__(bank.R)} L={Log.__format_number__(bank.L)}")
         amount_borrowed = 0
         list_borrowers = " borrows=["
         for bank_i in bank.active_borrowers:
@@ -1126,7 +1153,7 @@ class Model:
                         lack_of_capital_to_return_loan,
                         f"to return loan and interest {loan_to_return:.3f} > C={bank.C:.3f}",
                         "repay")
-                    # if returns None if borrower fails, in which case the bad debt and the cancel of loan it is
+                    # it returns None if borrower fails, in which case the bad debt and the cancel of loan it is
                     # done inside do_fire_sales() -> __do_bankruptcy__(). But that cancel after bankruptcy does not
                     # consider the profits:
                     if returned_by_borrower is not None:
@@ -1274,9 +1301,7 @@ class Model:
                 line1 += f"{bank_i.rij[j]:.3f},"
                 line2 += f"{bank_i.c[j]:.3f},"
             lines.append('  |' if lines else "c=|" + line2[:-1] + "| r=|" +
-                                             line1[
-                                             :-1] + 
-                                             f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
+                        line1[:-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
@@ -1287,7 +1312,7 @@ class Model:
             for line in lines:
                 self.log.debug("links", f"{line}")
         self.log.debug("links",
-                       f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
+                f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
 
         # (equation 7)
         log_info_1 = log_info_2 = ""
@@ -1336,6 +1361,13 @@ class Bank:
         self.model = bank_model
         self.failures = 0
         self.rationing = 0
+        self.lambda_ = 0
+        self.A = 0
+        self.rij = []
+        self.h = 0
+        self.p = 0
+        self.c = []
+        self.r = 0
         self.lender = None
         self.__assign_defaults__()
 
@@ -1434,6 +1466,8 @@ class Bank:
 
 class Gui:
     gooey = False
+    maximum = 100
+    current = 1
 
     def progress_bar(self, message, maximum):
         print(message)
@@ -1446,11 +1480,8 @@ class Gui:
         sys.stdout.flush()
 
     def parser(self):
-        try:
-            import interbank_gui
-            parser = interbank_gui.get_interactive_parser()
-        except:
-            parser = None
+        import interbank_gui
+        parser = interbank_gui.get_interactive_parser()
         if parser is None:
             parser = argparse.ArgumentParser()
         else:
@@ -1520,7 +1551,7 @@ class Utils:
                             help="No replace banks when they go bankrupted")
         parser.add_argument("--seed", type=int, default=None,
                             help="seed used for random generator")
-        args = parser.parse_args()
+        args, other_possible_config_args = parser.parse_known_args()
         if args.graph_stats:
             print(lc.GraphStatistics.describe(args.graph_stats))
             sys.exit(0)
@@ -1534,6 +1565,8 @@ class Utils:
             model.config.allow_replacement_of_bankrupted = False
         if args.debug:
             model.do_debug(args.debug)
+        if other_possible_config_args:
+            model.config.define_values_from_args(other_possible_config_args)
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)

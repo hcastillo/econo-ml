@@ -18,10 +18,10 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
 
     def test_values_after_execution(self):
         # model1 and model2 have different eta and so they will evolve different:
+        self.assertNotEqual(self.model1.banks[0].C, self.model2.banks[0].C)
         self.assertNotEqual(self.model1.banks[1].C, self.model2.banks[1].C)
         self.assertNotEqual(self.model1.banks[3].C, self.model2.banks[3].C)
         self.assertNotEqual(self.model1.banks[4].C, self.model2.banks[4].C)
-        self.assertNotEqual(self.model1.banks[2].C, self.model2.banks[2].C)
 
 
 if __name__ == '__main__':
