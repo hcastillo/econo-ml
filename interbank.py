@@ -111,17 +111,23 @@ class Config:
                 try:
                     name_config, value_config = item.split("=")
                 except ValueError:
-                    logging.error("A config value should be passed as parameter=value")
+                    logging.error("A Config value should be passed as parameter=value")
                     sys.exit(-1)
+                current_value = None
                 try:
-                    getattr(self, name_config)
+                    current_value = getattr(self, name_config)
                 except AttributeError:
-                    logging.error(f"Configuration has no '{name_config}' parameter")
+                    logging.error(f"Config has no '{name_config}' parameter")
                     sys.exit(-1)
                 try:
-                    setattr(self, name_config, float(value_config))
+                    if isinstance(current_value, int):
+                        setattr(self, name_config, int(value_config))
+                    elif isinstance(current_value, bool):
+                        setattr(self, name_config, value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'))
+                    else:
+                        setattr(self, name_config, float(value_config))
                 except ValueError:
-                    logging.error(f"Value given for {value_config} is not valid")
+                    logging.error(f"Value given for {name_config} is not valid: {value_config}")
                     sys.exit(-1)
 
 
@@ -676,21 +682,13 @@ class Log:
     model = None
     logLevel = "ERROR"
     progress_bar = None
-    graphical = False
 
     def __init__(self, its_model):
         self.model = its_model
 
-    def define_gui(self, gui):
-        self.graphical = gui.gooey
-
     def do_progress_bar(self, message, maximum):
-        if self.graphical:
-            self.progress_bar = Gui()
-            self.progress_bar.progress_bar(message, maximum)
-        else:
-            from progress.bar import Bar
-            self.progress_bar = Bar(message, max=maximum)
+        from progress.bar import Bar
+        self.progress_bar = Bar(message, max=maximum)
 
     @staticmethod
     def __format_number__(number):
@@ -1464,31 +1462,6 @@ class Bank:
                     return amount_to_sell
 
 
-class Gui:
-    gooey = False
-    maximum = 100
-    current = 1
-
-    def progress_bar(self, message, maximum):
-        print(message)
-        self.maximum = maximum
-        self.current = 1
-
-    def next(self):
-        self.current += 1
-        print("progress: {}%".format(self.current / self.maximum * 100))
-        sys.stdout.flush()
-
-    def parser(self):
-        import interbank_gui
-        parser = interbank_gui.get_interactive_parser()
-        if parser is None:
-            parser = argparse.ArgumentParser()
-        else:
-            self.gooey = True
-        return parser
-
-
 class Utils:
     """
     Auxiliary class to encapsulate the use of the model
@@ -1515,8 +1488,8 @@ class Utils:
             Run interactively the model
         """
         global model
-        gui = Gui()
-        parser = gui.parser()
+        parser = argparse.ArgumentParser()
+        parser.description = "<config=value> to set up Config options. use '?' to see values"
         parser.add_argument("--debug", type=int, default=None,
                             help="Stop and enter in debug mode after at this time")
         parser.add_argument("--log", default='ERROR', help="Log level messages (ERROR,DEBUG,INFO...)")
@@ -1565,14 +1538,12 @@ class Utils:
             model.config.allow_replacement_of_bankrupted = False
         if args.debug:
             model.do_debug(args.debug)
-        if other_possible_config_args:
-            model.config.define_values_from_args(other_possible_config_args)
+        model.config.define_values_from_args(other_possible_config_args)
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
         model.log.define_log(args.log, args.logfile, args.modules)
-        model.log.define_gui(gui)
         model.statistics.define_output_format(args.output_format)
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
