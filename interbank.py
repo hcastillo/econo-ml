@@ -65,6 +65,8 @@ class Config:
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
+    psi: float = 0.99 # market power parameter : 0 perfect competence .. 1 monopoly
+
     # banks initial parameters
     # L + C + R = D + E
     # but R = 0.02*D and C_i0= 30-2.7=27.3 and R=2.7
@@ -1283,7 +1285,7 @@ class Model:
                                              self.config.phi * self.banks[j].A -
                                              (1 - self.banks[j].p) *
                                              (self.config.xi * self.banks[j].A - bank_i.c[j])) \
-                                            / (self.banks[j].p * bank_i.c[j])
+                                            / (self.banks[j].p * bank_i.c[j] * (1-self.config.psi))
 
                             bank_i.asset_i += self.config.ji * bank_i.A
                             bank_i.asset_j += self.config.phi * self.banks[j].A
