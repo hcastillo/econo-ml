@@ -10,16 +10,18 @@ from interbank_lenderchange import ShockedMarket
 import exp_runner
 
 
-class MarketPowerRun(exp_runner.ExperimentRun):
+class ShockedMarketRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
     MC = 1
 
+    COMPARING_DATA = "../experiments/boltzmann"
+    COMPARING_LABEL = "Boltzmann"
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "../experiments/marketpower"
+    OUTPUT_DIRECTORY = "../experiments/shockedmarket"
 
     parameters = {
-        "psi": np.linspace(0.0, 0.99, num=10)
+        "p": np.linspace(0.001, 0.95, num=10)
     }
 
     LENGTH_FILENAME_PARAMETER = 5
@@ -34,8 +36,8 @@ class MarketPowerRun(exp_runner.ExperimentRun):
         model.config.lender_change = self.ALGORITHM()
         model.config.lender_change.set_parameter("p", execution_parameters["p"])
         model.configure(T=self.T, N=self.N, **execution_config)
-        MarketPowerRun.seed_offset += 1
-        model.initialize(seed=(self.seed + MarketPowerRun.seed_offset), save_graphs_instants=None,
+        ShockedMarketRun.seed_offset += 1
+        model.initialize(seed=(self.seed + ShockedMarketRun.seed_offset), save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
                          export_description=str(model.config) + str(execution_parameters))
@@ -45,4 +47,4 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
 if __name__ == "__main__":
     runner = exp_runner.Runner()
-    runner.do(MarketPowerRun)
+    runner.do(ShockedMarketRun)

@@ -1170,7 +1170,12 @@ class Model:
                     bank.get_lender().s -= bank.l  # we reduce the  's' => the lender could have more loans
                     bank.get_lender().C += bank.l  # we return the loan and it's profits
                     bank.get_lender().E += loan_profits  # the profits are paid as E
+                    #TODO maybe it has been removed prev if it is failed:
+                    if bank.id in bank.get_lender().active_borrowers:
+                        del bank.get_lender().active_borrowers[bank.id]
                 bank.E -= loan_profits
+                if bank.E < 0:
+                    bank.failed = True
 
         # now we should analyze the banks that were lenders. They can have in .d a value (that
         # should mean that they don't have enough C to cover the negative shock of D) but maybe

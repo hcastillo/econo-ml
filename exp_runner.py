@@ -33,7 +33,7 @@ class ExperimentRun:
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
 
-    XTICKS_DIVISOR = 4
+    XTICKS_DIVISOR = 1
 
     LABEL = "Invalid"
     OUTPUT_DIRECTORY = "Invalid"
