@@ -27,7 +27,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 988994
+    seed = 9999
     seed_offset = 1
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):

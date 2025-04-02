@@ -173,7 +173,7 @@ class ExperimentRun:
 
     def __filename_clean(self, value, max_length):
         value = str(value)
-        for r in "{}',: ":
+        for r in "{}',: .":
             value = value.replace(r, "")
         if value.endswith(".0"):
             # integer: 0 at left
