@@ -6,7 +6,7 @@ import interbank
 import tests.interbank_testclass
 
 
-class Balance3TestCase(tests.interbank_testclass.InterbankTest):
+class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     """
     test lender gives two loans: one of it could be paid correctly and the second one
          makes fails to the lender

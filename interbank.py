@@ -1071,6 +1071,8 @@ class Model:
                 if bank.incrD > 0:
                     self.log.debug(which_shock,
                                    f"{bank.get_id()} wins ΔD={bank.incrD:.3f}")
+                else:
+                    self.log.debug(which_shock, f"{bank.get_id()} has no shock")
             else:
                 # if "shock1" then we cannot be a lender: we have lost deposits
                 if which_shock == "shock1":
@@ -1083,8 +1085,15 @@ class Model:
                 else:
                     bank.d = abs(bank.incrD - bank.incrR + bank.C)  # it will need money
                     self.log.debug(which_shock,
-                                   f"{bank.get_id()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}")
-                    bank.C = 0  # we run out of capital
+                                   f"{bank.get_id()} loses ΔD={bank.incrD:.3f} has C={bank.C:.3f} "
+                                   f"and needs {bank.d:.3f}")
+
+                    if which_shock == "shock2":
+                        # in case shock2, we need to fire sale to cover that bank.d:
+                        bank.do_fire_sales(bank.d, f"ΔD={bank.incrD:.3f},C=0 and we need {bank.d:.3f}", which_shock)
+                    else:
+                        bank.C = 0
+
             self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
@@ -1470,7 +1479,7 @@ class Bank:
         #         extra_cost_of_selling = 25-5 = 20
         if cost_of_sell > self.L:
             self.model.log.debug(phase,
-                                 f"{self.get_id()} impossible fire sale to recover {amount_to_sell}: "
+                                 f"{self.get_id()} impossible fire sale to recover {amount_to_sell:.3f}: "
                                  f"cost_sell_L={cost_of_sell:.3f} > L={self.L:.3f}: {reason}")
             # we will return what remains in the bank after do bankruptcy:
             return self.do_bankruptcy(phase)
@@ -1478,7 +1487,7 @@ class Bank:
             self.L -= cost_of_sell
             self.E -= extra_cost_of_selling
             self.model.log.debug(phase,f"{self.get_id()} fire sales {amount_to_sell} "
-                                 f"so L-={cost_of_sell} and affects to E-={extra_cost_of_selling}")
+                                 f"so L-={cost_of_sell} and affects to E-={extra_cost_of_selling:.3f}")
             if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,
                                      f"{self.get_id()} new L={self.L:.3f} is under threshold {self.model.config.alfa}"
@@ -1497,7 +1506,7 @@ class Bank:
                 else:
                     self.model.log.debug(phase,
                                          f"{self.get_id()} fire sale sellL={amount_to_sell:.3f} "
-                                         f"at cost {cost_of_sell:.3f} reducing"
+                                         f"at cost {cost_of_sell:.3f} reducing "
                                          f"E={extra_cost_of_selling:.3f}: {reason}")
                     return amount_to_sell
 
