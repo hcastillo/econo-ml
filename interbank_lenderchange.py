@@ -146,7 +146,7 @@ def save_graph_png(graph, description, filename, add_info=False):
 
 def save_graph_json(graph, filename):
     if graph:
-        graph_json = nx.node_link_data(graph)
+        graph_json = nx.node_link_data(graph, edges="links")
         with open(filename, 'w') as f:
             json.dump(graph_json, f)
 

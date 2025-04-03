@@ -1501,14 +1501,7 @@ class Bank:
                                          f"{self.get_id()} new E={self.E:.3f} is under threshold "
                                          f"{self.model.config.alfa} and makes bankruptcy of bank: {reason}")
                     self.do_bankruptcy(phase)
-                    # we will fail, but we have obtained correctly amount_to_sell before failing:
-                    return amount_to_sell
-                else:
-                    self.model.log.debug(phase,
-                                         f"{self.get_id()} fire sale sellL={amount_to_sell:.3f} "
-                                         f"at cost {cost_of_sell:.3f} reducing "
-                                         f"E={extra_cost_of_selling:.3f}: {reason}")
-                    return amount_to_sell
+                return amount_to_sell
 
 
 class Utils:

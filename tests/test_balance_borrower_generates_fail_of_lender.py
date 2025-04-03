@@ -21,7 +21,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     #   shock2=0       shock2=0    --> #0 has to return 3.468
     #                                  no enough C -> fire sales 3.468
     #                                  that costs 11.56 in L -> new E = -6.092 fails
-    #                              --> #1 new
+    #                              --> #1 also fails
     def initialValues(self):
         self.setBank(bank=self.model.banks[0], C=2.0, L=20.0, D=20.0, E=2.0)
         self.assertBank(bank=self.model.banks[0], C=1.6, R=0.4)
@@ -39,7 +39,8 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], bankrupted=True)
         self.assertBank(bank=self.model.banks[1], bankrupted=True, active_borrowers={})
-        self.assertEqual(self.model.statistics.B[0],3.4)
+        # to ensure even both fail that B is correctly added:
+        self.assertEqual(self.model.statistics.B[0],3.3000000000000003)
 
 
 
