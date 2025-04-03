@@ -31,7 +31,7 @@ class InterbankTest(unittest.TestCase):
         else:
             return value
 
-    def setBank(self, bank: interbank.Bank, C: float, L: float, D: float, E: float):
+    def setBank(self, bank: interbank.Bank, C: float, L: float, D: float, E: float, lender: int = None):
         D = self.__check_values__(bank, 'D', D)
         L = self.__check_values__(bank, 'L', L)
         E = self.__check_values__(bank, 'E', E)
@@ -48,11 +48,13 @@ class InterbankTest(unittest.TestCase):
         bank.C = C
         bank.D = D
         bank.R = R
+        if not lender is None:
+            bank.lender = lender
 
     def assertBank(self, bank: interbank.Bank, C: float = None, L: float = None, R: float = None, D: float = None,
                    E: float = None,
-                   paid_loan: float = None, s: float = None, d: float = None,
-                   B: float = None, bankrupted: bool = False):
+                   paid_loan: float = None, paid_profits: float = None, s: float = None, d: float = None,
+                   B: float = None, bankrupted: bool = False, active_borrowers: dict = None):
         if L:
             self.assertEqual(bank.L, L)
         if E:
@@ -65,12 +67,16 @@ class InterbankTest(unittest.TestCase):
             self.assertEqual(bank.D, D)
         if paid_loan:
             self.assertEqual(bank.paid_loan, paid_loan)
+        if paid_profits:
+            self.assertEqual(bank.paid_profits, paid_profits)
         if d:
             self.assertEqual(bank.d, d)
         if s:
             self.assertEqual(bank.s, s)
         if B:
             self.assertEqual(bank.B, B)
+        if not active_borrowers is None:
+            self.assertEqual(bank.active_borrowers, active_borrowers)
         if bankrupted:
             self.assertGreater(bank.failures, 0)
         else:
@@ -84,9 +90,9 @@ def mockedShock(model, whichShock):
     for bank in model.banks:
         bank.incrD = InterbankTest.shocks[model.t][whichShock][bank.id]
         if bank.D + bank.incrD < 0:
-            bank.incrD = bank.D + bank.incrD if bank.D > 0 else 0
             model.log.debug("******",
                             f"{bank.get_id()} modified simulated ΔD={bank.incrD:.3f} because we had only D={bank.D:.3f}")
+            bank.incrD = bank.D + bank.incrD if bank.D > 0 else 0
         bank.D += bank.incrD
         if bank.incrD >= 0:
             bank.C += bank.incrD

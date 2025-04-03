@@ -38,6 +38,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], bankrupted=True)
         self.assertBank(bank=self.model.banks[1], C=11.299999999999999, L=15.0, D=20.0, E=6.6, s=7.899999999999999, B=3.4)
+        self.assertEqual(self.model.statistics.B[0],3.4)
 
 
 if __name__ == '__main__':

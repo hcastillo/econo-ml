@@ -906,7 +906,7 @@ class Model:
         self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
-        self.statistics.compute_bad_debt()
+        # self.statistics.compute_bad_debt()
         self.statistics.compute_rationing()
         self.statistics.compute_deposits_and_reserves()
         # only N<=1 could happen if we remove banks:
@@ -1172,23 +1172,25 @@ class Model:
                     # if we fail, we don't need to increase B because it is increased inside
                     # do_fire_sales->do_bankruptcy, the relevant here is to increment correctly lender.C and lender.E:
                     if gap_of_money_not_covered_of_loan>loan_profits:
-                        profits_paid = 0
-                        loan_paid = bank.l - gap_of_money_not_covered_of_loan + loan_profits
+                        bank.paid_profits = 0
+                        bank.paid_loan = bank.l - gap_of_money_not_covered_of_loan + loan_profits
                     else:
-                        loan_paid = bank.l
-                        profits_paid = loan_profits - gap_of_money_not_covered_of_loan
+                        bank.paid_loan = bank.l
+                        bank.paid_profits = loan_profits - gap_of_money_not_covered_of_loan
                     # only if both lender and borrower have not failed, we return the loan:
                     if not bank.get_lender().failed and not bank.failed:
-                        bank.get_lender().C += loan_paid
-                        bank.get_lender().E += profits_paid
+                        bank.get_lender().C += bank.paid_loan
+                        bank.get_lender().E += bank.paid_profits
                         del bank.get_lender().active_borrowers[bank.id]
                 else:
                     # the can pay the debt normally:
                     bank.C -= loan_to_return
-                    bank.get_lender().C += bank.l  # we return the loan and it's profits
-                    bank.get_lender().E += loan_profits  # the profits are paid as E
+                    bank.paid_loan = bank.l
+                    bank.paid_profits = loan_profits
+                    bank.get_lender().C += bank.paid_loan     # we return the loan and it's profits
+                    bank.get_lender().E += bank.paid_profits  # the profits are paid as E
                     del bank.get_lender().active_borrowers[bank.id]
-                bank.get_lender().s -= bank.l  # we reduce the  's' => the lender could have more loans
+                bank.get_lender().s += bank.paid_loan  # we have recovered in 's' the loan
                 bank.E -= loan_profits
                 if bank.E < 0:
                     bank.failed = True
@@ -1212,6 +1214,7 @@ class Model:
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
 
     def replace_bankrupted_banks(self):
+        self.statistics.compute_bad_debt()
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
         num_banks_failed_rationed = 0
         total_removed = 0
@@ -1255,6 +1258,8 @@ class Model:
         for bank in self.banks:
             bank.B = 0
             bank.rationing = 0
+            bank.paid_profits = 0
+            bank.paid_loan = 0
             bank.active_borrowers = {}
         # self.config.lender_change.initialize_step(self)
         if self.t == 0:
@@ -1402,6 +1407,8 @@ class Bank:
         self.d = 0  # amount of demand of loan
         self.B = 0  # bad debt: estimated later
         self.incrD = 0
+        self.paid_profits = 0
+        self.paid_loan = 0
         self.incrR = 0
         self.rationing = 0
         self.lambda_ = 0
@@ -1427,14 +1434,14 @@ class Bank:
 
         bad_debt = self.l - recovered  # the fire sale minus paying D: what the lender recovers
         self.D = 0
-        if self.get_lender() and self.l>0:
+        if not self.get_lender() is None and self.l>0:
             if bad_debt > 0:
                 self.get_lender().B += bad_debt
                 self.get_lender().E -= bad_debt
                 # Lender will be failed also if E<0:
                 if self.get_lender().E < 0:
                     self.model.log.debug(phase, f"{self.get_lender().get_id()} lender is bankrupted "
-                                         f"because {self.get_id()} does not return loan and due to that lender E<0")
+                               f" borrower {self.get_id()} does not return loan and lender E<0: {self.get_lender().E}")
                     self.get_lender().failed = True
                 self.get_lender().C += recovered
                 self.model.log.debug(phase, f"{self.get_id()} bankrupted (fire sale={recovered_in_fire_sales:.3f},"
@@ -1448,9 +1455,10 @@ class Bank:
                     self.model.log.debug(phase, f"{self.get_id()} bankrupted "
                                                 f"(lender{self.get_lender().get_id(short=True)}"
                                                 f".ΔB=0,ΔC={recovered:.3f}) (paidD={self.l:.3f})")
-            # we remove the loan only if we have not failed, if we have failed we have already even increased B:
-            if not self.failed:
-                self.get_lender().s -= self.l
+            # we return to .s the amount we have recovered and remove the bankrupted from
+            # the lender list of active_borrowers if it was not removed before in fire_sales:
+            self.get_lender().s += recovered
+            if self.id in self.get_lender().active_borrowers:
                 del self.get_lender().active_borrowers[self.id]
         return recovered
 
@@ -1462,8 +1470,8 @@ class Bank:
         #         extra_cost_of_selling = 25-5 = 20
         if cost_of_sell > self.L:
             self.model.log.debug(phase,
-                                 f"{self.get_id()} impossible fire sale "
-                                 f"sell_L={cost_of_sell:.3f} > L={self.L:.3f}: {reason}")
+                                 f"{self.get_id()} impossible fire sale to recover {amount_to_sell}: "
+                                 f"cost_sell_L={cost_of_sell:.3f} > L={self.L:.3f}: {reason}")
             # we will return what remains in the bank after do bankruptcy:
             return self.do_bankruptcy(phase)
         else:
