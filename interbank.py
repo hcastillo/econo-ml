@@ -1469,6 +1469,8 @@ class Bank:
         else:
             self.L -= cost_of_sell
             self.E -= extra_cost_of_selling
+            self.model.log.debug(phase,f"{self.get_id()} fire sales {amount_to_sell} "
+                                 f"so L-={cost_of_sell} and affects to E-={extra_cost_of_selling}")
             if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,
                                      f"{self.get_id()} new L={self.L:.3f} is under threshold {self.model.config.alfa}"
