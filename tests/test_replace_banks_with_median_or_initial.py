@@ -8,8 +8,8 @@ import tests.interbank_testclass
 
 class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     """
-    test lender gives two loans: one of it could be paid correctly and the second one
-         makes fails to the lender
+    if bank fails we can replace it using average values of surviving or the initial
+       values of L_i0, etc
     """
 
     #       #0             #1             #2
@@ -29,7 +29,8 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     #   C=9.49| D=20    failed          failed
     #   L=20  | E=9.89
     #   R=0.4 |
-
+    #   t=1
+    #
     def initialValues(self):
         self.setBank(bank=self.model.banks[0], C=10.0, L=20.0, D=20.0, E=10.0, lender=1)
         self.setBank(bank=self.model.banks[1], C=20.0, L=14.0, D=30.0, E=4.0)
@@ -42,15 +43,16 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
                                {"shock1": [-15, 5, -20], "shock2": [15, 3, 0], },
                            ])
         self.initialValues()
+        self.model.config.reintroduce_with_median = True
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[2], paid_loan=0, bankrupted=True)
-        self.assertBank(bank=self.model.banks[1], bankrupted=True)
         self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=False)
-        # even #1 has failed, the bad debt of #1 is taken into account:
-        # the loan of #2 not returned partially, generates 4.4 in bad debt
-        self.assertEqual(self.model.statistics.B[0],5.000000000000002)
+        # like only 1 has survived, both #1 and #2 will have new values with C,D,E equal to bank #0:
+        self.assertBank(bank=self.model.banks[2], bankrupted=True,
+                        C=self.model.banks[0].C, L=self.model.banks[0].L, D=self.model.banks[0].D)
+        self.assertBank(bank=self.model.banks[1], bankrupted=True,
+                        C = self.model.banks[0].C, L = self.model.banks[0].L, D = self.model.banks[0].D)
 
 
 if __name__ == '__main__':

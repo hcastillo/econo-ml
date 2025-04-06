@@ -235,16 +235,11 @@ class ExperimentRun:
             gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
             communities.append(len(graph_communities))
             lengths += [len(i) for i in graph_communities]
-        if not 'grade_max' in results:
-            results['grade_max'] = []
+        if not 'grade_avg' in results:
             results['grade_avg'] = []
             results['communities'] = []
             results['communities_not_alone'] = []
             results['gcs'] = []
-        try:
-            results['grade_max'].append([max(lengths), 0])
-        except ValueError:
-            results['grade_max'].append([0, 0])
         results['grade_avg'].append([0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0])
         results['communities'].append([(sum(communities)) / len(communities), 0])
         results['communities_not_alone'].append([(sum(communities_not_alone)) / len(communities_not_alone), 0])
@@ -267,12 +262,12 @@ class ExperimentRun:
             std_new_data = new_data.interest_rate.std()
             mean_all_data = array_all_data.interest_rate.mean()
             std_all_data = array_all_data.interest_rate.std()
-            if mean_new_data > self.LIMIT_MEAN * mean_all_data:
-                print(f"\n discarded {iteration_name}: mean {mean_new_data} > {self.LIMIT_MEAN}*{mean_all_data}")
-                return False
-            elif std_new_data > self.LIMIT_STD * std_all_data:
-                print(f"\n discarded {iteration_name}: std {std_new_data} > {self.LIMIT_STD}*{std_all_data}")
-                return False
+            # if mean_new_data > self.LIMIT_MEAN * mean_all_data:
+            #    print(f"\n discarded {iteration_name}: mean {mean_new_data} > {self.LIMIT_MEAN}*{mean_all_data}")
+            #    return False
+            #elif std_new_data > self.LIMIT_STD * std_all_data:
+            #    print(f"\n discarded {iteration_name}: std {std_new_data} > {self.LIMIT_STD}*{std_all_data}")
+            #    return False
         return True
 
     def do(self, clear_previous_results=False):

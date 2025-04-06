@@ -25,6 +25,8 @@ import networkx as nx
 import sys
 import os
 import matplotlib.pyplot as plt
+from spyder.config.gui import set_font
+
 import interbank_lenderchange as lc
 import pandas as pd
 import lxml.etree
@@ -47,6 +49,11 @@ class Config:
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
 
+    # If true allow_replacement, then:
+    #    - reintroduce=False we reintroduce bankrupted banks with initial values
+    #    - reintroduce=True we reintroduce with median of current values
+    reintroduce_with_median = False
+
     # shocks parameters:
     mi: float = 0.7  # mi µ
     omega: float = 0.6  # omega ω
@@ -65,7 +72,7 @@ class Config:
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
-    psi: float = 0.99 # market power parameter : 0 perfect competence .. 1 monopoly
+    psi: float = 0  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # banks initial parameters
     # L + C + R = D + E
@@ -76,6 +83,7 @@ class Config:
     D_i0: float = 135  # deposits
     E_i0: float = 15  # equity
     r_i0: float = 0.02  # initial rate
+
 
     # if enabled and != [] the values of t in the array (for instance [150,350]) will generate
     # a graph with the relations of the firms. If * all the instants will generate a graph, and also an animated gif
@@ -299,8 +307,9 @@ class Statistics:
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
         self.leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(leverage_of_borrowers) \
-            if len(leverage_of_borrowers) else 0
-        self.systemic_leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(self.model.banks)
+            if len(leverage_of_borrowers)>0 else 0
+        self.systemic_leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(self.model.banks) \
+            if len(self.model.banks)>0 else 0
 
     def compute_liquidity(self):
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
@@ -701,50 +710,11 @@ class Log:
             result = result[:-1]
         return result
 
-    def __get_string_debug_banks__(self, details, bank):
-        text = (f"{bank.get_id(short=True):6} C={Log.__format_number__(bank.C)} "
-                f"R={Log.__format_number__(bank.R)} L={Log.__format_number__(bank.L)}")
-        amount_borrowed = 0
-        list_borrowers = " borrows=["
-        for bank_i in bank.active_borrowers:
-            list_borrowers += self.model.banks[bank_i].get_id(short=True) + ","
-            amount_borrowed += bank.active_borrowers[bank_i]
-        if amount_borrowed:
-            text += f" l={Log.__format_number__(amount_borrowed)}"
-            list_borrowers = list_borrowers[:-1] + "]"
-        else:
-            text += "        "
-            list_borrowers = ""
-        text += f" | D={Log.__format_number__(bank.D)} E={Log.__format_number__(bank.E)}"
-        if details and hasattr(bank, 'd') and bank.d and bank.l:
-            text += f" l={Log.__format_number__(bank.d)}"
-        else:
-            text += "        "
-        if details and hasattr(bank, 's') and bank.s:
-            text += f" s={Log.__format_number__(bank.s)}"
-        else:
-            if details and hasattr(bank, 'd') and bank.d:
-                text += f" d={Log.__format_number__(bank.d)}"
-            else:
-                text += "        "
-        if bank.failed:
-            text += f" FAILED "
-        else:
-            if details and hasattr(bank, 'd') and bank.d > 0:
-                if bank.get_lender() is None:
-                    text += f" no lender"
-                else:
-                    text += f" lender{bank.get_lender().get_id(short=True)},r={bank.get_loan_interest():.2f}%"
-            else:
-                text += list_borrowers
-        text += f" B={Log.__format_number__(bank.B)}" if bank.B else "        "
-        return text
-
     def debug_banks(self, details: bool = True, info: str = ''):
         for bank in self.model.banks:
             if not info:
                 info = "-----"
-            self.info(info, self.__get_string_debug_banks__(details, bank))
+            self.info(info, bank.__str__(details=details))
 
     @staticmethod
     def get_level(option):
@@ -839,6 +809,9 @@ class Model:
         self.log = Log(self)
         self.statistics = Statistics(self)
         self.config = Config()
+        self.value_for_reintroduced_banks_L = self.config.L_i0
+        self.value_for_reintroduced_banks_E = self.config.E_i0
+        self.value_for_reintroduced_banks_D = self.config.D_i0
         if configuration:
             self.configure(**configuration)
         if self.backward_enabled:
@@ -1220,6 +1193,7 @@ class Model:
                 if bank.d > 0:  # and we have less deposits (incrD=d)
                     bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
 
+        self.estimate_average_values_for_replacement_of_banks()
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
 
     def replace_bankrupted_banks(self):
@@ -1365,6 +1339,26 @@ class Model:
         for bank in self.banks:
             self.log.debug("links", self.config.lender_change.change_lender(self, bank, self.t))
 
+    def estimate_average_values_for_replacement_of_banks(self):
+        self.value_for_reintroduced_banks_L = self.config.L_i0
+        self.value_for_reintroduced_banks_E = self.config.E_i0
+        self.value_for_reintroduced_banks_D = self.config.D_i0
+        if self.config.reintroduce_with_median:
+            banks_L = []
+            banks_E = []
+            banks_D = []
+            for bank in self.banks:
+                if not bank.failed and bank.E > 0:
+                    banks_L.append(bank.L)
+                    banks_D.append(bank.D)
+                    banks_E.append(bank.E)
+            if banks_L:
+                self.value_for_reintroduced_banks_L = np.median(banks_L)
+                self.value_for_reintroduced_banks_D = np.median(banks_D)
+                self.value_for_reintroduced_banks_E = np.median(banks_E)
+
+
+
 
 # %%
 
@@ -1399,15 +1393,15 @@ class Bank:
             self.model = bank_model
             self.lender = None
             self.failures = 0
-        self.L = self.model.config.L_i0
-        self.D = self.model.config.D_i0
+        self.L = self.model.value_for_reintroduced_banks_L
+        self.D = self.model.value_for_reintroduced_banks_D
+        self.E = self.model.value_for_reintroduced_banks_E
         self.A = 0
         self.r = 0
         self.rij = [0] * self.model.config.N
         self.c = []
         self.h = 0
         self.p = 0
-        self.E = self.model.config.E_i0
         self.R = self.model.config.reserves * self.D
         self.C = self.D + self.E - self.L - self.R
         self.mu = 0  # fitness of the bank:  estimated later
@@ -1503,6 +1497,45 @@ class Bank:
                     self.do_bankruptcy(phase)
                 return amount_to_sell
 
+    def __str__(self, details=False):
+        text = (f"{self.get_id(short=True):6} C={Log.__format_number__(self.C)} "
+                f"R={Log.__format_number__(self.R)} L={Log.__format_number__(self.L)}")
+        amount_borrowed = 0
+        list_borrowers = " borrows=["
+        for bank_i in self.active_borrowers:
+            list_borrowers += self.model.banks[bank_i].get_id(short=True) + ","
+            amount_borrowed += self.active_borrowers[bank_i]
+        if amount_borrowed:
+            text += f" l={Log.__format_number__(amount_borrowed)}"
+            list_borrowers = list_borrowers[:-1] + "]"
+        else:
+            text += "        "
+            list_borrowers = ""
+        text += f" | D={Log.__format_number__(self.D)} E={Log.__format_number__(self.E)}"
+        if details and hasattr(self, 'd') and self.d and self.l:
+            text += f" l={Log.__format_number__(self.d)}"
+        else:
+            text += "        "
+        if details and hasattr(self, 's') and self.s:
+            text += f" s={Log.__format_number__(self.s)}"
+        else:
+            if details and hasattr(self, 'd') and self.d:
+                text += f" d={Log.__format_number__(self.d)}"
+            else:
+                text += "        "
+        if self.failed:
+            text += f" FAILED "
+        else:
+            if details and hasattr(self, 'd') and self.d > 0:
+                if self.get_lender() is None:
+                    text += f" no lender"
+                else:
+                    text += f" lender{self.get_lender().get_id(short=True)},r={self.get_loan_interest():.2f}%"
+            else:
+                text += list_borrowers
+        text += f" B={Log.__format_number__(self.B)}" if self.B else "        "
+        return text
+
 
 class Utils:
     """
@@ -1564,12 +1597,13 @@ class Utils:
                             help="Directory where to store the results")
         parser.add_argument("--no_replace", action='store_true', default=False,
                             help="No replace banks when they go bankrupted")
+        parser.add_argument("--reintr_with_median", action="store_true", default=False,
+                            help="Reintroduce banks with the median of current banks")
         parser.add_argument("--seed", type=int, default=None,
                             help="seed used for random generator")
         args, other_possible_config_args = parser.parse_known_args()
         if args.graph_stats:
-            print(lc.GraphStatistics.describe(args.graph_stats))
-            sys.exit(0)
+            lc.GraphStatistics.describe(args.graph_stats, interact=True)
         if args.t != model.config.T:
             model.config.T = args.t
         if args.n != model.config.N:
@@ -1578,6 +1612,8 @@ class Utils:
             model.eta = args.eta
         if args.no_replace:
             model.config.allow_replacement_of_bankrupted = False
+        if args.reintr_with_median:
+            model.config.reintroduce_with_median = True
         if args.debug:
             model.do_debug(args.debug)
         model.config.define_values_from_args(other_possible_config_args)

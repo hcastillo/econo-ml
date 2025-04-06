@@ -154,7 +154,7 @@ def save_graph_json(graph, filename):
 def load_graph_json(filename):
     with open(filename, 'r') as f:
         graph_json = json.load(f)
-        return nx.node_link_graph(graph_json)
+        return nx.node_link_graph(graph_json, edges="links")
 
 
 def __len_edges(graph, node):
@@ -230,12 +230,18 @@ class GraphStatistics:
         except ZeroDivisionError:
             return 0
 
-
     @staticmethod
     def communities(graph):
         """Communities using greedy modularity maximization"""
-        return nx.community.greedy_modularity_communities(graph, resolution=0.5)
+        return list(nx.weakly_connected_components(graph))
 
+    @staticmethod
+    def grade_avg(graph):
+        communities = GraphStatistics.communities(graph)
+        total = 0
+        for community in communities:
+            total += len(community)
+        return total / len(communities)
 
     @staticmethod
     def communities_not_alone(graph):
@@ -245,26 +251,35 @@ class GraphStatistics:
             total += len(community) > 1
         return total
 
-
     @staticmethod
-    def describe(graph):
+    def describe(graph, interact=False):
         if isinstance(graph, str):
+            graph_name = graph
             try:
-                graph = load_graph_json(graph)
+                graph = load_graph_json(graph_name)
             except FileNotFoundError:
                 print("json file does not exist: %s" % graph)
                 sys.exit(0)
-            except:
+            except (UnicodeDecodeError, json.decoder.JSONDecodeError) as e:
                 print("json file does not contain a valid graph: %s" % graph)
                 sys.exit(0)
-        # clustering = GraphStatistics.avg_clustering_coef(graph)
-        # if clustering > 0 and clustering < 1:
-        #     clustering = f"clus_coef={clustering:5.3f}"
-        # else:
-        #     clustering = f"clus_coef={clustering}"
-        return (f"giant={GraphStatistics.giant_component_size(graph)} " +
-                f" comm_not_alone={GraphStatistics.communities_not_alone(graph)}" +
-                f" comm={len(GraphStatistics.communities(graph))}")
+        else:
+            graph_name = '?'
+        communities = GraphStatistics.communities(graph)
+        string_result = f"giant={GraphStatistics.giant_component_size(graph)} " + \
+                        f" comm_not_alone={GraphStatistics.communities_not_alone(graph)}" + \
+                        f" comm={len(communities)}" + \
+                        f" grade_avg={GraphStatistics.grade_avg(graph)}" + \
+                        f" gcs={GraphStatistics.giant_component_size(graph)}"
+        if interact:
+            import code
+            print(string_result)
+            print("communities=", list(GraphStatistics.communities(graph)))
+            print(f"\n{graph_name} loaded into 'graph'\n")
+            code.interact(local=locals())
+            sys.exit(0)
+        else:
+            return string_result
 
 
 def __get_graph_from_guru(input_graph, output_graph, current_node, previous_node):

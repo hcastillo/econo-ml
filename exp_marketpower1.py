@@ -18,6 +18,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
     ALGORITHM = ShockedMarket
     OUTPUT_DIRECTORY = "../experiments/marketpower1"
+    COMPARING_DATA = "not_valid"
 
     parameters = {  # items should be iterable:
         "psi": np.linspace(0.0, 0.99, num=10),
@@ -76,20 +77,29 @@ class MarketPowerRun(exp_runner.ExperimentRun):
         data_columns = list(next(iter(data[next(iter(data))])).columns)
         for k in data_columns:
             with open(f"{MarketPowerRun.OUTPUT_DIRECTORY}/_{k}.csv", "w") as file:
+                f1 = open(f"{MarketPowerRun.OUTPUT_DIRECTORY}/_{k}_mean.csv", "w")
                 for j in all_models[next(iter(all_models))]:
                     file.write(f";phi={j}")
+                    f1.write(f";phi={j}")
                 file.write("\n")
+                f1.write("\n")
 
                 for i in all_models:
                     file.write(f"p={i}")
+                    f1.write(f"p={i}")
                     for j in all_models[i]:
                         value = data[all_models[i][j]][0][k].median()
+                        value_mean = data[all_models[i][j]][0][k].mean()
                         for l in range(1, 1+len(data[all_models[i][j]][1:])):
                             value += data[all_models[i][j]][l][k].median()
+                            value_mean += data[all_models[i][j]][l][k].mean()
                         value /= len(data[all_models[i][j]])
-                        file.write(f";{value}")
+                        value_mean /= len(data[all_models[i][j]])
+                        file.write(f";{value}".replace(".",","))
+                        f1.write(f";{value_mean}".replace(".", ","))
                     file.write("\n")
-
+                    f1.write("\n")
+                f1.close()
 
 if __name__ == "__main__":
     runner = exp_runner.Runner()

@@ -38,6 +38,7 @@ class WholeExecution(unittest.TestCase):
         model.finish()
         os.remove('tests\\test_whole_execution_preferential_barabasi_pref.json')
         os.remove('tests\\test_whole_execution_preferential_barabasi_pref.png')
+        os.remove('tests\\test_whole_execution_preferential.gdt')
 
 
     def test_values_after_execution(self):

@@ -41,6 +41,8 @@ class WholeExecution(unittest.TestCase):
         model.finish()
         os.remove('tests\\test_whole_execution_restrictedmarket_erdos_renyi.json')
         os.remove('tests\\test_whole_execution_restrictedmarket_erdos_renyi.png')
+        os.remove('tests\\test_whole_execution_restrictedmarket.gdt')
+
 
     def test_values_after_execution(self):
         self.assertEqual(self.generated_now_values.to_json(), self.RESULTS_TO_COMPARE)

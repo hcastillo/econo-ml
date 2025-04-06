@@ -5,30 +5,29 @@ Executor for the interbank model using different values for the lc ShockedMarket
 @author: hector@bith.net
 """
 import numpy as np
-
 from interbank import Model
 from interbank_lenderchange import ShockedMarket
 import exp_runner
 
 
-class MarketPowerRun(exp_runner.ExperimentRun):
-    N = 50
+class GraphsRun(exp_runner.ExperimentRun):
+    N = 100
     T = 1000
-    MC = 1
+    MC = 4
 
+    COMPARING_DATA = "../experiments/boltzmann"
+    COMPARING_LABEL = "Boltzmann"
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "../experiments/marketpower"
-    COMPARING_DATA = "not_valid"
+    OUTPUT_DIRECTORY = "../experiments/shockedmarket.reintr"
 
-    parameters = {  # items should be iterable:
-        "psi": np.linspace(0.0, 0.99, num=10),
-        "p" : [0.5]
+    parameters = {
+        "p": np.linspace(0.001, 0.95, num=10)
     }
 
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 9999
+    seed = 9
     seed_offset = 1
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
@@ -36,9 +35,9 @@ class MarketPowerRun(exp_runner.ExperimentRun):
         model.export_datafile = filename
         model.config.lender_change = self.ALGORITHM()
         model.config.lender_change.set_parameter("p", execution_parameters["p"])
-        model.configure(T=self.T, N=self.N, **execution_config)
-        MarketPowerRun.seed_offset += 1
-        model.initialize(seed=(self.seed + MarketPowerRun.seed_offset), save_graphs_instants=None,
+        model.configure(T=self.T, N=self.N, reintroduce_with_median=True, **execution_config)
+        GraphsRun.seed_offset += 1
+        model.initialize(seed=(self.seed + GraphsRun.seed_offset), save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
                          export_description=str(model.config) + str(execution_parameters))
@@ -48,5 +47,4 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
 if __name__ == "__main__":
     runner = exp_runner.Runner()
-    runner.do(MarketPowerRun)
-
+    runner.do(GraphsRun)

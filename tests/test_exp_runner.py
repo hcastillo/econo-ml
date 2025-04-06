@@ -20,7 +20,8 @@ class ExpRunnerTestCase(unittest.TestCase):
     def setUp(self):
         #self.runner = exp_runner.Runner()
         #self.runner.do(MockedRunner)
-        os.remove("output/results.csv")
+        if os.path.exists('output/results.csv'):
+            os.remove("output/results.csv")
         self.runner = MockedRunner()
         self.runner.do()
 
@@ -29,7 +30,6 @@ class ExpRunnerTestCase(unittest.TestCase):
         self.assertEqual(len(self.runner.parameters['p']), 10)
         self.assertEqual(self.runner.parameters['p'][1], 0.11111111111111112)
         self.assertTrue(Path("output/results.csv").is_file())
-        #self.assertEqual(self.runner.get_models()[-2], 'p01880')
 
 
 if __name__ == '__main__':

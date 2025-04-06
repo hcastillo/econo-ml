@@ -11,9 +11,9 @@ import exp_runner
 
 
 class ShockedMarketRun(exp_runner.ExperimentRun):
-    N = 50
+    N = 100
     T = 1000
-    MC = 1
+    MC = 100
 
     COMPARING_DATA = "../experiments/boltzmann"
     COMPARING_LABEL = "Boltzmann"
@@ -27,7 +27,7 @@ class ShockedMarketRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 988994
+    seed = 9
     seed_offset = 1
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
