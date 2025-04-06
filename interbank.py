@@ -25,8 +25,6 @@ import networkx as nx
 import sys
 import os
 import matplotlib.pyplot as plt
-from spyder.config.gui import set_font
-
 import interbank_lenderchange as lc
 import pandas as pd
 import lxml.etree
@@ -837,7 +835,6 @@ class Model:
                         raise Exception(f"type of config {attribute} not allowed: {type(current_value)}")
             else:
                 raise LookupError("attribute in config not found: %s " % attribute)
-        self.initialize()
 
     def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None,
                    export_datafile=None, export_description=None, generate_plots=True, output_directory=None):
@@ -845,6 +842,9 @@ class Model:
         if not dont_seed:
             applied_seed = seed if seed else self.default_seed
             random.seed(applied_seed)
+            with open('seeds.txt','a') as f:
+                import sys
+                f.write( f"{sys.argv} {self.config} applied_seed={applied_seed}\n")
             self.config.seed = applied_seed
         self.save_graphs = save_graphs_instants
         self.banks = []

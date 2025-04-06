@@ -15,8 +15,10 @@ class RestrictedMarketTestCase(unittest.TestCase):
         self.model.configure(N=BANKS)
         self.model.config.lender_change = interbank_lenderchange.determine_algorithm("ShockedMarket")
         self.model.config.lender_change.set_parameter("p", P)
+        self.model.initialize()
         self.model.config.lender_change.initialize_bank_relationships(self.model)
         self.graphs = []
+
 
         # we execute T times the model:
         for t in range(T):

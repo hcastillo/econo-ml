@@ -76,17 +76,17 @@ class MarketPowerRun(exp_runner.ExperimentRun):
         # we extract the first item in the data[], which is a matrix with arrays (next of next then)
         data_columns = list(next(iter(data[next(iter(data))])).columns)
         for k in data_columns:
-            with open(f"{MarketPowerRun.OUTPUT_DIRECTORY}/_{k}.csv", "w") as file:
-                f1 = open(f"{MarketPowerRun.OUTPUT_DIRECTORY}/_{k}_mean.csv", "w")
+            with open(f"{MarketPowerRun.OUTPUT_DIRECTORY}/_{k}.csv", "w") as file, \
+                 open(f"{MarketPowerRun.OUTPUT_DIRECTORY}/_{k}_mean.csv", "w") as file_mean:
                 for j in all_models[next(iter(all_models))]:
                     file.write(f";phi={j}")
-                    f1.write(f";phi={j}")
+                    file_mean.write(f";phi={j}")
                 file.write("\n")
-                f1.write("\n")
+                file_mean.write("\n")
 
                 for i in all_models:
                     file.write(f"p={i}")
-                    f1.write(f"p={i}")
+                    file_mean.write(f"p={i}")
                     for j in all_models[i]:
                         value = data[all_models[i][j]][0][k].median()
                         value_mean = data[all_models[i][j]][0][k].mean()
@@ -96,10 +96,10 @@ class MarketPowerRun(exp_runner.ExperimentRun):
                         value /= len(data[all_models[i][j]])
                         value_mean /= len(data[all_models[i][j]])
                         file.write(f";{value}".replace(".",","))
-                        f1.write(f";{value_mean}".replace(".", ","))
+                        file_mean.write(f";{value_mean}".replace(".", ","))
                     file.write("\n")
-                    f1.write("\n")
-                f1.close()
+                    file_mean.write("\n")
+
 
 if __name__ == "__main__":
     runner = exp_runner.Runner()

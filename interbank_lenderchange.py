@@ -233,7 +233,7 @@ class GraphStatistics:
     @staticmethod
     def communities(graph):
         """Communities using greedy modularity maximization"""
-        return list(nx.weakly_connected_components(graph))
+        return list(nx.weakly_connected_components(graph if graph.is_directed() else graph.to_directed()))
 
     @staticmethod
     def grade_avg(graph):

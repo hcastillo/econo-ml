@@ -7,6 +7,7 @@ class BankTestCase(unittest.TestCase):
         self.model = interbank.Model()
         self.model.test = True
         self.model.configure(N=10)
+        self.model.initialize()
 
     def test_new_lender(self):
         for i in range(10):
