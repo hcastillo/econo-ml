@@ -214,6 +214,7 @@ class GraphStatistics:
         if graph.is_directed():
             #return len(max(nx.weakly_connected_components(graph), key=len))
             # return len(max(nx.strongly_connected_components(graph), key=len))
+            #TODO
             return nx.average_clustering(graph) #len(max(nx.strongly_connected_components(graph), key=len))
         else:
             return len(max(nx.connected_components(graph), key=len))

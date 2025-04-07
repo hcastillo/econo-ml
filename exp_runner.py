@@ -108,7 +108,10 @@ class ExperimentRun:
                 file.write(f";{j};std_{j}")
             file.write("\n")
             for i in range(len(array_with_x_values)):
-                file.write(f"{array_with_x_values[i].split('=')[1]}")
+                value_for_line = f"{array_with_x_values[i].split('=')[1]}"
+                if ' ' in value_for_line:
+                    value_for_line = value_for_line.split(' ')[0]
+                file.write(f"{value_for_line}")
                 for j in array_with_data:
                     file.write(
                         f";{array_with_data[j][i][0]};{array_with_data[j][i][1]}"
@@ -116,6 +119,7 @@ class ExperimentRun:
                 file.write("\n")
 
     def save_gdt(self, array_with_data, array_with_x_values, directory):
+        #TODO descripcion del modelo
         E = lxml.builder.ElementMaker()
         GRETLDATA = E.gretldata
         DESCRIPTION = E.description
@@ -133,7 +137,10 @@ class ExperimentRun:
 
         observations = OBSERVATIONS(count=f"{len(array_with_x_values)}", labels="false")
         for i in range(len(array_with_x_values)):
-            string_obs = f"{array_with_x_values[i].split('=')[1]}  "
+            value_for_line = f"{array_with_x_values[i].split('=')[1]}"
+            if ' ' in value_for_line:
+                value_for_line = value_for_line.split(' ')[0]
+            string_obs = f"{value_for_line}  "
             for j in array_with_data:
                 string_obs += f"{array_with_data[j][i][0]}  {array_with_data[j][i][1]}  "
             observations.append(OBS(string_obs))
@@ -146,6 +153,7 @@ class ExperimentRun:
             endobs=f"{len(array_with_x_values)}", type="cross-section"
         )
         with gzip.open(f"{directory}results.gdt", 'w') as output_file:
+            #TODO QUITAR ZIP with open(f"{directory}results.gdt", 'w') as output_file:
             output_file.write(
                 b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(
