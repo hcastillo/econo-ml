@@ -223,23 +223,36 @@ class ExperimentRun:
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
-    def get_statistics_of_graphs(self, graph_files, results):
+    def _get_statistics_of_individual_graph(self,filename, communities_not_alone, gcs, communities, lengths):
+        graph = interbank_lenderchange.load_graph_json(filename)
+        graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
+        communities_not_alone.append(interbank_lenderchange.GraphStatistics.communities_not_alone(graph))
+        gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
+        communities.append(len(graph_communities))
+        lengths += [len(i) for i in graph_communities]
+
+    def get_statistics_of_graphs(self, graph_files, results, model_parameters):
         communities_not_alone = []
         communities = []
         lengths = []
         gcs = []
-        for graph_file in graph_files:
-            graph = interbank_lenderchange.load_graph_json(f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json")
-            graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
-            communities_not_alone.append(interbank_lenderchange.GraphStatistics.communities_not_alone(graph))
-            gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
-            communities.append(len(graph_communities))
-            lengths += [len(i) for i in graph_communities]
+        # if results has not yet an array with graph statistics, we incorporate it:
         if not 'grade_avg' in results:
             results['grade_avg'] = []
             results['communities'] = []
             results['communities_not_alone'] = []
             results['gcs'] = []
+        for graph_file in graph_files:
+            filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json"
+            # we need to obtain the stats of all graph_files, but maybe we have not only a graph for each model
+            # analyzed, also a graph for each step t, so a "_0.json" will be present:
+            if not os.path.exists(filename) and os.path.exists(filename.replace(".json", "_0.json")):
+                for i in range(0, self.T):
+                    filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}_{i}.json"
+                    self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
+            else:
+                self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
+
         results['grade_avg'].append([0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0])
         results['communities'].append([(sum(communities)) / len(communities), 0])
         results['communities_not_alone'].append([(sum(communities_not_alone)) / len(communities_not_alone), 0])
@@ -320,7 +333,7 @@ class ExperimentRun:
                         else:
                             results_to_plot[k] = [[mean_estimated, std_estimated]]
                     if self.ALGORITHM.GRAPH_NAME:
-                        self.get_statistics_of_graphs(graphs_iteration, results_to_plot)
+                        self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
                     progress_bar.next()
             progress_bar.finish()
@@ -332,6 +345,7 @@ class ExperimentRun:
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
                   f"{self.OUTPUT_DIRECTORY}/", results_comparing)
+        self.results_to_plot = results_to_plot
         return results_to_plot, results_x_axis
 
 

@@ -19,7 +19,6 @@ import random
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-# import matplotlib.gridspec as gridspec
 import networkx as nx
 import sys
 import inspect
@@ -213,7 +212,9 @@ class GraphStatistics:
         """weakly connected componentes of the directed graph using Tarjan's algorithm:
            https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm"""
         if graph.is_directed():
-            return len(max(nx.weakly_connected_components(graph), key=len))
+            #return len(max(nx.weakly_connected_components(graph), key=len))
+            # return len(max(nx.strongly_connected_components(graph), key=len))
+            return nx.average_clustering(graph) #len(max(nx.strongly_connected_components(graph), key=len))
         else:
             return len(max(nx.connected_components(graph), key=len))
 
@@ -234,7 +235,7 @@ class GraphStatistics:
     def communities(graph):
         """Communities using greedy modularity maximization"""
         return list(nx.weakly_connected_components(graph if graph.is_directed() else graph.to_directed()))
-
+        #return list(nx.strongly_connected_components(graph if graph.is_directed() else graph.to_directed()))
     @staticmethod
     def grade_avg(graph):
         communities = GraphStatistics.communities(graph)
@@ -269,11 +270,11 @@ class GraphStatistics:
         string_result = f"giant={GraphStatistics.giant_component_size(graph)} " + \
                         f" comm_not_alone={GraphStatistics.communities_not_alone(graph)}" + \
                         f" comm={len(communities)}" + \
-                        f" grade_avg={GraphStatistics.grade_avg(graph)}" + \
                         f" gcs={GraphStatistics.giant_component_size(graph)}"
         if interact:
             import code
             print(string_result)
+            print(f"grade_avg={GraphStatistics.grade_avg(graph)}")
             print("communities=", list(GraphStatistics.communities(graph)))
             print(f"\n{graph_name} loaded into 'graph'\n")
             code.interact(local=locals())
@@ -324,6 +325,9 @@ class LenderChange:
     def __init__(self):
         self.parameter = {}
         self.initial_graph_file = None
+
+    def __str__(self):
+        return "LenderChangePrototype"
 
     def initialize_bank_relationships(self, this_model):
         """ Call once at initialize() model """
@@ -380,6 +384,9 @@ class Boltzmann(LenderChange):
     # parameter to control the change of guru: 0 then Boltzmann only, 1 everyone will move randomly
     gamma: float = 0.5  # [0..1] gamma
     CHANGE_LENDER_IF_HIGHER = 0.5
+
+    def __str__(self):
+        return "BoltzMann"
 
     def initialize_bank_relationships(self, this_model):
         if self.initial_graph_file:
@@ -466,6 +473,9 @@ class InitialStability(Boltzmann):
     CHANGE_LENDER_IF_HIGHER = 0.8
     GRAPH_NAME = 'barabasi_albert'
 
+    def __str__(self):
+        return "InitialStability"
+
     def __create_directed_graph_from_barabasi_albert(self, barabasi_albert, result, current_node, previous_node):
         if len(barabasi_albert.edges(current_node)) > 1:
             for (_, destination) in barabasi_albert.edges(current_node):
@@ -504,6 +514,9 @@ class Preferential(Boltzmann):
     banks_graph = None
     guru = None
     GRAPH_NAME = "barabasi_pref"
+
+    def __str__(self):
+        return f"Preferential.m={self.parameter['m']}"
 
     def check_parameter(self, name, value):
         if name == 'm':
@@ -602,8 +615,12 @@ class RestrictedMarket(LenderChange):
     """ Using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
           lender for each bank, it replicates the situation after a crisis when banks do not credit
     """
-
+    SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = True
     GRAPH_NAME = "erdos_renyi"
+
+    def __str__(self):
+        return f"Restricted.p={self.parameter['p']}"
+
 
     def generate_banks_graph(self, this_model):
         result = nx.DiGraph()
@@ -637,11 +654,13 @@ class RestrictedMarket(LenderChange):
             self.banks_graph, description = self.generate_banks_graph(this_model)
         self.banks_graph.type = self.GRAPH_NAME
         if this_model.export_datafile and save_graph:
+            filename_for_file = f"_{self.GRAPH_NAME}"
+            if self.SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP:
+                filename_for_file += f"_{this_model.t}"
             save_graph_png(self.banks_graph, description,
-                           this_model.statistics.get_export_path(this_model.export_datafile, f"_{self.GRAPH_NAME}.png"))
+                         this_model.statistics.get_export_path(this_model.export_datafile, f"{filename_for_file}.png"))
             save_graph_json(self.banks_graph,
-                            this_model.statistics.get_export_path(this_model.export_datafile,
-                                                                  f"_{self.GRAPH_NAME}.json"))
+                         this_model.statistics.get_export_path(this_model.export_datafile, f"{filename_for_file}.json"))
         for (borrower, lender_for_borrower) in self.banks_graph.edges():
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
@@ -673,16 +692,24 @@ class ShockedMarket(RestrictedMarket):
         in t=i are destroyed and new aleatory links in t=i+1 are created using a new Erdos Renyi
         graph.
     """
+    SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = True
+
+    def __str__(self):
+        return f"Shocked.p={self.parameter['p']}"
 
     def step_setup_links(self, this_model):
         """ At the end of each step, a new graph is generated """
-        self.initialize_bank_relationships(this_model, save_graph=False)
+        self.initialize_bank_relationships(this_model, save_graph=self.SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP)
 
 
 class SmallWorld(ShockedMarket):
     """ SmallWorld implementation using Watts Strogatz
     """
     GRAPH_NAME = "watts_strogatz"
+
+    def __str__(self):
+        return f"SmallWorld.p={self.parameter['p']}"
+
 
     def generate_banks_graph(self, this_model):
         generator = WattsStrogatzGraph()

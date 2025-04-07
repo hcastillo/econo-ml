@@ -457,10 +457,18 @@ class Statistics:
         OBSERVATIONS = E.observations
         OBS = E.obs
         variables = VARIABLES(count=f"{sum(1 for _ in self.enumerate_results())}")
+        header_text = ""
+        for item in header:
+            header_text += item + " "
+        first = True
         for variable_name, _ in self.enumerate_results():
             if variable_name == 'leverage':
                 variable_name += "_"
-            variables.append(VARIABLE(name=f"{variable_name}"))
+            if first:
+                variables.append(VARIABLE(name=f"{variable_name}", label=f"{header_text}"))
+            else:
+                variables.append(VARIABLE(name=f"{variable_name}"))
+            first = False
 
         observations = OBSERVATIONS(count=f"{self.model.config.T}", labels="false")
         for i in range(self.model.config.T):
@@ -468,9 +476,6 @@ class Statistics:
             for _, variable in self.enumerate_results():
                 string_obs += f"{variable[i]}  "
             observations.append(OBS(string_obs))
-        header_text = ""
-        for item in header:
-            header_text += item + " "
         gdt_result = gretl_data(
             DESCRIPTION(header_text),
             variables,
@@ -842,9 +847,6 @@ class Model:
         if not dont_seed:
             applied_seed = seed if seed else self.default_seed
             random.seed(applied_seed)
-            with open('seeds.txt','a') as f:
-                import sys
-                f.write( f"{sys.argv} {self.config} applied_seed={applied_seed}\n")
             self.config.seed = applied_seed
         self.save_graphs = save_graphs_instants
         self.banks = []
@@ -856,7 +858,10 @@ class Model:
             self.export_datafile = export_datafile
         if generate_plots:
             self.generate_plots = generate_plots
-        self.export_description = str(self.config) if export_description is None else export_description
+        if export_description is None:
+            self.export_description = str(self.config) + str(self.config.lender_change)
+        else:
+            self.export_description = export_description
         for i in range(self.config.N):
             self.banks.append(Bank(i, self))
         self.config.lender_change.initialize_bank_relationships(self)

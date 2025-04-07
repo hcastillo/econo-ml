@@ -10,7 +10,7 @@ from mock import patch
 from pathlib import Path
 import os
 
-def get_statistics_of_graphs_mocked(_, _b, _c):
+def get_statistics_of_graphs_mocked(_, _b, _c, _d):
     pass
 
 
