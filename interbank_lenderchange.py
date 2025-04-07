@@ -693,7 +693,7 @@ class ShockedMarket(RestrictedMarket):
         in t=i are destroyed and new aleatory links in t=i+1 are created using a new Erdos Renyi
         graph.
     """
-    SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = True
+    SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = False
 
     def __str__(self):
         return f"Shocked.p={self.parameter['p']}"

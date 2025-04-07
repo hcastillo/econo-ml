@@ -127,12 +127,25 @@ class ExperimentRun:
         VARIABLE = E.variable
         OBSERVATIONS = E.observations
         OBS = E.obs
+
+        # used for description of the model inside the gdt:
+        model = Model()
+        model.config.lender_change = self.ALGORITHM()
+        description1 = str(array_with_x_values)
+        description2 = str(model.config) + str(model.config.lender_change)
+
         variables = VARIABLES(count=f"{2 * len(array_with_data) + 1}")
-        variables.append(VARIABLE(name=f"{array_with_x_values[0].split('=')[0]}"))
+        variables.append(VARIABLE(name=f"{array_with_x_values[0].split('=')[0]}",
+                                  label=f"{description1}"))
+        first = True
         for j in array_with_data:
             if j == "leverage":
                 j = "leverage_"
-            variables.append(VARIABLE(name=f"{j}"))
+            if first:
+                variables.append(VARIABLE(name=f"{j}", label=f"{description2}"))
+            else:
+                variables.append(VARIABLE(name=f"{j}"))
+            first = False
             variables.append(VARIABLE(name=f"std_{j}"))
 
         observations = OBSERVATIONS(count=f"{len(array_with_x_values)}", labels="false")
@@ -152,7 +165,7 @@ class ExperimentRun:
             version="1.4", name='prueba', frequency="special:1", startobs="1",
             endobs=f"{len(array_with_x_values)}", type="cross-section"
         )
-        with gzip.open(f"{directory}results.gdt", 'w') as output_file:
+        with open(f"{directory}results.gdt", 'b+w') as output_file:
             #TODO QUITAR ZIP with open(f"{directory}results.gdt", 'w') as output_file:
             output_file.write(
                 b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
