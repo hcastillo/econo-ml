@@ -263,10 +263,13 @@ class Statistics:
         for bank in self.model.banks:
             if bank.E > maxE:
                 maxE = bank.E
+            # bank is lender and has effectively given a loan:
             if bank.incrD >= 0:
-                asset_i.append(bank.asset_i)
-            else:
-                asset_j.append(bank.asset_j)
+                if bank.active_borrowers:
+                    asset_i.append(bank.asset_i)
+            # bank is borrower and has effectively received a loan:
+            elif bank.d > 0:
+                    asset_j.append(bank.asset_j)
             if bank.active_borrowers:
                 num_of_banks_that_are_lenders += 1
                 for bank_that_is_borrower in bank.active_borrowers:
