@@ -517,7 +517,10 @@ class Preferential(Boltzmann):
     GRAPH_NAME = "barabasi_pref"
 
     def __str__(self):
-        return f"Preferential.m={self.parameter['m']}"
+        if 'p' in self.parameter:
+            return f"Preferential.m={self.parameter['m']}"
+        else:
+            return f"Preferential"
 
     def check_parameter(self, name, value):
         if name == 'm':
@@ -696,7 +699,11 @@ class ShockedMarket(RestrictedMarket):
     SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = False
 
     def __str__(self):
-        return f"Shocked.p={self.parameter['p']}"
+        if 'p' in self.parameter:
+            return f"Shocked.p={self.parameter['p']}"
+        else:
+            return f"Shocked"
+
 
     def step_setup_links(self, this_model):
         """ At the end of each step, a new graph is generated """
@@ -709,7 +716,10 @@ class SmallWorld(ShockedMarket):
     GRAPH_NAME = "watts_strogatz"
 
     def __str__(self):
-        return f"SmallWorld.p={self.parameter['p']}"
+        if 'p' in self.parameter:
+            return f"SmallWorld.p={self.parameter['p']}"
+        else:
+            return f"SmallWorld"
 
 
     def generate_banks_graph(self, this_model):
