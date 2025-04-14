@@ -623,8 +623,10 @@ class RestrictedMarket(LenderChange):
     GRAPH_NAME = "erdos_renyi"
 
     def __str__(self):
-        return f"Restricted.p={self.parameter['p']}"
-
+        if 'p' in self.parameter:
+            return f"Restricted.p={self.parameter['p']}"
+        else:
+            return f"Restricted"
 
     def generate_banks_graph(self, this_model):
         result = nx.DiGraph()

@@ -270,7 +270,11 @@ class ExperimentRun:
             if not os.path.exists(filename) and os.path.exists(filename.replace(".json", "_0.json")):
                 for i in range(0, self.T):
                     filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}_{i}.json"
-                    self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
+                    try:
+                        self._get_statistics_of_individual_graph(filename,
+                                                                 communities_not_alone, gcs, communities, lengths)
+                    except FileNotFoundError:
+                        break
             else:
                 self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
 

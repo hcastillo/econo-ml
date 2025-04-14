@@ -6,9 +6,6 @@ Executor for the interbank model using different values for the lc ShockedMarket
 """
 import numpy as np
 import pandas as pd
-from absl.testing.parameterized import parameters
-from networkx.algorithms.communicability_alg import communicability
-
 import interbank_lenderchange
 import exp_runner
 import random

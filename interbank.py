@@ -96,7 +96,7 @@ class Config:
                            'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'systemic_leverage': False,
-                           'loans': False,
+                           'loans': False, 'c': True,
                            'reserves': True, 'deposits': True,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
                            'num_banks': True, 'bankruptcy_rationed': True}
@@ -204,6 +204,7 @@ class Statistics:
         self.prob_bankruptcy = np.zeros(self.model.config.T, dtype=float)
         self.active_lenders = np.zeros(self.model.config.T, dtype=int)
         self.fitness = np.zeros(self.model.config.T, dtype=float)
+        self.c = np.zeros(self.model.config.T, dtype=float)
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
         self.asset_j = np.zeros(self.model.config.T, dtype=float)
@@ -334,8 +335,10 @@ class Statistics:
 
     def compute_probability_of_lender_change_and_num_banks(self):
         probabilities = [bank.P for bank in self.model.banks]
+        lender_capacities = [np.mean(bank.c) for bank in self.model.banks]
         self.P[self.model.t] = sum(probabilities) / self.model.config.N
         self.P_max[self.model.t] = max(probabilities)
+        self.c[self.model.t] = np.mean(lender_capacities)
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
         # only if we don't replace banks makes sense to report how many banks we have in each step:
