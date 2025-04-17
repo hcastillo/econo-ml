@@ -65,7 +65,7 @@ class Config:
 
     # liquidation cost of collateral
     xi: float = 0.3  # xi ξ
-    ro: float = 0.00001 # 0.3  # ro ρ fire sale cost
+    ro: float = 0.3 # 0.3  # ro ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
@@ -142,6 +142,9 @@ class Config:
 # %%
 
 class Statistics:
+    lender_no_d = []
+    no_lender = []
+    enough_money = []
     bankruptcy = []
     best_lender = []
     best_lender_clients = []
@@ -785,9 +788,6 @@ class Model:
         model.forward()
         result = model.get_current_fitness() # t=5
         model.backward() # t=4 again
-
-
-
     """
     banks = []  # An array of Bank with size Model.config.N
     t: int = 0  # current value of time, t = 0..Model.config.T
@@ -796,6 +796,7 @@ class Model:
     default_seed: int = 20579  # seed for this simulation
     backward_enabled = False  # if true, we can execute backward()
     policy_changes = 0
+
 
     # if not None, we will debug at this instant i, entering in interactive mode
     debug = None
@@ -857,6 +858,7 @@ class Model:
         self.save_graphs = save_graphs_instants
         self.banks = []
         self.t = 0
+
         if not self.config.lender_change:
             self.config.lender_change = lc.determine_algorithm()
         self.policy_changes = 0
@@ -1082,18 +1084,20 @@ class Model:
 
     def do_loans(self):
         for bank_index, bank in enumerate(self.banks):
+            # we don't save directly in bank.rationing because it if fails it's replaced and we lost the value:
+            rationing_of_bank = 0
             # decrement in which we should borrow
             if bank.d > 0:
                 if bank.get_lender() is None or bank.get_lender().d > 0:
                     bank.l = 0
-                    bank.rationing = bank.d
+                    rationing_of_bank = bank.d
                     bank.do_fire_sales(bank.rationing,
                                        f"no lender for this bank" if bank.get_lender() is None else
                                        f"lender {bank.get_lender().get_id(short=True)} has no money", "loans")
                 else:
                     # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
                     if bank.d > bank.get_lender().s:
-                        bank.rationing = bank.d - bank.get_lender().s
+                        rationing_of_bank = bank.d - bank.get_lender().s
                         bank.do_fire_sales(bank.rationing,
                                            f"lender.s={bank.get_lender().s:.3f} but need d={bank.d:.3f}", "loans")
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
@@ -1106,7 +1110,7 @@ class Model:
                         else:
                             bank.l = 0
                     else:
-                        bank.rationing = 0
+                        # rationing_of_bank = 0
                         bank.l = bank.d  # amount of loan (wrote in the borrower)
                         bank.get_lender().active_borrowers[bank_index] = bank.d  # amount of loan (wrote in the lender)
                         bank.get_lender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
@@ -1117,6 +1121,7 @@ class Model:
             # the shock can be covered by own capital
             else:
                 bank.l = 0
+                # rationing_of_bank = 0
                 if bank.active_borrowers:
                     list_borrowers = ""
                     amount_borrowed = 0
@@ -1125,6 +1130,7 @@ class Model:
                         amount_borrowed += bank.active_borrowers[bank_i]
                     self.log.debug("loans", f"{bank.get_id()} has a total of {len(bank.active_borrowers)} loans with " +
                                    f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
+            bank.rationing = rationing_of_bank
 
     def do_repayments(self):
         # first deposits, which are the preferential payments, but only when we are borrowers in first shock:
