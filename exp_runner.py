@@ -27,8 +27,8 @@ class ExperimentRun:
     T = 1
     MC = 1
 
-    LIMIT_MEAN = 3
-    LIMIT_STD = 20
+    LIMIT_MEAN = 5
+    LIMIT_STD = 25
     LIMIT_VARIABLE_TO_CHECK = 'interest_rate'
 
     COMPARING_DATA = ""
@@ -307,25 +307,45 @@ class ExperimentRun:
         return results_comparing
 
     def data_seems_ok(self, filename_for_iteration:str, i:int,
-                      new_data:pd.core.frame.DataFrame, array_all_data:pd.core.frame.DataFrame):
+                      individual_execution:pd.core.frame.DataFrame, array_all_data:pd.core.frame.DataFrame):
         # if 'interest_rate' not in array, means that it's the first execution, so nothing to compare:
-        if self.LIMIT_VARIABLE_TO_CHECK in array_all_data.keys():
-            # we obtain the average and std:
-            mean_new_data = new_data.interest_rate.mean()
-            std_new_data = new_data.interest_rate.std()
-            mean_all_data = array_all_data.interest_rate.mean()
-            std_all_data = array_all_data.interest_rate.std()
-            if mean_new_data > self.LIMIT_MEAN * mean_all_data:
-                self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: mean of "
-                                           f"{self.LIMIT_VARIABLE_TO_CHECK} {mean_new_data} >"
-                                           f" {self.LIMIT_MEAN}*{mean_all_data}")
+        for k in array_all_data.keys():
+            if k.strip() == "t":
+                continue
+            mean_estimated = array_all_data[k].mean()
+            mean_individual_execution=individual_execution[k].mean()
+            warnings.filterwarnings(
+                "ignore"
+            )  # it generates RuntimeWarning: overflow encountered in multiply
+            std_individual_execution = individual_execution[k].std()
+            std_estimated = array_all_data[k].std()
+
+            if mean_individual_execution > self.LIMIT_MEAN * mean_estimated:
+                print(f"\n discarded {filename_for_iteration}_{i}: mean of "
+                                           f"{k} {mean_individual_execution} > {self.LIMIT_MEAN}*{mean_estimated}")
                 return False
-            elif std_new_data > self.LIMIT_STD * std_all_data:
-                self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: std of "
-                                           f"{self.LIMIT_VARIABLE_TO_CHECK} "
-                                           f"{std_new_data} > {self.LIMIT_STD}*{std_all_data}")
+            if std_individual_execution > self.LIMIT_STD * std_estimated:
+                print(f"\n discarded {filename_for_iteration}_{i}: std of "
+                                           f"{k} {std_individual_execution} > {self.LIMIT_STD}*{std_estimated}")
                 return False
         return True
+        # if self.LIMIT_VARIABLE_TO_CHECK in array_all_data.keys():
+        #     # we obtain the average and std:
+        #     mean_new_data = individual_execution.interest_rate.mean()
+        #     std_new_data = individual_execution.interest_rate.std()
+        #     mean_all_data = array_all_data.interest_rate.mean()
+        #     std_all_data = array_all_data.interest_rate.std()
+        #     if mean_new_data > self.LIMIT_MEAN * mean_all_data:
+        #         self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: mean of "
+        #                                    f"{self.LIMIT_VARIABLE_TO_CHECK} {mean_new_data} >"
+        #                                    f" {self.LIMIT_MEAN}*{mean_all_data}")
+        #         return False
+        #     elif std_new_data > self.LIMIT_STD * std_all_data:
+        #         self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: std of "
+        #                                    f"{self.LIMIT_VARIABLE_TO_CHECK} "
+        #                                    f"{std_new_data} > {self.LIMIT_STD}*{std_all_data}")
+        #         return False
+        # return True
 
     def load_or_execute_model(self, model_configuration, model_parameters, filename_for_iteration,
                               i, clear_previous_results):
@@ -390,7 +410,7 @@ class ExperimentRun:
                             # new execution with different seed:
                             result_mc = self.load_or_execute_model(model_configuration, model_parameters,
                                                                    filename_for_iteration, i, clear_previous_results)
-                            result_iteration = pd.concat([result_iteration, result_mc])
+                        result_iteration = pd.concat([result_iteration, result_mc])
 
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
                     # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
