@@ -15,7 +15,7 @@ class PreferentialRun(exp_runner.ExperimentRun):
     T = 1000
     MC = 1
 
-    OUTPUT_DIRECTORY = "../experiments/preferential"
+    OUTPUT_DIRECTORY = "c:\\experiments\\preferential"
     ALGORITHM = Preferential
     COMPARING_DATA = "experiments/boltzmann"
     COMPARING_LABEL = "Boltzmann"
@@ -36,7 +36,8 @@ class PreferentialRun(exp_runner.ExperimentRun):
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
-                         export_description=str(model.config) + str(execution_parameters))
+                         export_description=self.describe_experiment_parameters(model, execution_parameters,
+                                                                                seed_random))
         model.simulate_full(interactive=False)
         return model.finish()
 

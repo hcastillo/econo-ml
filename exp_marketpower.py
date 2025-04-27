@@ -17,7 +17,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 100
 
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "../experiments/marketpower"
+    OUTPUT_DIRECTORY = "c:\\experiments\\marketpower"
     COMPARING_DATA = "not_valid"
     COMPARING_LABEL = None
 
@@ -42,7 +42,8 @@ class MarketPowerRun(exp_runner.ExperimentRun):
         model.initialize(seed=(self.seed + MarketPowerRun.seed_offset), save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
-                         export_description=str(model.config) + str(execution_parameters))
+                         export_description=self.describe_experiment_parameters(model, execution_parameters,
+                                                                                seed_random))
         model.simulate_full(interactive=False)
         return model.finish()
 

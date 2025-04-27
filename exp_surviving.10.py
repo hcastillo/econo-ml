@@ -25,7 +25,7 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
     LIMIT_STD = 20
 
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "../experiments/surviving.10"
+    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.10"
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.0001, 1, num=10),
@@ -50,7 +50,8 @@ class RestrictedMarketSurvivingRun(exp_runner.ExperimentRun):
         model.initialize(seed=(self.seed + RestrictedMarketSurvivingRun.seed_offset), save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
-                         export_description=str(model.config) + str(execution_parameters))
+                         export_description=self.describe_experiment_parameters(model, execution_parameters,
+                                                                                seed_random))
         model.simulate_full(interactive=False)
         return model.finish()
 

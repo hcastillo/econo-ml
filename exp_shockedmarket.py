@@ -13,12 +13,12 @@ import exp_runner
 class ShockedMarketRun(exp_runner.ExperimentRun):
     N = 100
     T = 1000
-    MC = 100
+    MC = 10
 
     COMPARING_DATA = "../experiments/boltzmann"
     COMPARING_LABEL = "Boltzmann"
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "../experiments/shockedmarket"
+    OUTPUT_DIRECTORY = "c:\\experiments\\shockedmarket"
 
     parameters = {
         "p": np.linspace(0.001, 0.95, num=10)
@@ -40,7 +40,8 @@ class ShockedMarketRun(exp_runner.ExperimentRun):
         model.initialize(seed=(self.seed + ShockedMarketRun.seed_offset), save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
-                         export_description=str(model.config) + str(execution_parameters))
+                         export_description=self.describe_experiment_parameters(model, execution_parameters,
+                                                                                seed_random))
         model.simulate_full(interactive=False)
         return model.finish()
 

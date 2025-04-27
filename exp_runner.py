@@ -29,6 +29,7 @@ class ExperimentRun:
 
     LIMIT_MEAN = 3
     LIMIT_STD = 20
+    LIMIT_VARIABLE_TO_CHECK = 'interest_rate'
 
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
@@ -51,6 +52,8 @@ class ExperimentRun:
 
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
+
+    log_replaced_data = ""
 
     def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
         # we plot only x labels 1 of each 10:
@@ -119,7 +122,6 @@ class ExperimentRun:
                 file.write("\n")
 
     def save_gdt(self, array_with_data, array_with_x_values, directory):
-        #TODO descripcion del modelo
         E = lxml.builder.ElementMaker()
         GRETLDATA = E.gretldata
         DESCRIPTION = E.description
@@ -166,21 +168,33 @@ class ExperimentRun:
             endobs=f"{len(array_with_x_values)}", type="cross-section"
         )
         with open(f"{directory}results.gdt", 'b+w') as output_file:
-            #TODO QUITAR ZIP with open(f"{directory}results.gdt", 'w') as output_file:
             output_file.write(
                 b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(
                 lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
+
+    def describe_experiment_parameters(self, model, execution_parameters, seed_random):
+        export_description = ""
+        for item in dir(model.config):
+            if item in execution_parameters:
+                export_description += f"{item}={execution_parameters[item]} "
+            elif item == 'seed':
+                export_description += f"seed={seed_random} "
+            elif isinstance(getattr(model.config, item), int) or isinstance(getattr(model.config, item), float):
+                export_description += f"{item}={getattr(model.config, item)} "
+        return export_description
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()
         model.export_datafile = filename
         model.config.lender_change = self.ALGORITHM()
         model.configure(T=self.T, N=self.N, **execution_config)
+
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False,
-                         export_description=str(model.config) + str(execution_parameters))
+                         export_description=self.describe_experiment_parameters(model, execution_parameters,
+                                                                                seed_random))
         model.simulate_full(interactive=False)
         return model.finish()
 
@@ -279,9 +293,10 @@ class ExperimentRun:
                 self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
 
         results['grade_avg'].append([0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0])
-        results['communities'].append([(sum(communities)) / len(communities), 0])
-        results['communities_not_alone'].append([(sum(communities_not_alone)) / len(communities_not_alone), 0])
-        results['gcs'].append([sum(gcs) / len(gcs), 0])
+        results['communities'].append([0 if len(communities) == 0 else (sum(communities)) / len(communities), 0])
+        results['communities_not_alone'].append([0 if len(communities_not_alone) == 0 else
+                                                 (sum(communities_not_alone)) / len(communities_not_alone), 0])
+        results['gcs'].append([0 if len(gcs) == 0 else sum(gcs) / len(gcs), 0])
 
     def load_comparing(self, results_to_plot, results_x_axis):
         results_comparing = None
@@ -291,24 +306,46 @@ class ExperimentRun:
                 results_comparing = None
         return results_comparing
 
-    def data_seems_ok(self, iteration_name:str,
+    def data_seems_ok(self, filename_for_iteration:str, i:int,
                       new_data:pd.core.frame.DataFrame, array_all_data:pd.core.frame.DataFrame):
         # if 'interest_rate' not in array, means that it's the first execution, so nothing to compare:
-        if 'interest_rate' in array_all_data.keys():
+        if self.LIMIT_VARIABLE_TO_CHECK in array_all_data.keys():
             # we obtain the average and std:
             mean_new_data = new_data.interest_rate.mean()
             std_new_data = new_data.interest_rate.std()
             mean_all_data = array_all_data.interest_rate.mean()
             std_all_data = array_all_data.interest_rate.std()
-            # if mean_new_data > self.LIMIT_MEAN * mean_all_data:
-            #    print(f"\n discarded {iteration_name}: mean {mean_new_data} > {self.LIMIT_MEAN}*{mean_all_data}")
-            #    return False
-            #elif std_new_data > self.LIMIT_STD * std_all_data:
-            #    print(f"\n discarded {iteration_name}: std {std_new_data} > {self.LIMIT_STD}*{std_all_data}")
-            #    return False
+            if mean_new_data > self.LIMIT_MEAN * mean_all_data:
+                self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: mean of "
+                                           f"{self.LIMIT_VARIABLE_TO_CHECK} {mean_new_data} >"
+                                           f" {self.LIMIT_MEAN}*{mean_all_data}")
+                return False
+            elif std_new_data > self.LIMIT_STD * std_all_data:
+                self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: std of "
+                                           f"{self.LIMIT_VARIABLE_TO_CHECK} "
+                                           f"{std_new_data} > {self.LIMIT_STD}*{std_all_data}")
+                return False
         return True
 
+    def load_or_execute_model(self, model_configuration, model_parameters, filename_for_iteration,
+                              i, clear_previous_results):
+        mc_iteration = random.randint(9999, 20000)
+        if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+                and not clear_previous_results):
+            result_mc = pd.read_csv(
+                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
+        elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+              and not clear_previous_results):
+            result_mc = interbank.Statistics.read_gdt(
+                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+        else:
+            result_mc = self.run_model(
+                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
+                model_configuration, model_parameters, mc_iteration)
+        return result_mc
+
     def do(self, clear_previous_results=False):
+        self.log_replaced_data = ""
         if clear_previous_results:
             results_to_plot = results_comparing = {}
             results_x_axis = []
@@ -323,28 +360,42 @@ class ExperimentRun:
             progress_bar.update()
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
-                    result_iteration = pd.DataFrame()
+                    result_iteration_to_check = pd.DataFrame()
                     graphs_iteration = []
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
+                    # first round to load all the self.MC and estimate mean and standard deviation of the series inside
+                    # result_iteration:
                     for i in range(self.MC):
-                        mc_iteration = random.randint(9999, 20000)
-                        if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
-                                and not clear_previous_results):
-                            result_mc = pd.read_csv(
-                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
-                        elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                              and not clear_previous_results):
-                            result_mc = interbank.Statistics.read_gdt(
-                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                        else:
-                            result_mc = self.run_model(
-                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
-                                model_configuration, model_parameters, mc_iteration)
+                        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                               filename_for_iteration, i, clear_previous_results)
+                        graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+                        result_iteration_to_check = pd.concat([result_iteration_to_check, result_mc])
 
-                        # time to decide what to do with result_mc: let's see the mean() and std():
-                        if self.data_seems_ok(f"{filename_for_iteration}_{i}", result_mc, result_iteration):
-                            graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+                    # second round to verify if one of the models should be replaced because it presents abnormal
+                    # values comparing to the other (self.MC-1):
+                    result_iteration = pd.DataFrame()
+                    for i in range(self.MC):
+                        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                               filename_for_iteration, i, clear_previous_results)
+                        while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check):
+                            # we should erase the file now and replace by a new execution:
+                            try:
+                                os.remove(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+                            except FileNotFoundError:
+                                pass
+                            try:
+                                os.remove(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+                            except FileNotFoundError:
+                                pass
+                            # new execution with different seed:
+                            result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                                   filename_for_iteration, i, clear_previous_results)
                             result_iteration = pd.concat([result_iteration, result_mc])
+
+                    # When it arrives here, all the results are correct and inside the self.MC executions, if one
+                    # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
+                    # file and execution using a different seed.
+                    # We save now mean and std inside results_to_plot to create later the results:
                     for k in result_iteration.keys():
                         if k.strip() == "t":
                             continue
@@ -361,12 +412,15 @@ class ExperimentRun:
                         self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
                     progress_bar.next()
+
             progress_bar.finish()
             print(f"Saving results in {self.OUTPUT_DIRECTORY}...")
             self.save_csv(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
             self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
         else:
             print(f"Loaded data from previous work from {self.OUTPUT_DIRECTORY}")
+        if self.log_replaced_data:
+            print(self.log_replaced_data)
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
                   f"{self.OUTPUT_DIRECTORY}/", results_comparing)

@@ -96,6 +96,7 @@ class Config:
                            'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'systemic_leverage': False,
+                           'num_of_rationed': True,
                            'loans': False, 'c': True,
                            'reserves': True, 'deposits': True,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
@@ -172,6 +173,7 @@ class Statistics:
     active_borrowers = []
     active_lenders = []
     prob_bankruptcy = []
+    num_of_rationed = []
 
     # only used if config.allow_replacement_of_bankrupted is false
     num_banks = []
@@ -230,6 +232,7 @@ class Statistics:
         self.num_banks = np.zeros(self.model.config.T, dtype=int)
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.bankruptcy_rationed = np.zeros(self.model.config.T, dtype=int)
+        self.num_of_rationed = np.zeros(self.model.config.T, dtype=int)
 
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
@@ -893,7 +896,7 @@ class Model:
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
         # self.statistics.compute_bad_debt()
-        self.statistics.compute_rationing()
+        # self.statistics.compute_rationing()
         self.statistics.compute_deposits_and_reserves()
         # only N<=1 could happen if we remove banks:
         if self.config.N > 1:
@@ -1083,6 +1086,8 @@ class Model:
             self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
+        num_of_rationed = 0
+        total_rationed = 0
         for bank_index, bank in enumerate(self.banks):
             # we don't save directly in bank.rationing because it if fails it's replaced and we lost the value:
             rationing_of_bank = 0
@@ -1091,15 +1096,19 @@ class Model:
                 if bank.get_lender() is None or bank.get_lender().d > 0:
                     bank.l = 0
                     rationing_of_bank = bank.d
-                    bank.do_fire_sales(bank.rationing,
-                                       f"no lender for this bank" if bank.get_lender() is None else
-                                       f"lender {bank.get_lender().get_id(short=True)} has no money", "loans")
+                    total_rationed += rationing_of_bank
+                    num_of_rationed += 1
+                    bank.do_fire_sales(rationing_of_bank,
+                                       f"rationing={rationing_of_bank:.3f} as no lender for this bank" if bank.get_lender() is None else
+                                       f"rationing={rationing_of_bank:.3f} as lender {bank.get_lender().get_id(short=True)} has no money", "loans")
                 else:
                     # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
                     if bank.d > bank.get_lender().s:
                         rationing_of_bank = bank.d - bank.get_lender().s
-                        bank.do_fire_sales(bank.rationing,
-                                           f"lender.s={bank.get_lender().s:.3f} but need d={bank.d:.3f}", "loans")
+                        total_rationed += rationing_of_bank
+                        num_of_rationed += 1
+                        bank.do_fire_sales(rationing_of_bank,
+                                           f"lender.s={bank.get_lender().s:.3f} but need d={bank.d:.3f}, rationing={rationing_of_bank:.3f}", "loans")
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.get_lender().s > 0:
                             bank.l = bank.get_lender().s  # amount of loan (wrote in the borrower)
@@ -1131,6 +1140,10 @@ class Model:
                     self.log.debug("loans", f"{bank.get_id()} has a total of {len(bank.active_borrowers)} loans with " +
                                    f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
             bank.rationing = rationing_of_bank
+        self.statistics.num_of_rationed[self.t] = num_of_rationed
+        self.statistics.rationing[self.t] = total_rationed
+        self.log.debug("loans", f"this step rationed total={total_rationed:.3f} in {num_of_rationed} banks ")
+
 
     def do_repayments(self):
         # first deposits, which are the preferential payments, but only when we are borrowers in first shock:
@@ -1461,7 +1474,7 @@ class Bank:
                 # Lender will be failed also if E<0:
                 if self.get_lender().E < 0:
                     self.model.log.debug(phase, f"{self.get_lender().get_id()} lender is bankrupted "
-                               f" borrower {self.get_id()} does not return loan and lender E<0: {self.get_lender().E}")
+                               f" borrower {self.get_id()} does not return loan and lender E<0: {self.get_lender().E:.3f}")
                     self.get_lender().failed = True
                 self.get_lender().C += recovered
                 self.model.log.debug(phase, f"{self.get_id()} bankrupted (fire sale={recovered_in_fire_sales:.3f},"
@@ -1497,8 +1510,8 @@ class Bank:
         else:
             self.L -= cost_of_sell
             self.E -= extra_cost_of_selling
-            self.model.log.debug(phase,f"{self.get_id()} fire sales {amount_to_sell} "
-                                 f"so L-={cost_of_sell} and affects to E-={extra_cost_of_selling:.3f}")
+            self.model.log.debug(phase,f"{self.get_id()} fire sales {amount_to_sell:.3f} "
+                                 f"so L-={cost_of_sell:.3f} and affects to E-={extra_cost_of_selling:.3f}")
             if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,
                                      f"{self.get_id()} new L={self.L:.3f} is under threshold {self.model.config.alfa}"
