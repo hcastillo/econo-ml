@@ -27,6 +27,7 @@ class ExperimentRun:
     T = 1
     MC = 1
 
+    LIMIT_OUTLIER = 2
     LIMIT_MEAN = 5
     LIMIT_STD = 25
     LIMIT_VARIABLE_TO_CHECK = 'interest_rate'
@@ -320,13 +321,8 @@ class ExperimentRun:
             std_individual_execution = individual_execution[k].std()
             std_estimated = array_all_data[k].std()
 
-            if mean_individual_execution > self.LIMIT_MEAN * mean_estimated:
-                print(f"\n discarded {filename_for_iteration}_{i}: mean of "
-                                           f"{k} {mean_individual_execution} > {self.LIMIT_MEAN}*{mean_estimated}")
-                return False
-            if std_individual_execution > self.LIMIT_STD * std_estimated:
-                print(f"\n discarded {filename_for_iteration}_{i}: std of "
-                                           f"{k} {std_individual_execution} > {self.LIMIT_STD}*{std_estimated}")
+            # we discard outliers: whatever is over μ±3σ or under μ±3σ:
+            if not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <= mean_individual_execution <= (mean_estimated + self.LIMIT_OUTLIER * std_estimated)):
                 return False
         return True
         # if self.LIMIT_VARIABLE_TO_CHECK in array_all_data.keys():
