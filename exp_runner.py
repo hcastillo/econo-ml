@@ -22,28 +22,32 @@ import lxml.builder
 import gzip
 import argparse
 
+
 class ExperimentRun:
     N = 1
     T = 1
     MC = 1
 
-    LIMIT_MEAN = 3
-    LIMIT_STD = 20
+    LIMIT_OUTLIER = 3
 
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
 
-    XTICKS_DIVISOR = 4
+    XTICKS_DIVISOR = 1
 
     LABEL = "Invalid"
     OUTPUT_DIRECTORY = "Invalid"
 
     ALGORITHM = interbank_lenderchange.ShockedMarket
 
+    ALLOW_REPLACEMENT_OF_BANKRUPTED = True
+
     config = {  # items should be iterable:
         # "µ": np.linspace(0.7,0.8,num=2),
         # "ω": [0.55,0.6,0.7]
     }
+
+    SEED_FOR_EXECUTION = 2025
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.001, 0.100, num=40),
@@ -51,6 +55,8 @@ class ExperimentRun:
 
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
+
+    log_replaced_data = ""
 
     def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
         # we plot only x labels 1 of each 10:
@@ -108,7 +114,10 @@ class ExperimentRun:
                 file.write(f";{j};std_{j}")
             file.write("\n")
             for i in range(len(array_with_x_values)):
-                file.write(f"{array_with_x_values[i].split('=')[1]}")
+                value_for_line = f"{array_with_x_values[i].split('=')[1]}"
+                if ' ' in value_for_line:
+                    value_for_line = value_for_line.split(' ')[0]
+                file.write(f"{value_for_line}")
                 for j in array_with_data:
                     file.write(
                         f";{array_with_data[j][i][0]};{array_with_data[j][i][1]}"
@@ -123,17 +132,33 @@ class ExperimentRun:
         VARIABLE = E.variable
         OBSERVATIONS = E.observations
         OBS = E.obs
+
+        # used for description of the model inside the gdt:
+        model = Model()
+        model.config.lender_change = self.ALGORITHM()
+        description1 = str(array_with_x_values)
+        description2 = str(model.config) + str(model.config.lender_change)
+
         variables = VARIABLES(count=f"{2 * len(array_with_data) + 1}")
-        variables.append(VARIABLE(name=f"{array_with_x_values[0].split('=')[0]}"))
+        variables.append(VARIABLE(name=f"{array_with_x_values[0].split('=')[0]}",
+                                  label=f"{description1}"))
+        first = True
         for j in array_with_data:
             if j == "leverage":
                 j = "leverage_"
-            variables.append(VARIABLE(name=f"{j}"))
+            if first:
+                variables.append(VARIABLE(name=f"{j}", label=f"{description2}"))
+            else:
+                variables.append(VARIABLE(name=f"{j}"))
+            first = False
             variables.append(VARIABLE(name=f"std_{j}"))
 
         observations = OBSERVATIONS(count=f"{len(array_with_x_values)}", labels="false")
         for i in range(len(array_with_x_values)):
-            string_obs = f"{array_with_x_values[i].split('=')[1]}  "
+            value_for_line = f"{array_with_x_values[i].split('=')[1]}"
+            if ' ' in value_for_line:
+                value_for_line = value_for_line.split(' ')[0]
+            string_obs = f"{value_for_line}  "
             for j in array_with_data:
                 string_obs += f"{array_with_data[j][i][0]}  {array_with_data[j][i][1]}  "
             observations.append(OBS(string_obs))
@@ -145,7 +170,7 @@ class ExperimentRun:
             version="1.4", name='prueba', frequency="special:1", startobs="1",
             endobs=f"{len(array_with_x_values)}", type="cross-section"
         )
-        with gzip.open(f"{directory}results.gdt", 'w') as output_file:
+        with open(f"{directory}results.gdt", 'b+w') as output_file:
             output_file.write(
                 b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(
@@ -155,11 +180,18 @@ class ExperimentRun:
         model = Model()
         model.export_datafile = filename
         model.config.lender_change = self.ALGORITHM()
-        model.configure(T=self.T, N=self.N, **execution_config)
+        if 'p' in execution_parameters and (isinstance(self.ALGORITHM(),interbank_lenderchange.RestrictedMarket) or
+                                            isinstance(self.ALGORITHM(),interbank_lenderchange.ShockedMarket) or
+                                            isinstance(self.ALGORITHM(), interbank_lenderchange.SmallWorld)):
+            model.config.lender_change.set_parameter("p", execution_parameters["p"])
+        if 'm' in execution_parameters and isinstance(self.ALGORITHM(),interbank_lenderchange.Preferential):
+            model.config.lender_change.set_parameter("m", int(execution_parameters["m"]))
+        model.configure(T=self.T, N=self.N,
+                        allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
+
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
-                         generate_plots=False,
-                         export_description=str(model.config) + str(execution_parameters))
+                         generate_plots=False)
         model.simulate_full(interactive=False)
         return model.finish()
 
@@ -173,7 +205,7 @@ class ExperimentRun:
 
     def __filename_clean(self, value, max_length):
         value = str(value)
-        for r in "{}',: ":
+        for r in "{}',: .":
             value = value.replace(r, "")
         if value.endswith(".0"):
             # integer: 0 at left
@@ -223,59 +255,94 @@ class ExperimentRun:
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
-    def get_statistics_of_graphs(self, graph_files, results):
+    def _get_statistics_of_individual_graph(self, filename, communities_not_alone, gcs, communities, lengths):
+        graph = interbank_lenderchange.load_graph_json(filename)
+        graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
+        communities_not_alone.append(interbank_lenderchange.GraphStatistics.communities_not_alone(graph))
+        gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
+        communities.append(len(graph_communities))
+        lengths += [len(i) for i in graph_communities]
+
+    def get_statistics_of_graphs(self, graph_files, results, model_parameters):
         communities_not_alone = []
         communities = []
         lengths = []
         gcs = []
-        for graph_file in graph_files:
-            graph = interbank_lenderchange.load_graph_json(f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json")
-            graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
-            communities_not_alone.append(interbank_lenderchange.GraphStatistics.communities_not_alone(graph))
-            gcs.append(interbank_lenderchange.GraphStatistics.giant_component_size(graph))
-            communities.append(len(graph_communities))
-            lengths += [len(i) for i in graph_communities]
-        if not 'grade_max' in results:
-            results['grade_max'] = []
+        # if results has not yet an array with graph statistics, we incorporate it:
+        if not 'grade_avg' in results:
             results['grade_avg'] = []
             results['communities'] = []
             results['communities_not_alone'] = []
             results['gcs'] = []
-        try:
-            results['grade_max'].append([max(lengths), 0])
-        except ValueError:
-            results['grade_max'].append([0, 0])
+        for graph_file in graph_files:
+            filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json"
+            # we need to obtain the stats of all graph_files, but maybe we have not only a graph for each model
+            # analyzed, also a graph for each step t, so a "_0.json" will be present:
+            if not os.path.exists(filename) and os.path.exists(filename.replace(".json", "_0.json")):
+                for i in range(0, self.T):
+                    filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}_{i}.json"
+                    try:
+                        self._get_statistics_of_individual_graph(filename,
+                                                                 communities_not_alone, gcs, communities, lengths)
+                    except FileNotFoundError:
+                        break
+            else:
+                self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
+
         results['grade_avg'].append([0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0])
-        results['communities'].append([(sum(communities)) / len(communities), 0])
-        results['communities_not_alone'].append([(sum(communities_not_alone)) / len(communities_not_alone), 0])
-        results['gcs'].append([sum(gcs) / len(gcs), 0])
+        results['communities'].append([0 if len(communities) == 0 else (sum(communities)) / len(communities), 0])
+        results['communities_not_alone'].append([0 if len(communities_not_alone) == 0 else
+                                                 (sum(communities_not_alone)) / len(communities_not_alone), 0])
+        results['gcs'].append([0 if len(gcs) == 0 else sum(gcs) / len(gcs), 0])
 
     def load_comparing(self, results_to_plot, results_x_axis):
         results_comparing = None
         if self.COMPARING_DATA:
             results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")
-            if len(results_x_comparing) != len(results_x_axis) and len(results_x_comparing)!=1:
+            if len(results_x_comparing) != len(results_x_axis) and len(results_x_comparing) != 1:
                 results_comparing = None
         return results_comparing
 
-    def data_seems_ok(self, iteration_name:str,
-                      new_data:pd.core.frame.DataFrame, array_all_data:pd.core.frame.DataFrame):
+    def data_seems_ok(self, filename_for_iteration: str, i: int,
+                      individual_execution: pd.core.frame.DataFrame, array_all_data: pd.core.frame.DataFrame):
         # if 'interest_rate' not in array, means that it's the first execution, so nothing to compare:
-        if 'interest_rate' in array_all_data.keys():
-            # we obtain the average and std:
-            mean_new_data = new_data.interest_rate.mean()
-            std_new_data = new_data.interest_rate.std()
-            mean_all_data = array_all_data.interest_rate.mean()
-            std_all_data = array_all_data.interest_rate.std()
-            if mean_new_data > self.LIMIT_MEAN * mean_all_data:
-                print(f"\n discarded {iteration_name}: mean {mean_new_data} > {self.LIMIT_MEAN}*{mean_all_data}")
-                return False
-            elif std_new_data > self.LIMIT_STD * std_all_data:
-                print(f"\n discarded {iteration_name}: std {std_new_data} > {self.LIMIT_STD}*{std_all_data}")
+        for k in array_all_data.keys():
+            if k.strip() == "t":
+                continue
+            mean_estimated = array_all_data[k].mean()
+            mean_individual_execution = individual_execution[k].mean()
+            warnings.filterwarnings(
+                "ignore"
+            )  # it generates RuntimeWarning: overflow encountered in multiply
+            std_estimated = array_all_data[k].std()
+
+            # we discard outliers: whatever is over μ±3σ or under μ±3σ:
+            if (not np.isnan(mean_estimated) and not np.isnan(std_estimated) and
+                not np.isnan(mean_individual_execution) and
+                not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <=
+                mean_individual_execution <=
+                (mean_estimated + self.LIMIT_OUTLIER * std_estimated))):
                 return False
         return True
 
+    def load_or_execute_model(self, model_configuration, model_parameters, filename_for_iteration,
+                              i, clear_previous_results, seed_for_this_model):
+        if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+                and not clear_previous_results):
+            result_mc = pd.read_csv(
+                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
+        elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+              and not clear_previous_results):
+            result_mc = interbank.Statistics.read_gdt(
+                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+        else:
+            result_mc = self.run_model(
+                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
+                model_configuration, model_parameters, seed_for_this_model)
+        return result_mc
+
     def do(self, clear_previous_results=False):
+        self.log_replaced_data = ""
         if clear_previous_results:
             results_to_plot = results_comparing = {}
             results_x_axis = []
@@ -284,34 +351,50 @@ class ExperimentRun:
             results_comparing = self.load_comparing(results_to_plot, results_x_axis)
         if not results_to_plot:
             self.__verify_directories__()
+            seeds_for_random = self.generate_random_seeds_for_this_execution()
             progress_bar = Bar(
                 "Executing models", max=self.get_num_models()
             )
             progress_bar.update()
+            position_inside_seeds_for_random = 0
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
-                    result_iteration = pd.DataFrame()
+                    result_iteration_to_check = pd.DataFrame()
                     graphs_iteration = []
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
+                    # first round to load all the self.MC and estimate mean and standard deviation of the series inside
+                    # result_iteration:
                     for i in range(self.MC):
-                        mc_iteration = random.randint(9999, 20000)
-                        if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
-                                and not clear_previous_results):
-                            result_mc = pd.read_csv(
-                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
-                        elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                              and not clear_previous_results):
-                            result_mc = interbank.Statistics.read_gdt(
-                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                        else:
-                            result_mc = self.run_model(
-                                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
-                                model_configuration, model_parameters, mc_iteration)
+                        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                               filename_for_iteration, i, clear_previous_results,
+                                                               seeds_for_random[position_inside_seeds_for_random])
+                        graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+                        result_iteration_to_check = pd.concat([result_iteration_to_check, result_mc])
+                        position_inside_seeds_for_random += 1
 
-                        # time to decide what to do with result_mc: let's see the mean() and std():
-                        if self.data_seems_ok(f"{filename_for_iteration}_{i}", result_mc, result_iteration):
-                            graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
-                            result_iteration = pd.concat([result_iteration, result_mc])
+                    # second round to verify if one of the models should be replaced because it presents abnormal
+                    # values comparing to the other (self.MC-1):
+                    result_iteration = pd.DataFrame()
+                    position_inside_seeds_for_random -= self.MC
+                    for i in range(self.MC):
+                        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                               filename_for_iteration, i, clear_previous_results,
+                                                               seeds_for_random[position_inside_seeds_for_random])
+                        offset = 1
+                        while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check):
+                            self.discard_execution_of_iteration(filename_for_iteration, i)
+                            result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                                   filename_for_iteration, i, clear_previous_results,
+                                                                   (seeds_for_random[position_inside_seeds_for_random]
+                                                                    + offset))
+                            offset += 1
+                        position_inside_seeds_for_random += 1
+                        result_iteration = pd.concat([result_iteration, result_mc])
+
+                    # When it arrives here, all the results are correct and inside the self.MC executions, if one
+                    # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
+                    # file and execution using a different seed.
+                    # We save now mean and std inside results_to_plot to create later the results:
                     for k in result_iteration.keys():
                         if k.strip() == "t":
                             continue
@@ -325,24 +408,51 @@ class ExperimentRun:
                         else:
                             results_to_plot[k] = [[mean_estimated, std_estimated]]
                     if self.ALGORITHM.GRAPH_NAME:
-                        self.get_statistics_of_graphs(graphs_iteration, results_to_plot)
+                        self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
                     progress_bar.next()
+
             progress_bar.finish()
             print(f"Saving results in {self.OUTPUT_DIRECTORY}...")
             self.save_csv(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
             self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
         else:
             print(f"Loaded data from previous work from {self.OUTPUT_DIRECTORY}")
+        if self.log_replaced_data:
+            print(self.log_replaced_data)
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
                   f"{self.OUTPUT_DIRECTORY}/", results_comparing)
+        self.results_to_plot = results_to_plot
         return results_to_plot, results_x_axis
+
+    def generate_random_seeds_for_this_execution(self):
+        seeds_for_random = []
+        random.seed(self.SEED_FOR_EXECUTION)
+        for _ in self.get_models(self.config):
+            for _ in self.get_models(self.parameters):
+                for i in range(self.MC):
+                    seeds_for_random.append(random.randint(1000, 99999))
+        return seeds_for_random
+
+    def discard_execution_of_iteration(self, filename_for_iteration, i):
+        # we should erase or remove the file and then we will generate a new execution with a different seed:
+        if os.path.exists(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv"):
+            base, ext = os.path.splitext(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+        elif os.path.exists(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
+            base, ext = os.path.splitext(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+        offset = 1
+        while True:
+            new_name = f"{base}_discarded{offset}{ext}"
+            if not os.path.exists(new_name):
+                os.rename(f"{base}{ext}", new_name)
+                break
+            offset += 1
 
 
 class Runner:
     def do(self, experiment_runner):
-        parser = argparse.ArgumentParser(description="Executes interbank model using "+
+        parser = argparse.ArgumentParser(description="Executes interbank model using " +
                                                      experiment_runner.__name__)
         parser.add_argument(
             "--do",
@@ -360,7 +470,7 @@ class Runner:
             "--clear",
             default=False,
             action=argparse.BooleanOptionalAction,
-            help="Ignore generated files and create them again",
+            help="Ignore generated results.csv and create it again",
         )
         args = parser.parse_args()
         experiment = experiment_runner()

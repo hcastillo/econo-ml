@@ -6,9 +6,9 @@ import tests.interbank_testclass
 from mock import patch
 
 
-class Balance3TestCase(tests.interbank_testclass.InterbankTest):
+class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     """
-    test borrower obtains a loan, and after does bankruptcy
+    test with two banks during 5 steps with shocks
     """
 
     def initial_values(self):
@@ -29,9 +29,9 @@ class Balance3TestCase(tests.interbank_testclass.InterbankTest):
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[0], C=21.3, L=120, D=129, E=15, bankrupted=True)
-        self.assertBank(bank=self.model.banks[1], C=35.6, L=20,  D=46,  E=10)
-        self.assertBank(bank=self.model.banks[2], C=32.3, L=120, D=143, E=12)
+        self.assertBank(bank=self.model.banks[0], C=21.419999999999995, L=120, D=129, E=15, bankrupted=True)
+        self.assertBank(bank=self.model.banks[1], C=35.080000000000005, L=20,  D=46,  E=10)
+        self.assertBank(bank=self.model.banks[2], C=33.96, L=120, D=143, E=13.819999999999999)
 
 
 if __name__ == '__main__':

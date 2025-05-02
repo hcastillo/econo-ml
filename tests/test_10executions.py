@@ -16,13 +16,13 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
 
     def test_values_after_execution(self):
         self.assertEqual(self.model.banks[1].C, 27.3)
-        self.assertEqual(self.model.banks[3].D, 199.31236336553437)
+        self.assertEqual(self.model.banks[3].D, 256.61549169583344)
         self.assertEqual(self.model.banks[4].E, 15)
-        self.assertEqual(self.model.banks[0].A, 121.73103416054751)
-        self.assertEqual(self.model.banks[0].R, 1.7310341605475106)
+        self.assertEqual(self.model.banks[0].A, 130.7063359949939)
+        self.assertEqual(self.model.banks[0].R, 2.314126719899878)
         self.assertEqual(self.model.banks[1].A, 150)
         self.assertEqual(self.model.banks[2].A, 123.13503987356722)
-        self.assertEqual(self.model.banks[3].A, 214.31236336553437)
+        self.assertEqual(self.model.banks[3].A, 271.6154916958335)
         self.assertEqual(self.model.banks[4].A, 174.109587332632)
         self.assertEqual(self.model.banks[4].R, 3.18219174665264)
         self.assertEqual(self.model.banks[4].R, self.model.banks[4].D*self.model.config.reserves)

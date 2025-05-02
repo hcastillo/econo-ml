@@ -7,14 +7,10 @@ import os
 
 NUMBER_ELEMENTS = 10
 NUMBER_OF_BANKS = 50
-<<<<<<< HEAD
-TYPES_OF_GRAPHS = ('barabasi', 'erdos_renyi', 'smallworld')
-=======
 TYPES_OF_GRAPHS = ( #'barabasi',
                    'erdos_renyi',
                    #'smallworld'
                   )
->>>>>>> with_reserves
 OUTPUT = "../graphs_tests/"
 model = interbank.Model()
 progress_bar = Bar("Getting graphs", max=NUMBER_ELEMENTS*len(TYPES_OF_GRAPHS))
@@ -49,11 +45,6 @@ for i in range(NUMBER_ELEMENTS):
                     p = i / NUMBER_ELEMENTS
                     if p == 0:
                         p = 0.003
-<<<<<<< HEAD
-                    elif p == 1:
-                        p = 0.999
-=======
->>>>>>> with_reserves
                     if type_of_graph == 'erdos_renyi':
                         model.config.lender_change = interbank_lenderchange.ShockedMarket()
                         origin1 = nx.erdos_renyi_graph(n=NUMBER_OF_BANKS, p=p)
