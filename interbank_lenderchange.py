@@ -19,7 +19,7 @@ import random
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+# import matplotlib.gridspec as gridspec
 import networkx as nx
 import sys
 import inspect
@@ -113,9 +113,9 @@ def save_graph_png(graph, description, filename, add_info=False):
             description = ""
         description += " " + GraphStatistics.describe(graph)
 
-    fig = plt.figure(layout="constrained")
-    gs = gridspec.GridSpec(4, 4, figure=fig)
-    fig.add_subplot(gs[:, :])
+    #fig = plt.figure(layout="constrained")
+    #gs = gridspec.GridSpec(4, 4, figure=fig)
+    #fig.add_subplot(gs[:, :])
     guru = draw(graph, new_guru_look_for=True, title=description)
     plt.rcParams.update({'font.size': 6})
 
@@ -129,13 +129,13 @@ def save_graph_png(graph, description, filename, add_info=False):
     # ax4.set_xlabel('')
     # ax4.set_ylabel('')
 
-    ax5 = fig.add_subplot(gs[-1, 0])
-    aux_y = nx.degree_histogram(graph)
-    aux_y.sort(reverse=True)
-    aux_x = np.arange(0, len(aux_y)).tolist()
-    ax5.loglog(aux_x, aux_y, 'o')
-    ax5.set_xlabel('')
-    ax5.set_ylabel('')
+    # ax5 = fig.add_subplot(gs[-1, 0])
+    # aux_y = nx.degree_histogram(graph)
+    # aux_y.sort(reverse=True)
+    # aux_x = np.arange(0, len(aux_y)).tolist()
+    # ax5.loglog(aux_x, aux_y, 'o')
+    # ax5.set_xlabel('')
+    # ax5.set_ylabel('')
 
     plt.rcParams.update(plt.rcParamsDefault)
     warnings.filterwarnings("ignore", category=UserWarning)
@@ -207,7 +207,6 @@ class WattsStrogatzGraph:
         return G
 
 
-
 class GraphStatistics:
     @staticmethod
     def giant_component_size(graph):
@@ -219,7 +218,11 @@ class GraphStatistics:
             return len(max(nx.connected_components(graph), key=len))
 
     @staticmethod
-    def clustering_coeff(graph):
+    def get_all_credit_channels(graph):
+        return graph.number_of_edges()
+
+    @staticmethod
+    def avg_clustering_coef(graph):
         """clustering coefficient 0..1, 1 for totally connected graphs, and 0 for totally isolated
            if ~0 then a small world"""
         try:
@@ -227,20 +230,40 @@ class GraphStatistics:
         except ZeroDivisionError:
             return 0
 
+
     @staticmethod
     def communities(graph):
-        """number of communities using greedy modularity maximization"""
-        return nx.community.greedy_modularity_communities(graph)
+        """Communities using greedy modularity maximization"""
+        return nx.community.greedy_modularity_communities(graph, resolution=0.5)
+
+
+    @staticmethod
+    def communities_not_alone(graph):
+        """Number of communities that are not formed only with an isolated node"""
+        total = 0
+        for community in GraphStatistics.communities(graph):
+            total += len(community) > 1
+        return total
+
 
     @staticmethod
     def describe(graph):
-        clustering = GraphStatistics.clustering_coeff(graph)
-        if clustering > 0 and clustering < 1:
-            clustering = f"clus_coef={clustering:5.3f}"
-        else:
-            clustering = f"clus_coef={clustering}"
+        if isinstance(graph, str):
+            try:
+                graph = load_graph_json(graph)
+            except FileNotFoundError:
+                print("json file does not exist: %s" % graph)
+                sys.exit(0)
+            except:
+                print("json file does not contain a valid graph: %s" % graph)
+                sys.exit(0)
+        # clustering = GraphStatistics.avg_clustering_coef(graph)
+        # if clustering > 0 and clustering < 1:
+        #     clustering = f"clus_coef={clustering:5.3f}"
+        # else:
+        #     clustering = f"clus_coef={clustering}"
         return (f"giant={GraphStatistics.giant_component_size(graph)} " +
-                clustering +
+                f" comm_not_alone={GraphStatistics.communities_not_alone(graph)}" +
                 f" comm={len(GraphStatistics.communities(graph))}")
 
 
@@ -308,8 +331,7 @@ class LenderChange:
         pass
 
     def set_initial_graph_file(self, lc_ini_graph_file):
-        if lc_ini_graph_file:
-            self.initial_graph_file = lc_ini_graph_file
+        self.initial_graph_file = lc_ini_graph_file
 
     def describe(self):
         return ""
@@ -325,6 +347,12 @@ class LenderChange:
             else:
                 print(f"error with parameter '{name}' for {self.__class__.__name__}")
                 sys.exit(-1)
+
+    def get_credit_channels(self):
+        if hasattr(self, "banks_graph"):
+            return GraphStatistics.get_all_credit_channels(self.banks_graph)
+        else:
+            return None
 
 
 # ---------------------------------------------------------
@@ -349,17 +377,17 @@ class Boltzmann(LenderChange):
         """ It uses γ but only after t=20, at the beginning only Boltzmann"""
         possible_lender = self.new_lender(this_model, bank)
         if possible_lender is None:
-            possible_lender_mi = 0
+            possible_lender_mu = 0
         else:
-            possible_lender_mi = this_model.banks[possible_lender].mu
+            possible_lender_mu = this_model.banks[possible_lender].mu
         if bank.get_lender() is None:
-            current_lender_mi = 0
+            current_lender_mu = 0
         else:
-            current_lender_mi = bank.get_lender().mu
+            current_lender_mu = bank.get_lender().mu
 
         # we can now break old links and set up new lenders, using probability P
         # (equation 8)
-        boltzmann = 1 / (1 + math.exp(-this_model.config.beta * (possible_lender_mi - current_lender_mi)))
+        boltzmann = 1 / (1 + math.exp(-this_model.config.beta * (possible_lender_mu - current_lender_mu)))
 
         if t < 20:
             # bank.P = 0.35
@@ -565,10 +593,12 @@ class RestrictedMarket(LenderChange):
     def generate_banks_graph(self, this_model):
         result = nx.DiGraph()
         result.add_nodes_from(list(range(this_model.config.N)))
-        for u in range(this_model.config.N):
-            for v in range(u + 1, this_model.config.N):
-                if random.random() < self.parameter['p'] and not result.in_edges(v):
-                    result.add_edge(u, v)
+        for i in range(this_model.config.N):
+            if random.random() < self.parameter['p']:
+                j = random.randrange(this_model.config.N)
+                while j == i:
+                    j = random.randrange(this_model.config.N)
+                result.add_edge(i, j)
         return result, f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
 
     def check_parameter(self, name, value):
@@ -597,16 +627,22 @@ class RestrictedMarket(LenderChange):
             save_graph_json(self.banks_graph,
                             this_model.statistics.get_export_path(this_model.export_datafile,
                                                                   f"_{self.GRAPH_NAME}.json"))
-        for (lender_for_borrower, borrower) in self.banks_graph.edges():
+        for (borrower, lender_for_borrower) in self.banks_graph.edges():
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> with_reserves
     def step_setup_links(self, this_model):
         # if not declared, at each step it will generate a new graph:
         pass
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> with_reserves
     def new_lender(self, this_model, bank):
         """ We return the same lender we have created in self.banks_graph """
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
@@ -645,7 +681,6 @@ class SmallWorld(ShockedMarket):
         generator = WattsStrogatzGraph()
         result = generator.new(n=this_model.config.N, p=self.parameter['p'])
         return result, f"watts_strogatz p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
-
 
     def initialize_bank_relationships(self, this_model, save_graph=True):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""

@@ -34,9 +34,10 @@ class Balance1TestCase(interbank_testclass.InterbankTest):
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[0], C=4.0, L=15.0, D=7.0, E=12.0)
-        self.assertBank(bank=self.model.banks[1], C=11.0, L=15.0, D=15.0, E=11.0, s=14)
-        self.assertBank(bank=self.model.banks[2], C=5.0, L=8.333333333333332, D=9.0, E=4.33333333333333333, s=5)
+        self.assertBank(bank=self.model.banks[0], C=4, L=14.116000000000001,
+                        D=7.0, E=11.376000000000003)
+        self.assertBank(bank=self.model.banks[1], C=10.465200000000001, L=15.0, D=15.0, E=11.0052, s=13.465200000000001)
+        self.assertBank(bank=self.model.banks[2], C=5, L=15, D=9.0, E=9, s=5)
 
 
 if __name__ == '__main__':

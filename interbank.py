@@ -39,9 +39,7 @@ class Config:
     T: int = 1000  # time (1000)
     N: int = 50  # number of banks (50)
 
-    # not used in this implementation:
-    # ȓ: float  = 0.02     # percentage reserves (at the moment, no R is used)
-    # đ: int    = 1        # number of outgoing links allowed
+    reserves: float = 0.02
 
     # seed applied for random values (set during initialize)
     seed = None
@@ -68,9 +66,11 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # banks initial parameters
-    # L + C + (R) = D + E
+    # L + C + R = D + E
+    # but R = 0.02*D and C_i0= 30-2.7=27.3 and R=2.7
     L_i0: float = 120  # long term assets
-    C_i0: float = 30  # capital
+    C_i0: float = 30  # capital BEFORE RESERVES ESTIMATION, after it will be 27.3
+    # R_i0=2.7
     D_i0: float = 135  # deposits
     E_i0: float = 15  # equity
     r_i0: float = 0.02  # initial rate
@@ -83,20 +83,57 @@ class Config:
     # what elements are in the results.csv file, and also which are plot.
     # 1 if also plot, 0 not to plot:
     ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate': True, 'asset_i': True, 'asset_j': True,
-                           'equity': True, 'equity_borrowers': True, 'bankruptcy': True, 'credit_channels': True,
+                           'equity': True, 'equity_borrowers': True, 'bankruptcy': True,
+                           'potential_credit_channels': True,
                            'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
+<<<<<<< HEAD
                            'rationing': True, 'leverage': False, 'loans': False,
                            'num_lenders': False, 'num_borrowers': False, 'prob_bankruptcy': False,
+=======
+                           'rationing': True, 'leverage': False, 'systemic_leverage': False,
+                           'loans': False,
+                           'reserves': True, 'deposits': True,
+                           'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
+>>>>>>> with_reserves
                            'num_banks': True, 'bankruptcy_rationed': True}
 
-    def __str__(self):
+    def __str__(self, separator=""):
         description = sys.argv[0] if __name__ == '__main__' else ''
         for attr in dir(self):
             value = getattr(self, attr)
             if isinstance(value, int) or isinstance(value, float):
-                description += f" {attr}={value}"
+                description += f" {attr}={value}{separator}"
         return description + " "
+
+    def define_values_from_args(self, config_list):
+        if config_list:
+            config_list.sort()
+            for item in config_list:
+                if item == '?':
+                    print(self.__str__(separator="\n"))
+                    sys.exit(0)
+                try:
+                    name_config, value_config = item.split("=")
+                except ValueError:
+                    logging.error("A Config value should be passed as parameter=value")
+                    sys.exit(-1)
+                current_value = None
+                try:
+                    current_value = getattr(self, name_config)
+                except AttributeError:
+                    logging.error(f"Config has no '{name_config}' parameter")
+                    sys.exit(-1)
+                try:
+                    if isinstance(current_value, int):
+                        setattr(self, name_config, int(value_config))
+                    elif isinstance(current_value, bool):
+                        setattr(self, name_config, value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'))
+                    else:
+                        setattr(self, name_config, float(value_config))
+                except ValueError:
+                    logging.error(f"Value given for {name_config} is not valid: {value_config}")
+                    sys.exit(-1)
 
 
 # %%
@@ -105,22 +142,29 @@ class Statistics:
     bankruptcy = []
     best_lender = []
     best_lender_clients = []
-    credit_channels = []
+    potential_credit_channels = []
     liquidity = []
     policy = []
+    deposits = []
+    reserves = []
     interest_rate = []
     incrementD = []
     fitness = []
     rationing = []
     leverage = []
+    systemic_leverage = []
     loans = []
     asset_i = []
     asset_j = []
     equity = []
+    equity_borrowers = []
     P = []
     B = []
-    num_borrowers = []
-    num_lenders = []
+    P_max = []
+    P_min = []
+    P_std = []
+    active_borrowers = []
+    active_lenders = []
     prob_bankruptcy = []
 
     # only used if config.allow_replacement_of_bankrupted is false
@@ -152,10 +196,10 @@ class Statistics:
             os.mkdir(self.OUTPUT_DIRECTORY)
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
         self.best_lender_clients = np.zeros(self.model.config.T, dtype=int)
-        self.credit_channels = np.zeros(self.model.config.T, dtype=int)
-        self.num_borrowers = np.zeros(self.model.config.T, dtype=int)
+        self.potential_credit_channels = np.zeros(self.model.config.T, dtype=int)
+        self.active_borrowers = np.zeros(self.model.config.T, dtype=int)
         self.prob_bankruptcy = np.zeros(self.model.config.T, dtype=float)
-        self.num_lenders = np.zeros(self.model.config.T, dtype=int)
+        self.active_lenders = np.zeros(self.model.config.T, dtype=int)
         self.fitness = np.zeros(self.model.config.T, dtype=float)
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
@@ -166,6 +210,7 @@ class Statistics:
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
         self.leverage = np.zeros(self.model.config.T, dtype=float)
+        self.systemic_leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
         self.P = np.zeros(self.model.config.T, dtype=float)
         self.P_max = np.zeros(self.model.config.T, dtype=float)
@@ -173,6 +218,8 @@ class Statistics:
         self.P_std = np.zeros(self.model.config.T, dtype=float)
         self.B = np.zeros(self.model.config.T, dtype=float)
         self.loans = np.zeros(self.model.config.T, dtype=float)
+        self.deposits = np.zeros(self.model.config.T, dtype=float)
+        self.reserves = np.zeros(self.model.config.T, dtype=float)
         self.num_banks = np.zeros(self.model.config.T, dtype=int)
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.bankruptcy_rationed = np.zeros(self.model.config.T, dtype=int)
@@ -194,68 +241,69 @@ class Statistics:
 
         self.best_lender[self.model.t] = best
         self.best_lender_clients[self.model.t] = best_value
-        # self.credit_channels is updated directly at the moment the credit channel is set up
-        # during Model.do_loans()
 
-    def compute_interest_loans_leverage(self):
-        num_of_banks_with_lenders = 0
-        num_of_banks_with_borrowers = 0
-        sum_of_interests_rates = 0
+        # number of possible credit channels:
+        credit_channels = self.model.config.lender_change.get_credit_channels()
+        if credit_channels is None:
+            self.potential_credit_channels[self.model.t] = len(self.model.banks)
+        else:
+            self.potential_credit_channels[self.model.t] = credit_channels
 
-        sum_of_asset_i = 0
-        sum_of_asset_j = 0
+    def compute_interest_rates_and_loans(self):
+        interests_rates_of_borrowers = []
+        asset_i = []
+        asset_j = []
+        sum_of_loans = 0
+        maxE = 0
+        num_of_banks_that_are_lenders = 0
+        num_of_banks_that_are_borrowers = 0
+        for bank in self.model.banks:
+            if bank.E > maxE:
+                maxE = bank.E
+            if bank.incrD >= 0:
+                asset_i.append(bank.asset_i)
+            else:
+                asset_j.append(bank.asset_j)
+            if bank.active_borrowers:
+                num_of_banks_that_are_lenders += 1
+                for bank_that_is_borrower in bank.active_borrowers:
+                    sum_of_loans += bank.active_borrowers[bank_that_is_borrower]
+            elif bank.l > 0:
+                num_of_banks_that_are_borrowers += 1
+                interests_rates_of_borrowers.append(bank.get_loan_interest())
+        avg_prob_bankruptcy = []
+        if maxE > 0:
+            for bank in self.model.banks:
+                if bank.get_loan_interest() is not None and bank.l > 0:
+                    avg_prob_bankruptcy.append((1 - bank.E / maxE))
+        avg_prob_bankruptcy = sum(map(lambda x: x, avg_prob_bankruptcy)) / len(
+            avg_prob_bankruptcy) if avg_prob_bankruptcy else 0
+        self.interest_rate[self.model.t] = (sum(map(lambda x: x, interests_rates_of_borrowers)) /
+                                            len(interests_rates_of_borrowers)) if interests_rates_of_borrowers else 0
+        self.asset_i[self.model.t] = sum(map(lambda x: x, asset_i)) / len(asset_i) if len(asset_i) > 0 else np.nan
+        self.asset_j[self.model.t] = sum(map(lambda x: x, asset_j)) / len(asset_j) if len(asset_j) > 0 else np.nan
+        self.loans[
+            self.model.t] = sum_of_loans / num_of_banks_that_are_lenders if num_of_banks_that_are_lenders else np.nan
+        self.prob_bankruptcy[self.model.t] = avg_prob_bankruptcy
+        self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
+        self.active_borrowers[self.model.t] = num_of_banks_that_are_borrowers
+
+    def compute_leverage_and_equity(self):
         sum_of_equity = 0
         sum_of_equity_borrowers = 0
-        sum_of_loans = 0
-        sum_of_leverage = 0
-        maxE = 0
-
+        leverage_of_borrowers = []
         for bank in self.model.banks:
+            sum_of_equity += bank.E
             if bank.get_loan_interest() is not None and bank.l > 0:
-                sum_of_interests_rates += bank.get_loan_interest()
-                sum_of_asset_i += bank.asset_i
-                sum_of_asset_j += bank.asset_j
-                sum_of_equity += bank.E
-                num_of_banks_with_lenders += 1
-                sum_of_loans += bank.l
-                sum_of_leverage += bank.l / bank.E
-                if bank.E > maxE:
-                    maxE = bank.E
+                leverage_of_borrowers.append(bank.l / bank.E)
             if bank.active_borrowers:
-                num_of_banks_with_borrowers += 1
-                sum_of_equity_borrowers += bank.E
-
-        if num_of_banks_with_lenders:
-            avg_prob_bankruptcy = 0
-            num_elements = 0
-            if maxE > 0:
-                for bank in self.model.banks:
-                    if bank.get_loan_interest() is not None and bank.l > 0:
-                        avg_prob_bankruptcy += (1 - bank.E / maxE)
-                        num_elements += 1
-                avg_prob_bankruptcy = avg_prob_bankruptcy / num_elements
-
-            self.interest_rate[self.model.t] = sum_of_interests_rates / num_of_banks_with_lenders
-            self.asset_i[self.model.t] = sum_of_asset_i / num_of_banks_with_lenders
-            self.asset_j[self.model.t] = sum_of_asset_j / num_of_banks_with_lenders
-            self.equity[self.model.t] = sum_of_equity / num_of_banks_with_lenders
-            self.equity_borrowers[self.model.t] = sum_of_equity_borrowers / num_of_banks_with_borrowers \
-                if num_of_banks_with_borrowers else 0
-            self.loans[self.model.t] = sum_of_loans / num_of_banks_with_lenders
-            self.leverage[self.model.t] = sum_of_leverage / num_of_banks_with_lenders
-            self.num_lenders[self.model.t] = num_of_banks_with_lenders
-            self.prob_bankruptcy[self.model.t] = avg_prob_bankruptcy
-        else:
-            self.interest_rate[self.model.t] = np.nan
-            self.asset_j[self.model.t] = np.nan
-            self.asset_j[self.model.t] = np.nan
-            self.equity[self.model.t] = np.nan
-            self.equity_borrowers[self.model.t] = np.nan
-            self.loans[self.model.t] = np.nan
-            self.leverage[self.model.t] = np.nan
-            self.num_lenders[self.model.t] = 0
-            self.prob_bankruptcy[self.model.t] = 0
-        self.num_borrowers[self.model.t] = num_of_banks_with_borrowers
+                for borrower in bank.active_borrowers:
+                    sum_of_equity_borrowers += self.model.banks[borrower].E
+        self.equity[self.model.t] = sum_of_equity
+        self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
+        self.leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(leverage_of_borrowers) \
+            if len(leverage_of_borrowers) else 0
+        self.systemic_leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(self.model.banks)
 
     def compute_liquidity(self):
         self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
@@ -273,6 +321,10 @@ class Statistics:
     def compute_rationing(self):
         self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
 
+    def compute_deposits_and_reserves(self):
+        self.deposits[self.model.t] = sum(map(lambda x: x.D, self.model.banks))
+        self.reserves[self.model.t] = sum(map(lambda x: x.R, self.model.banks))
+
     def compute_probability_of_lender_change_and_num_banks(self):
         probabilities = [bank.P for bank in self.model.banks]
         self.P[self.model.t] = sum(probabilities) / self.model.config.N
@@ -280,7 +332,10 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
         # only if we don't replace banks makes sense to report how many banks we have in each step:
+<<<<<<< HEAD
         #if not self.config.allow_replacement_of_bankrupted:
+=======
+>>>>>>> with_reserves
         self.num_banks[self.model.t] = len(self.model.banks)
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
@@ -395,7 +450,7 @@ class Statistics:
 
     def __generate_gdt(self, export_datafile, header):
         E = lxml.builder.ElementMaker()
-        GRETLDATA = E.gretldata
+        gretl_data = E.gretldata
         DESCRIPTION = E.description
         VARIABLES = E.variables
         VARIABLE = E.variable
@@ -416,7 +471,7 @@ class Statistics:
         header_text = ""
         for item in header:
             header_text += item + " "
-        gdt_result = GRETLDATA(
+        gdt_result = gretl_data(
             DESCRIPTION(header_text),
             variables,
             observations,
@@ -460,7 +515,7 @@ class Statistics:
         if columns and values:
             return pd.DataFrame(columns=columns, data=values)
         else:
-            return pd.Dataframe()
+            return pd.DataFrame()
 
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
@@ -636,21 +691,13 @@ class Log:
     model = None
     logLevel = "ERROR"
     progress_bar = None
-    graphical = False
 
     def __init__(self, its_model):
         self.model = its_model
 
-    def define_gui(self, gui):
-        self.graphical = gui.gooey
-
     def do_progress_bar(self, message, maximum):
-        if self.graphical:
-            self.progress_bar = Gui()
-            self.progress_bar.progress_bar(message, maximum)
-        else:
-            from progress.bar import Bar
-            self.progress_bar = Bar(message, max=maximum)
+        from progress.bar import Bar
+        self.progress_bar = Bar(message, max=maximum)
 
     @staticmethod
     def __format_number__(number):
@@ -662,7 +709,8 @@ class Log:
         return result
 
     def __get_string_debug_banks__(self, details, bank):
-        text = f"{bank.get_id():10} C={Log.__format_number__(bank.C)} L={Log.__format_number__(bank.L)}"
+        text = (f"{bank.get_id(short=True):6} C={Log.__format_number__(bank.C)} "
+                f"R={Log.__format_number__(bank.R)} L={Log.__format_number__(bank.L)}")
         amount_borrowed = 0
         list_borrowers = " borrows=["
         for bank_i in bank.active_borrowers:
@@ -729,7 +777,7 @@ class Log:
 
     def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = "%(module)s"):
         self.modules = modules.split(",") if modules else []
-        formatter = logging.Formatter('%(levelname)s-' + script_name + '- %(message)s')
+        formatter = logging.Formatter('%(levelname)s-' + '- %(message)s')
         self.logLevel = Log.get_level(log.upper())
         self.logger.setLevel(self.logLevel)
         if logfile:
@@ -854,18 +902,20 @@ class Model:
         self.do_shock("shock1")
         self.do_loans()
         self.log.debug_banks()
-        self.statistics.compute_interest_loans_leverage()
+        self.statistics.compute_interest_rates_and_loans()
         self.do_shock("shock2")
         self.do_repayments()
         self.log.debug_banks()
         if self.log.progress_bar:
             self.log.progress_bar.next()
+        self.statistics.compute_leverage_and_equity()
         self.statistics.compute_liquidity()
         self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
         self.statistics.compute_bad_debt()
         self.statistics.compute_rationing()
+        self.statistics.compute_deposits_and_reserves()
         # only N<=1 could happen if we remove banks:
         if self.config.N > 1:
             self.setup_links()
@@ -949,15 +999,6 @@ class Model:
         """
         return self.statistics.fitness[self.t - 1 if self.t > 0 else 0]
 
-    def get_current_credit_channels(self):
-        """
-        Determines the number of credits channels USED (each bank has a possible lender, but only if
-        it needs it borrows money. This number represents how many banks have set up a credit with a lender
-        :return:
-        int
-        """
-        return self.statistics.credit_channels[self.t - 1 if self.t > 0 else 0]
-
     def get_current_liquidity(self):
         """
         Returns the liquidity (the sum of the liquidity)
@@ -1015,14 +1056,21 @@ class Model:
         """
         return self.statistics.bankruptcy[self.t - 1 if self.t > 0 else 0]
 
+    def determine_shock_value(self, bank, _shock):
+        return bank.D * (self.config.mi + self.config.omega * random.random())
+
     def do_shock(self, which_shock):
         # (equation 2)
         for bank in self.banks:
-            bank.newD = bank.D * (self.config.mi + self.config.omega * random.random())
+            bank.newD = self.determine_shock_value(bank, which_shock)
             bank.incrD = bank.newD - bank.D
             bank.D = bank.newD
+            bank.newR = self.config.reserves * bank.D
+            bank.incrR = bank.newR - bank.R
+            bank.R = bank.newR
+
             if bank.incrD >= 0:
-                bank.C += bank.incrD
+                bank.C += bank.incrD - bank.incrR
                 # if "shock1" then we can be a lender:
                 if which_shock == "shock1":
                     bank.s = bank.C
@@ -1034,13 +1082,13 @@ class Model:
                 # if "shock1" then we cannot be a lender: we have lost deposits
                 if which_shock == "shock1":
                     bank.s = 0
-                if bank.incrD + bank.C >= 0:
+                if bank.incrD - bank.incrR + bank.C >= 0:
                     bank.d = 0  # it will not need to borrow
-                    bank.C += bank.incrD
+                    bank.C += bank.incrD - bank.incrR
                     self.log.debug(which_shock,
                                    f"{bank.get_id()} loses ΔD={bank.incrD:.3f}, covered by capital")
                 else:
-                    bank.d = abs(bank.incrD + bank.C)  # it will need money
+                    bank.d = abs(bank.incrD - bank.incrR + bank.C)  # it will need money
                     self.log.debug(which_shock,
                                    f"{bank.get_id()} loses ΔD={bank.incrD:.3f} but has only C={bank.C:.3f}")
                     bank.C = 0  # we run out of capital
@@ -1050,17 +1098,13 @@ class Model:
         for bank_index, bank in enumerate(self.banks):
             # decrement in which we should borrow
             if bank.d > 0:
-                if bank.get_lender() is None:
+
+                if bank.get_lender() is None or bank.get_lender().d > 0:
                     bank.l = 0
-                    bank.rationing = bank.d
-                    # new situation: the bank has no borrower, so we should fire sale or die:
-                    bank.do_fire_sales(bank.rationing, f"no lender for this bank", "loans")
-                elif bank.get_lender().d > 0:
-                    # if the lender has no increment then NO LOAN could be obtained: we fire sale L:
                     bank.rationing = bank.d
                     bank.do_fire_sales(bank.rationing,
+                                       f"no lender for this bank" if bank.get_lender() is None else
                                        f"lender {bank.get_lender().get_id(short=True)} has no money", "loans")
-                    bank.l = 0
                 else:
                     # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
                     if bank.d > bank.get_lender().s:
@@ -1070,14 +1114,13 @@ class Model:
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
                         if bank.get_lender().s > 0:
                             bank.l = bank.get_lender().s  # amount of loan (wrote in the borrower)
-                            self.statistics.credit_channels[self.t] += 1
                             # amount of loan (wrote in the lender)
                             bank.get_lender().active_borrowers[bank_index] = bank.get_lender().s
                             bank.get_lender().C -= bank.l  # amount of loan that reduces lender capital
                             bank.get_lender().s = 0
                     else:
+                        bank.rationing = 0
                         bank.l = bank.d  # amount of loan (wrote in the borrower)
-                        self.statistics.credit_channels[self.t] += 1
                         bank.get_lender().active_borrowers[bank_index] = bank.d  # amount of loan (wrote in the lender)
                         bank.get_lender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
                         bank.get_lender().C -= bank.d  # amount of loan that reduces lender capital
@@ -1097,38 +1140,58 @@ class Model:
                                    f"[{list_borrowers[:-1]}] of l={amount_borrowed}")
 
     def do_repayments(self):
-        # first all borrowers must pay their loans:
+        # first deposits, which are the preferent payments, but only if we are borrowers:
+        for bank in self.banks:
+            if bank.l > 0:  # if we are borrowers
+                if bank.d > 0 and not bank.failed:  # and we have less deposits (incrD=d)
+                    bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
+
+        # second all borrowers must pay their loans:
         for bank in self.banks:
             if bank.l > 0:
                 loan_profits = bank.get_loan_interest() * bank.l
                 loan_to_return = bank.l + loan_profits
                 # (equation 3)
                 if loan_to_return > bank.C:
+                    # we need to fire sale to cover the debt:
                     lack_of_capital_to_return_loan = loan_to_return - bank.C
                     bank.C = 0
-                    bank.paid_loan = bank.do_fire_sales(
+                    returned_by_borrower = bank.do_fire_sales(
                         lack_of_capital_to_return_loan,
                         f"to return loan and interest {loan_to_return:.3f} > C={bank.C:.3f}",
                         "repay")
-                # the fire sales of line above could bankrupt the bank, if not, we pay "normally" the loan:
+                    # it returns None if borrower fails, in which case the bad debt and the cancel of loan it is
+                    # done inside do_fire_sales() -> __do_bankruptcy__(). But that cancel after bankruptcy does not
+                    # consider the profits:
+                    if returned_by_borrower is not None:
+                        bank.get_lender().s -= bank.l  # we reduce the  's' => the lender could have more loans
+                        bank.get_lender().C += loan_profits  # we return the loan and it's profits
+                        bank.get_lender().E += loan_profits  # the profits are paid as E
+                        bank.paid_loan = returned_by_borrower
+                    else:
+                        bank.paid_loan = 0
                 else:
+                    # the can pay the debt normally:
                     bank.C -= loan_to_return
-                    bank.E -= loan_profits
-                    bank.paid_loan = bank.l
-                    bank.l = 0
+                    bank.paid_loan = loan_to_return
                     bank.get_lender().s -= bank.l  # we reduce the  's' => the lender could have more loans
-                    bank.get_lender().C += loan_to_return  # we return the loan and it's profits
+                    bank.get_lender().C += bank.l  # we return the loan and it's profits
                     bank.get_lender().E += loan_profits  # the profits are paid as E
-                    self.log.debug(
-                        "repay",
-                        f"{bank.get_id()} pays loan {loan_to_return:.3f} (E={bank.E:.3f},C={bank.C:.3f}) to lender" +
-                        f" {bank.get_lender().get_id()} (ΔE={loan_profits:.3f},ΔC={bank.l:.3f})")
+                bank.E -= loan_profits
 
-        # now  when ΔD<0 it's time to use capital or sell L again
-        # (now we have the loans cancelled, or the bank bankrupted):
+        # now we should analyze the banks that were lenders. They can have in .d a value (that
+        # should mean that they don't have enough C to cover the negative shock of D) but maybe
+        # they have had an income of a paid loan by its borrowers, so let's ignore .d and check
+        # again if C > incrD:
         for bank in self.banks:
-            if bank.d > 0 and not bank.failed:
-                bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
+            if bank.l == 0:  # if they are lenders, borrowers have finished at this point
+                if bank.C < bank.incrD:
+                    bank.d = bank.incrD - bank.C
+                else:
+                    bank.d = 0
+                # and if still they have .d >0 , its means that it should do a fire sale:
+                if bank.d > 0:  # and we have less deposits (incrD=d)
+                    bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
 
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
 
@@ -1167,7 +1230,7 @@ class Model:
                 bank_i.id -= 1
             for borrower in list(bank_i.active_borrowers):
                 if borrower > bank_to_remove.id:
-                    bank_i.active_borrowers[borrower-1] = bank_i.active_borrowers[borrower]
+                    bank_i.active_borrowers[borrower - 1] = bank_i.active_borrowers[borrower]
                     del bank_i.active_borrowers[borrower]
                 elif borrower == bank_to_remove.id:
                     del bank_i.active_borrowers[borrower]
@@ -1197,7 +1260,7 @@ class Model:
         max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
         for bank in self.banks:
             bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
-            bank.A = bank.C + bank.L  # bank.L / bank.λ + bank.D
+            bank.A = bank.C + bank.L + bank.R
 
         # determine c (lending capacity) for all other banks (to whom give loans):
         for bank in self.banks:
@@ -1245,8 +1308,7 @@ class Model:
                 line1 += f"{bank_i.rij[j]:.3f},"
                 line2 += f"{bank_i.c[j]:.3f},"
             lines.append('  |' if lines else "c=|" + line2[:-1] + "| r=|" +
-                                             line1[
-                                             :-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
+                        line1[:-1] + f"| {bank_i.get_id(short=True)} h={bank_i.h:.3f},λ={bank_i.lambda_:.3f} ")
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
@@ -1257,7 +1319,7 @@ class Model:
             for line in lines:
                 self.log.debug("links", f"{line}")
         self.log.debug("links",
-                       f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
+                f"maxE={maxE:.3f} maxC={maxC:.3f} max_lambda={max_lambda:.3f} min_r={min_r:.3f} ŋ={self.eta:.3f}")
 
         # (equation 7)
         log_info_1 = log_info_2 = ""
@@ -1306,18 +1368,29 @@ class Bank:
         self.model = bank_model
         self.failures = 0
         self.rationing = 0
+        self.lambda_ = 0
+        self.A = 0
+        self.rij = []
+        self.h = 0
+        self.p = 0
+        self.c = []
+        self.r = 0
         self.lender = None
         self.__assign_defaults__()
 
     def __assign_defaults__(self):
         self.L = self.model.config.L_i0
-        self.C = self.model.config.C_i0
         self.D = self.model.config.D_i0
         self.E = self.model.config.E_i0
+        self.R = self.model.config.reserves * self.D
+        self.C = self.D + self.E - self.L - self.R
         self.mu = 0  # fitness of the bank:  estimated later
         self.l = 0  # amount of loan done:  estimated later
         self.s = 0  # amount of loan received: estimated later
+        self.d = 0  # amount of demand of loan
         self.B = 0  # bad debt: estimated later
+        self.incrD = 0
+        self.incrR = 0
         self.failed = False
         # identity of the lender
         self.lender = self.model.config.lender_change.new_lender(self.model, self)
@@ -1344,6 +1417,9 @@ class Bank:
             self.paid_loan = recovered
             self.get_lender().B += bad_debt
             self.get_lender().E -= bad_debt
+            # Lender will be failed also if E<0:
+            if self.get_lender().E < 0:
+                self.get_lender().failed = True
             self.get_lender().C += recovered
             self.model.log.debug(phase, f"{self.get_id()} bankrupted (fire sale={recovered_in_fire_sales:.3f},"
                                         f"recovers={recovered:.3f},paidD={self.D:.3f})"
@@ -1395,32 +1471,6 @@ class Bank:
                     return amount_to_sell
 
 
-class Gui:
-    gooey = False
-
-    def progress_bar(self, message, maximum):
-        print(message)
-        self.maximum = maximum
-        self.current = 1
-
-    def next(self):
-        self.current += 1
-        print("progress: {}%".format(self.current / self.maximum * 100))
-        sys.stdout.flush()
-
-    def parser(self):
-        try:
-            import interbank_gui
-            parser = interbank_gui.get_interactive_parser()
-        except:
-            parser = None
-        if parser is None:
-            parser = argparse.ArgumentParser()
-        else:
-            self.gooey = True
-        return parser
-
-
 class Utils:
     """
     Auxiliary class to encapsulate the use of the model
@@ -1447,8 +1497,10 @@ class Utils:
             Run interactively the model
         """
         global model
-        gui = Gui()
-        parser = gui.parser()
+        parser = argparse.ArgumentParser()
+        parser.description = "<config=value> to set up Config options. use '?' to see values"
+        parser.add_argument("--debug", type=int, default=None,
+                            help="Stop and enter in debug mode after at this time")
         parser.add_argument("--log", default='ERROR', help="Log level messages (ERROR,DEBUG,INFO...)")
         parser.add_argument("--modules", default=None, help=f"Log only this modules (separated by ,)")
         parser.add_argument("--logfile", default=None, help="File to send logs to")
@@ -1458,9 +1510,9 @@ class Utils:
         parser.add_argument("--gif_graph", default=False,
                             type=bool,
                             help=f"If --graph, then also an animated gif with all graphs ")
+        parser.add_argument("--graph_stats", default=False,
+                            type=str, help=f"Load a json of a graph and give us statistics of it")
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
-        parser.add_argument("--debug", type=int, default=None,
-                            help="Stop and enter in debug mode after at this time")
         parser.add_argument("--eta", type=float, default=Model.eta, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
         parser.add_argument("--lc_p", type=float, default=None,
@@ -1481,7 +1533,10 @@ class Utils:
                             help="No replace banks when they go bankrupted")
         parser.add_argument("--seed", type=int, default=None,
                             help="seed used for random generator")
-        args = parser.parse_args()
+        args, other_possible_config_args = parser.parse_known_args()
+        if args.graph_stats:
+            print(lc.GraphStatistics.describe(args.graph_stats))
+            sys.exit(0)
         if args.t != model.config.T:
             model.config.T = args.t
         if args.n != model.config.N:
@@ -1492,12 +1547,12 @@ class Utils:
             model.config.allow_replacement_of_bankrupted = False
         if args.debug:
             model.do_debug(args.debug)
+        model.config.define_values_from_args(other_possible_config_args)
         model.config.lender_change = lc.determine_algorithm(args.lc)
         model.config.lender_change.set_parameter("p", args.lc_p)
         model.config.lender_change.set_parameter("m", args.lc_m)
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
         model.log.define_log(args.log, args.logfile, args.modules)
-        model.log.define_gui(gui)
         model.statistics.define_output_format(args.output_format)
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)

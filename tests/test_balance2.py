@@ -14,7 +14,7 @@ class Balance2TestCase(tests.interbank_testclass.InterbankTest):
         self.setBank(bank=self.model.banks[0], C=10.0, L=15.0, D=15.0, E=10.0)
         self.setBank(bank=self.model.banks[1], C=10.0, L=15.0, D=15.0, E=10.0)
 
-    @patch.object(interbank.Model, "do_shock", tests.interbank_testclass.mockedShock)
+    @patch.object(interbank.Model, "determine_shock_value", tests.interbank_testclass.determine_shock_value_mocked)
     def setUp(self):
         self.configureTest( N=2,T=1,
                             shocks=[
@@ -24,8 +24,10 @@ class Balance2TestCase(tests.interbank_testclass.InterbankTest):
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[0], C=16.94, L=15.0, D=22.0, E=9.94, paid_loan=3)
-        self.assertBank(bank=self.model.banks[1], C=3.06, L=15.0, D=8.0, E=10.06, s=20)
+        self.assertBank(bank=self.model.banks[0], C=16.499200000000002, L=15.0, D=22.0, E=9.9392,
+                        paid_loan=3.100800000000001)
+        self.assertBank(bank=self.model.banks[1], C=3.040000000000001, L=15, D=8.0,
+                        E=10.0608, s=16.36)
 
 
 
