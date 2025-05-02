@@ -12,8 +12,8 @@ import exp_runner
 
 class RestrictedMarketRun(exp_runner.ExperimentRun):
     N = 50
-    T = 1000
-    MC = 1
+    T = 100
+    MC = 100
 
     OUTPUT_DIRECTORY = "c:\\experiments\\restrictedmarket"
     ALGORITHM = RestrictedMarket
@@ -27,23 +27,7 @@ class RestrictedMarketRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 988993
-    seed_offset = 0
-
-    def run_model(self, filename, execution_config, execution_parameters, seed_random):
-        model = Model()
-        model.export_datafile = filename
-        model.config.lender_change = self.ALGORITHM()
-        model.config.lender_change.set_parameter("p", execution_parameters["p"])
-        model.configure(T=self.T, N=self.N, **execution_config)
-        RestrictedMarketRun.seed_offset += 1
-        model.initialize(seed=self.seed + RestrictedMarketRun.seed_offset, save_graphs_instants=None,
-                         export_datafile=filename,
-                         generate_plots=False,
-                         export_description=self.describe_experiment_parameters(model, execution_parameters,
-                                                                                seed_random))
-        model.simulate_full(interactive=False)
-        return model.finish()
+    SEED_FOR_EXECUTION = 988993
 
 
 if __name__ == "__main__":

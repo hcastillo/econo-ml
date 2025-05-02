@@ -30,9 +30,7 @@ class GraphsRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 9
-    seed_offset = 1
-
+    SEED_FOR_EXECUTION = 9
 
     def generate_banks_graph(self, p, outgoings):
         result = nx.DiGraph()

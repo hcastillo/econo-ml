@@ -27,6 +27,8 @@ class PreferentialRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 2
     LENGTH_FILENAME_CONFIG = 0
 
+    SEED_FOR_EXECUTION = 2025
+
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()
         model.export_datafile = filename
@@ -35,9 +37,7 @@ class PreferentialRun(exp_runner.ExperimentRun):
         model.configure(T=self.T, N=self.N, **execution_config)
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
-                         generate_plots=False,
-                         export_description=self.describe_experiment_parameters(model, execution_parameters,
-                                                                                seed_random))
+                         generate_plots=False)
         model.simulate_full(interactive=False)
         return model.finish()
 

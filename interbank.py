@@ -37,7 +37,7 @@ class Config:
     Configuration parameters for the interbank network
     """
     T: int = 1000  # time (1000)
-    N: int = 50  # number of banks (50)
+    N: int = 100  # number of banks (50)
 
     reserves: float = 0.02
 
@@ -54,17 +54,17 @@ class Config:
 
     # shocks parameters:
     mi: float = 0.7  # mi µ
-    omega: float = 0.6  # omega ω
+    omega: float = 0.6 #0.55 # omega ω #TODO 0.6
 
     # Lender's change mechanism
     lender_change: lc.LenderChange = None
 
     # screening costs
-    phi: float = 0.025  # phi Φ
-    ji: float = 0.015  # ji Χ
+    phi: float = 0.025  # phi Φ 0.25
+    ji: float = 0.015  # ji Χ 0.0015
 
     # liquidation cost of collateral
-    xi: float = 0.3  # xi ξ
+    xi: float = 0.3 ##0.6  # xi ξ
     ro: float = 0.3 # 0.3  # ro ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
@@ -854,7 +854,7 @@ class Model:
     def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None,
                    export_datafile=None, export_description=None, generate_plots=True, output_directory=None):
         self.statistics.reset(output_directory=output_directory)
-        if not dont_seed:
+        if not dont_seed and self.config.seed is None:
             applied_seed = seed if seed else self.default_seed
             random.seed(applied_seed)
             self.config.seed = applied_seed
@@ -1327,7 +1327,11 @@ class Model:
                                              (1 - self.banks[j].p) *
                                              (self.config.xi * self.banks[j].A - bank_i.c[j])) \
                                             / (self.banks[j].p * bank_i.c[j] * (1-self.config.psi))
+                            #if bank_i.rij[j] > 1.5:
+                            #    # print(f" t={self.t} bank{bank_i.get_id()} rij_{j} = {bank_i.rij[j]}")
+                            #    bank_i.rij[j] = 1.5
 
+                            #TODO
                             bank_i.asset_i += self.config.ji * bank_i.A
                             bank_i.asset_j += self.config.phi * self.banks[j].A
                             bank_i.asset_j += (1 - self.banks[j].p)

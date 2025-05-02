@@ -22,15 +22,13 @@ import lxml.builder
 import gzip
 import argparse
 
+
 class ExperimentRun:
     N = 1
     T = 1
     MC = 1
 
-    LIMIT_OUTLIER = 2
-    LIMIT_MEAN = 5
-    LIMIT_STD = 25
-    LIMIT_VARIABLE_TO_CHECK = 'interest_rate'
+    LIMIT_OUTLIER = 3
 
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
@@ -42,10 +40,14 @@ class ExperimentRun:
 
     ALGORITHM = interbank_lenderchange.ShockedMarket
 
+    ALLOW_REPLACEMENT_OF_BANKRUPTED = True
+
     config = {  # items should be iterable:
         # "µ": np.linspace(0.7,0.8,num=2),
         # "ω": [0.55,0.6,0.7]
     }
+
+    SEED_FOR_EXECUTION = 2025
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.001, 0.100, num=40),
@@ -174,28 +176,22 @@ class ExperimentRun:
             output_file.write(
                 lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
 
-    def describe_experiment_parameters(self, model, execution_parameters, seed_random):
-        export_description = ""
-        for item in dir(model.config):
-            if item in execution_parameters:
-                export_description += f"{item}={execution_parameters[item]} "
-            elif item == 'seed':
-                export_description += f"seed={seed_random} "
-            elif isinstance(getattr(model.config, item), int) or isinstance(getattr(model.config, item), float):
-                export_description += f"{item}={getattr(model.config, item)} "
-        return export_description
-
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()
         model.export_datafile = filename
         model.config.lender_change = self.ALGORITHM()
-        model.configure(T=self.T, N=self.N, **execution_config)
+        if 'p' in execution_parameters and (isinstance(self.ALGORITHM(),interbank_lenderchange.RestrictedMarket) or
+                                            isinstance(self.ALGORITHM(),interbank_lenderchange.ShockedMarket) or
+                                            isinstance(self.ALGORITHM(), interbank_lenderchange.SmallWorld)):
+            model.config.lender_change.set_parameter("p", execution_parameters["p"])
+        if 'm' in execution_parameters and isinstance(self.ALGORITHM(),interbank_lenderchange.Preferential):
+            model.config.lender_change.set_parameter("m", int(execution_parameters["m"]))
+        model.configure(T=self.T, N=self.N,
+                        allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
 
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
-                         generate_plots=False,
-                         export_description=self.describe_experiment_parameters(model, execution_parameters,
-                                                                                seed_random))
+                         generate_plots=False)
         model.simulate_full(interactive=False)
         return model.finish()
 
@@ -259,7 +255,7 @@ class ExperimentRun:
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
-    def _get_statistics_of_individual_graph(self,filename, communities_not_alone, gcs, communities, lengths):
+    def _get_statistics_of_individual_graph(self, filename, communities_not_alone, gcs, communities, lengths):
         graph = interbank_lenderchange.load_graph_json(filename)
         graph_communities = interbank_lenderchange.GraphStatistics.communities(graph)
         communities_not_alone.append(interbank_lenderchange.GraphStatistics.communities_not_alone(graph))
@@ -303,49 +299,34 @@ class ExperimentRun:
         results_comparing = None
         if self.COMPARING_DATA:
             results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")
-            if len(results_x_comparing) != len(results_x_axis) and len(results_x_comparing)!=1:
+            if len(results_x_comparing) != len(results_x_axis) and len(results_x_comparing) != 1:
                 results_comparing = None
         return results_comparing
 
-    def data_seems_ok(self, filename_for_iteration:str, i:int,
-                      individual_execution:pd.core.frame.DataFrame, array_all_data:pd.core.frame.DataFrame):
+    def data_seems_ok(self, filename_for_iteration: str, i: int,
+                      individual_execution: pd.core.frame.DataFrame, array_all_data: pd.core.frame.DataFrame):
         # if 'interest_rate' not in array, means that it's the first execution, so nothing to compare:
         for k in array_all_data.keys():
             if k.strip() == "t":
                 continue
             mean_estimated = array_all_data[k].mean()
-            mean_individual_execution=individual_execution[k].mean()
+            mean_individual_execution = individual_execution[k].mean()
             warnings.filterwarnings(
                 "ignore"
             )  # it generates RuntimeWarning: overflow encountered in multiply
-            std_individual_execution = individual_execution[k].std()
             std_estimated = array_all_data[k].std()
 
             # we discard outliers: whatever is over μ±3σ or under μ±3σ:
-            if not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <= mean_individual_execution <= (mean_estimated + self.LIMIT_OUTLIER * std_estimated)):
+            if (not np.isnan(mean_estimated) and not np.isnan(std_estimated) and
+                not np.isnan(mean_individual_execution) and
+                not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <=
+                mean_individual_execution <=
+                (mean_estimated + self.LIMIT_OUTLIER * std_estimated))):
                 return False
         return True
-        # if self.LIMIT_VARIABLE_TO_CHECK in array_all_data.keys():
-        #     # we obtain the average and std:
-        #     mean_new_data = individual_execution.interest_rate.mean()
-        #     std_new_data = individual_execution.interest_rate.std()
-        #     mean_all_data = array_all_data.interest_rate.mean()
-        #     std_all_data = array_all_data.interest_rate.std()
-        #     if mean_new_data > self.LIMIT_MEAN * mean_all_data:
-        #         self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: mean of "
-        #                                    f"{self.LIMIT_VARIABLE_TO_CHECK} {mean_new_data} >"
-        #                                    f" {self.LIMIT_MEAN}*{mean_all_data}")
-        #         return False
-        #     elif std_new_data > self.LIMIT_STD * std_all_data:
-        #         self.log_replaced_data += (f"\n discarded {filename_for_iteration}_{i}: std of "
-        #                                    f"{self.LIMIT_VARIABLE_TO_CHECK} "
-        #                                    f"{std_new_data} > {self.LIMIT_STD}*{std_all_data}")
-        #         return False
-        # return True
 
     def load_or_execute_model(self, model_configuration, model_parameters, filename_for_iteration,
-                              i, clear_previous_results):
-        mc_iteration = random.randint(9999, 20000)
+                              i, clear_previous_results, seed_for_this_model):
         if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
                 and not clear_previous_results):
             result_mc = pd.read_csv(
@@ -357,7 +338,7 @@ class ExperimentRun:
         else:
             result_mc = self.run_model(
                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
-                model_configuration, model_parameters, mc_iteration)
+                model_configuration, model_parameters, seed_for_this_model)
         return result_mc
 
     def do(self, clear_previous_results=False):
@@ -370,10 +351,12 @@ class ExperimentRun:
             results_comparing = self.load_comparing(results_to_plot, results_x_axis)
         if not results_to_plot:
             self.__verify_directories__()
+            seeds_for_random = self.generate_random_seeds_for_this_execution()
             progress_bar = Bar(
                 "Executing models", max=self.get_num_models()
             )
             progress_bar.update()
+            position_inside_seeds_for_random = 0
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
                     result_iteration_to_check = pd.DataFrame()
@@ -383,29 +366,29 @@ class ExperimentRun:
                     # result_iteration:
                     for i in range(self.MC):
                         result_mc = self.load_or_execute_model(model_configuration, model_parameters,
-                                                               filename_for_iteration, i, clear_previous_results)
+                                                               filename_for_iteration, i, clear_previous_results,
+                                                               seeds_for_random[position_inside_seeds_for_random])
                         graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
                         result_iteration_to_check = pd.concat([result_iteration_to_check, result_mc])
+                        position_inside_seeds_for_random += 1
 
                     # second round to verify if one of the models should be replaced because it presents abnormal
                     # values comparing to the other (self.MC-1):
                     result_iteration = pd.DataFrame()
+                    position_inside_seeds_for_random -= self.MC
                     for i in range(self.MC):
                         result_mc = self.load_or_execute_model(model_configuration, model_parameters,
-                                                               filename_for_iteration, i, clear_previous_results)
+                                                               filename_for_iteration, i, clear_previous_results,
+                                                               seeds_for_random[position_inside_seeds_for_random])
+                        offset = 1
                         while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check):
-                            # we should erase the file now and replace by a new execution:
-                            try:
-                                os.remove(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
-                            except FileNotFoundError:
-                                pass
-                            try:
-                                os.remove(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                            except FileNotFoundError:
-                                pass
-                            # new execution with different seed:
+                            self.discard_execution_of_iteration(filename_for_iteration, i)
                             result_mc = self.load_or_execute_model(model_configuration, model_parameters,
-                                                                   filename_for_iteration, i, clear_previous_results)
+                                                                   filename_for_iteration, i, clear_previous_results,
+                                                                   (seeds_for_random[position_inside_seeds_for_random]
+                                                                    + offset))
+                            offset += 1
+                        position_inside_seeds_for_random += 1
                         result_iteration = pd.concat([result_iteration, result_mc])
 
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
@@ -443,10 +426,33 @@ class ExperimentRun:
         self.results_to_plot = results_to_plot
         return results_to_plot, results_x_axis
 
+    def generate_random_seeds_for_this_execution(self):
+        seeds_for_random = []
+        random.seed(self.SEED_FOR_EXECUTION)
+        for _ in self.get_models(self.config):
+            for _ in self.get_models(self.parameters):
+                for i in range(self.MC):
+                    seeds_for_random.append(random.randint(1000, 99999))
+        return seeds_for_random
+
+    def discard_execution_of_iteration(self, filename_for_iteration, i):
+        # we should erase or remove the file and then we will generate a new execution with a different seed:
+        if os.path.exists(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv"):
+            base, ext = os.path.splitext(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+        elif os.path.exists(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
+            base, ext = os.path.splitext(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+        offset = 1
+        while True:
+            new_name = f"{base}_discarded{offset}{ext}"
+            if not os.path.exists(new_name):
+                os.rename(f"{base}{ext}", new_name)
+                break
+            offset += 1
+
 
 class Runner:
     def do(self, experiment_runner):
-        parser = argparse.ArgumentParser(description="Executes interbank model using "+
+        parser = argparse.ArgumentParser(description="Executes interbank model using " +
                                                      experiment_runner.__name__)
         parser.add_argument(
             "--do",
@@ -464,7 +470,7 @@ class Runner:
             "--clear",
             default=False,
             action=argparse.BooleanOptionalAction,
-            help="Ignore generated files and create them again",
+            help="Ignore generated results.csv and create it again",
         )
         args = parser.parse_args()
         experiment = experiment_runner()

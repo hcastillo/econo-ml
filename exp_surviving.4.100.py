@@ -12,17 +12,17 @@ import exp_surviving_runner
 
 
 class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
-    N = 50
+    N = 100
     T = 1000
     MC = 15
 
-    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.4"
+    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.4.100"
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.0001, 1, num=4),
     }
 
-    SEED_FOR_EXECUTION = 918995
+    SEED_FOR_EXECUTION = 918994
 
 
 if __name__ == "__main__":

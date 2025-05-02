@@ -29,23 +29,8 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
-    seed = 2025
-    seed_offset = 1
+    SEED_FOR_EXECUTION = 2025
 
-    def run_model(self, filename, execution_config, execution_parameters, seed_random):
-        model = Model()
-        model.export_datafile = filename
-        model.config.lender_change = self.ALGORITHM()
-        model.config.lender_change.set_parameter("p", execution_parameters["p"])
-        model.configure(T=self.T, N=self.N, **execution_config)
-        MarketPowerRun.seed_offset += 1
-        model.initialize(seed=(self.seed + MarketPowerRun.seed_offset), save_graphs_instants=None,
-                         export_datafile=filename,
-                         generate_plots=False,
-                         export_description=self.describe_experiment_parameters(model, execution_parameters,
-                                                                                seed_random))
-        model.simulate_full(interactive=False)
-        return model.finish()
 
 
 if __name__ == "__main__":
