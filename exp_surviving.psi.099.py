@@ -12,7 +12,7 @@ import exp_surviving_runner
 
 
 class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
-    N = 40
+    N = 50
     T = 1000
     MC = 15
 

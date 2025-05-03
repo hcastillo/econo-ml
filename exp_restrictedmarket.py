@@ -4,8 +4,6 @@
 Executor for the interbank model using different values for the lc ShockedMarket
 @author: hector@bith.net
 """
-import numpy as np
-from interbank import Model
 from interbank_lenderchange import RestrictedMarket
 import exp_runner
 
@@ -13,7 +11,7 @@ import exp_runner
 class RestrictedMarketRun(exp_runner.ExperimentRun):
     N = 50
     T = 100
-    MC = 100
+    MC = 10
 
     OUTPUT_DIRECTORY = "c:\\experiments\\restrictedmarket"
     ALGORITHM = RestrictedMarket

@@ -36,33 +36,33 @@ class SurvivingRun(exp_runner.ExperimentRun):
 
     SEED_FOR_EXECUTION = 1
 
+    # which variable is used to determine the color:
+    COLORS_VARIABLE = 'p'
+
     # p = [0..1] and range of viridis colors is 10 options, so if value of p=0.177 we will choose #2
     #                                                                      p=0.301 we will choose #3
-    colors = plt.colormaps['viridis'](np.linspace(0, 1, 11))
+    _colors = []
 
-    @staticmethod
-    def get_color(value_of_p):
-        idx = int(round(value_of_p*10, 0))
-        return SurvivingRun.colors[idx]
+    def get_color(self, all_models, i):
+        if self._colors == []:
+            self._colors = plt.colormaps['viridis'](np.linspace(0, 1, len(all_models)))
+        return self._colors[i]
 
     @staticmethod
     def determine_average_of_series(array_with_iterations_and_series):
         result_array = {}
         for iteration in array_with_iterations_and_series:  # iterations = p=0.0001, p=0.0002
-            result_array[iteration] = pd.concat(array_with_iterations_and_series[iteration],axis=1).agg("mean", 1)
+            result_array[iteration] = pd.concat(array_with_iterations_and_series[iteration], axis=1).agg("mean", 1)
         return result_array
 
     def generate_plot(self, title, output_file, data_to_plot, all_models, max_t, logarithm=False):
         plt.clf()
         plt.title(f"{title} with RestrictedMarket p (MC={self.MC})")
-        max_t = 0
         for i, iteration in enumerate(data_to_plot):
             plt.plot(data_to_plot[iteration], "-",
-                     color=SurvivingRun.get_color(all_models[i]['p']),
-                     label=str(all_models[i]['p'])[:5])
-            if len(data_to_plot[iteration]) > max_t:
-                max_t = len(data_to_plot[iteration])
-        plt.legend(loc='best', title="p")
+                     color=self.get_color(all_models, i),
+                     label=str(all_models[i][self.COLORS_VARIABLE])[:5])
+        plt.legend(loc='best', title=self.COLORS_VARIABLE)
         # max of ticks we want in x range: 10
         plt.xticks(range(0, max_t, divmod(max_t, 10)[0]))
         if logarithm:
@@ -83,8 +83,8 @@ class SurvivingRun(exp_runner.ExperimentRun):
     def accumulated_data(array):
         if isinstance(array, dict):
             result = {}
-            for serie in array:
-                result[serie] = SurvivingRun.accumulated_data(array[serie])
+            for series in array:
+                result[series] = SurvivingRun.accumulated_data(array[series])
             return result
         else:
             result = array.copy()
@@ -130,12 +130,12 @@ class SurvivingRun(exp_runner.ExperimentRun):
         data_of_surviving_banks_avg = experiment.determine_average_of_series(data_of_surviving_banks)
         data_of_failures_avg = experiment.determine_average_of_series(data_of_failures)
         data_of_failures_acum_avg = experiment.accumulated_data(data_of_failures_avg)
-        data_of_failures_rationed_avg =\
+        data_of_failures_rationed_avg = \
             experiment.determine_average_of_series(data_of_failures_rationed)
         data_of_failures_rationed_acum_avg = experiment.accumulated_data(data_of_failures_rationed_avg)
 
         max_t = experiment.determine_max_t([data_of_surviving_banks_avg, data_of_failures_avg,
-                                              data_of_failures_rationed_avg])
+                                            data_of_failures_rationed_avg])
         # experiment.generate_plot("Surviving banks", "_surviving.png",
         #                           data_of_surviving_banks_avg, all_models, max_t)
         #experiment.generate_plot("Surviving banks log", "_surviving_log.png",
@@ -155,12 +155,10 @@ class SurvivingRun(exp_runner.ExperimentRun):
         # experiment.generate_plot("Failures rationed", "_failures_rationed_log.png",
         #                            data_of_failures_rationed_avg, all_models, max_t, logarithm=True)
         experiment.generate_plot("Failures rationed acum", "_failures_rationed_acum.png",
-                                   data_of_failures_rationed_acum_avg, all_models, max_t)
+                                 data_of_failures_rationed_acum_avg, all_models, max_t)
         experiment.save_surviving_csv(data_of_failures_rationed_acum_avg, '_failures_rationed_acum', max_t)
         experiment.generate_plot("Failures rationed acum log", "_failures_rationed_acum_log.png",
-                                   data_of_failures_rationed_acum_avg, all_models, max_t, logarithm=True)
-
-
+                                 data_of_failures_rationed_acum_avg, all_models, max_t, logarithm=True)
 
     def save_surviving_csv(self, data, name, max_t):
         with open(f"{self.OUTPUT_DIRECTORY}/{name}.csv", "w") as file:
@@ -180,4 +178,3 @@ class SurvivingRun(exp_runner.ExperimentRun):
 
 class Runner(exp_runner.Runner):
     pass
-

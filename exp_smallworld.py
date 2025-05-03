@@ -5,7 +5,6 @@ Executor for the interbank model using different values for the lc ShockedMarket
 @author: hector@bith.net
 """
 import numpy as np
-from interbank import Model
 from interbank_lenderchange import SmallWorld
 import exp_runner
 
