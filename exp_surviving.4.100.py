@@ -18,7 +18,7 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
 
     OUTPUT_DIRECTORY = "c:\\experiments\\surviving.4.100"
 
-    parameters = {  # items should be iterable:
+    parameters = {
         "p": np.linspace(0.0001, 1, num=4),
     }
 
@@ -28,5 +28,6 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
 if __name__ == "__main__":
     runner = exp_surviving_runner.Runner()
     experiment = runner.do(RestrictedMarketSurvivingRun)
-    experiment.plot_surviving(experiment)
+    if experiment:
+        experiment.plot_surviving(experiment)
 

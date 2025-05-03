@@ -54,14 +54,14 @@ class Config:
 
     # shocks parameters:
     mi: float = 0.7  # mi µ
-    omega: float = 0.6 #0.55 # omega ω #TODO 0.6
+    omega: float = 0.55 # omega ω
 
     # Lender's change mechanism
     lender_change: lc.LenderChange = None
 
     # screening costs
-    phi: float = 0.025  # phi Φ 0.25
-    ji: float = 0.015  # ji Χ 0.0015
+    phi: float = 0.25  # phi Φ
+    ji: float = 0.0015  # ji Χ
 
     # liquidation cost of collateral
     xi: float = 0.3 ##0.6  # xi ξ
@@ -97,18 +97,22 @@ class Config:
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'systemic_leverage': False,
                            'num_of_rationed': True,
-                           'loans': False, 'c': True,
+                           'loans': False, 'c': True, 'demanded':True, 'loaned':True,
                            'reserves': True, 'deposits': True,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
                            'num_banks': True, 'bankruptcy_rationed': True}
 
     def __str__(self, separator=""):
         description = sys.argv[0] if __name__ == '__main__' else ''
+        for attr, value in self:
+            description += f" {attr}={value}{separator}"
+        return description + " "
+
+    def __iter__(self):
         for attr in dir(self):
             value = getattr(self, attr)
-            if isinstance(value, int) or isinstance(value, float):
-                description += f" {attr}={value}{separator}"
-        return description + " "
+            if isinstance(value, int) or isinstance(value, float) or isinstance(value, bool):
+                yield attr, value
 
     def define_values_from_args(self, config_list):
         if config_list:
@@ -218,6 +222,8 @@ class Statistics:
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
+        self.loaned = np.zeros(self.model.config.T, dtype=float)
+        self.demanded = np.zeros(self.model.config.T, dtype=float)
         self.leverage = np.zeros(self.model.config.T, dtype=float)
         self.systemic_leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
@@ -836,18 +842,10 @@ class Model:
                 attribute = attribute.replace("lc_", "")
                 if attribute == 'lc':
                     self.config.lender_change = lc.determine_algorithm(configuration[attribute])
-                    print(self.config.lender_change.__name__)
                 else:
                     self.config.lender_change.set_parameter(attribute, configuration["lc_" + attribute])
             elif hasattr(self.config, attribute):
-                current_value = getattr(self.config, attribute)
-                if isinstance(current_value, int):
-                    setattr(self.config, attribute, int(configuration[attribute]))
-                else:
-                    if isinstance(current_value, float):
-                        setattr(self.config, attribute, float(configuration[attribute]))
-                    else:
-                        raise Exception(f"type of config {attribute} not allowed: {type(current_value)}")
+                setattr(self.config, attribute, configuration[attribute])
             else:
                 raise LookupError("attribute in config not found: %s " % attribute)
 
@@ -1088,11 +1086,14 @@ class Model:
     def do_loans(self):
         num_of_rationed = 0
         total_rationed = 0
+        total_demanded = 0
+        total_loans = 0
         for bank_index, bank in enumerate(self.banks):
             # we don't save directly in bank.rationing because it if fails it's replaced and we lost the value:
             rationing_of_bank = 0
             # decrement in which we should borrow
             if bank.d > 0:
+                total_demanded += bank.d
                 if bank.get_lender() is None or bank.get_lender().d > 0:
                     bank.l = 0
                     rationing_of_bank = bank.d
@@ -1118,9 +1119,11 @@ class Model:
                             bank.get_lender().s = 0
                         else:
                             bank.l = 0
+                        total_loans += bank.l
                     else:
                         # rationing_of_bank = 0
                         bank.l = bank.d  # amount of loan (wrote in the borrower)
+                        total_loans += bank.l
                         bank.get_lender().active_borrowers[bank_index] = bank.d  # amount of loan (wrote in the lender)
                         bank.get_lender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
                         bank.get_lender().C -= bank.d  # amount of loan that reduces lender capital
@@ -1142,6 +1145,8 @@ class Model:
             bank.rationing = rationing_of_bank
         self.statistics.num_of_rationed[self.t] = num_of_rationed
         self.statistics.rationing[self.t] = total_rationed
+        self.statistics.demanded[self.t] = total_demanded
+        self.statistics.loaned[self.t] = total_loans
         self.log.debug("loans", f"this step rationed total={total_rationed:.3f} in {num_of_rationed} banks ")
 
 

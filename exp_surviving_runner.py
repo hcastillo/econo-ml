@@ -105,23 +105,26 @@ class SurvivingRun(exp_runner.ExperimentRun):
         data_of_failures_acum = {}
 
         all_models = []
-        for model_configuration in experiment.get_models(experiment.parameters):
-            all_models.append(model_configuration)
-            filename_for_iteration = experiment.get_filename_for_iteration(model_configuration, {})
-            data_of_surviving_banks[filename_for_iteration] = []
-            data_of_failures[filename_for_iteration] = []
-            data_of_failures_acum[filename_for_iteration] = []
-            data_of_failures_rationed[filename_for_iteration] = []
-            data_of_failures_rationed_acum[filename_for_iteration] = []
-            for i in range(experiment.MC):
-                if os.path.isfile(f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
-                    result_mc = Statistics.read_gdt(
-                        f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                    data_of_surviving_banks[filename_for_iteration].append(result_mc['num_banks'])
-                    # bankruptcies and bankruptcies rationed are accumulated data:
-                    # [1,2,1,0,1] -> [1,3,4,4,5]
-                    data_of_failures[filename_for_iteration].append(result_mc['bankruptcies'])
-                    data_of_failures_rationed[filename_for_iteration].append(result_mc['bankruptcy_rationed'])
+        for model_configuration in experiment.get_models(experiment.config):
+            for model_parameters in experiment.get_models(experiment.parameters):
+                values_of_this_iteration = model_configuration.copy()
+                values_of_this_iteration.update(model_parameters)
+                all_models.append(values_of_this_iteration)
+                filename_for_iteration = experiment.get_filename_for_iteration(model_parameters, model_configuration)
+                data_of_surviving_banks[filename_for_iteration] = []
+                data_of_failures[filename_for_iteration] = []
+                data_of_failures_acum[filename_for_iteration] = []
+                data_of_failures_rationed[filename_for_iteration] = []
+                data_of_failures_rationed_acum[filename_for_iteration] = []
+                for i in range(experiment.MC):
+                    if os.path.isfile(f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
+                        result_mc = Statistics.read_gdt(
+                            f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+                        data_of_surviving_banks[filename_for_iteration].append(result_mc['num_banks'])
+                        # bankruptcies and bankruptcies rationed are accumulated data:
+                        # [1,2,1,0,1] -> [1,3,4,4,5]
+                        data_of_failures[filename_for_iteration].append(result_mc['bankruptcies'])
+                        data_of_failures_rationed[filename_for_iteration].append(result_mc['bankruptcy_rationed'])
 
         # we have now MC different series for each iteration, so let's estimate the average of all the MonteCarlos:
         data_of_surviving_banks_avg = experiment.determine_average_of_series(data_of_surviving_banks)

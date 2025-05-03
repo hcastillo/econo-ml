@@ -137,7 +137,12 @@ class ExperimentRun:
         model = Model()
         model.config.lender_change = self.ALGORITHM()
         description1 = str(array_with_x_values)
-        description2 = str(model.config) + str(model.config.lender_change)
+        for item_config in self.config:
+            if item_config in model.config:
+                setattr(model.config, item_config, None)
+        # model.config = values of the default Model without the values that
+        # are changed in Runner.config and printed as self.config:
+        description2 = str(model.config) + str(self.config) + str(model.config.lender_change)
 
         variables = VARIABLES(count=f"{2 * len(array_with_data) + 1}")
         variables.append(VARIABLE(name=f"{array_with_x_values[0].split('=')[0]}",
@@ -186,6 +191,7 @@ class ExperimentRun:
             model.config.lender_change.set_parameter("p", execution_parameters["p"])
         if 'm' in execution_parameters and isinstance(self.ALGORITHM(),interbank_lenderchange.Preferential):
             model.config.lender_change.set_parameter("m", int(execution_parameters["m"]))
+
         model.configure(T=self.T, N=self.N,
                         allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
 

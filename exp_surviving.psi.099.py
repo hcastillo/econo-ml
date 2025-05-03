@@ -12,18 +12,22 @@ import exp_surviving_runner
 
 
 class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
-    N = 50
+    N = 40
     T = 1000
     MC = 15
 
-    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.4"
+    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.psi.1"
 
     parameters = {
         "p": np.linspace(0.0001, 1, num=4),
     }
+    config = {
+        "psi": [0.999]
+    }
 
-    SEED_FOR_EXECUTION = 918995
-
+    SEED_FOR_EXECUTION = 318994
+    LENGTH_FILENAME_PARAMETER = 3
+    LENGTH_FILENAME_CONFIG = 5
 
 if __name__ == "__main__":
     runner = exp_surviving_runner.Runner()
