@@ -11,7 +11,7 @@ import exp_runner
 class RestrictedMarketRun(exp_runner.ExperimentRun):
     N = 50
     T = 100
-    MC = 10
+    MC = 50
 
     OUTPUT_DIRECTORY = "c:\\experiments\\restrictedmarket"
     ALGORITHM = RestrictedMarket

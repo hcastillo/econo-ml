@@ -13,7 +13,7 @@ import exp_runner
 class PreferentialRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 10
+    MC = 50
 
     OUTPUT_DIRECTORY = "c:\\experiments\\preferential"
     ALGORITHM = Preferential

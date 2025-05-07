@@ -2,7 +2,7 @@
 # coding: utf-8
 """
 Executor for the interbank model using different values for the lc RestrictedMarket
-   to determine number of survivings banks (no replacement of bankrupted)
+   to determine number of surviving banks (no replacement of bankrupted)
    depending on p
 
 @author: hector@bith.net
@@ -16,7 +16,7 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
     T = 1000
     MC = 5
 
-    OUTPUT_DIRECTORY = "../experiments/surviving1"
+    OUTPUT_DIRECTORY = "c:\\experiments\\surviving"
 
     parameters = {  # items should be iterable:
         "p": np.linspace(0.0001, 0.6, num=4),

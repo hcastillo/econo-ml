@@ -38,13 +38,14 @@ class SurvivingRun(exp_runner.ExperimentRun):
 
     # which variable is used to determine the color:
     COLORS_VARIABLE = 'p'
+    COMPARING_DATA_IN_SURVIVING = False
 
     # p = [0..1] and range of viridis colors is 10 options, so if value of p=0.177 we will choose #2
     #                                                                      p=0.301 we will choose #3
-    _colors = []
+    _colors = np.array([])
 
     def get_color(self, all_models, i):
-        if self._colors == []:
+        if self._colors.size == 0:
             self._colors = plt.colormaps['viridis'](np.linspace(0, 1, len(all_models)))
         return self._colors[i]
 
@@ -52,16 +53,25 @@ class SurvivingRun(exp_runner.ExperimentRun):
     def determine_average_of_series(array_with_iterations_and_series):
         result_array = {}
         for iteration in array_with_iterations_and_series:  # iterations = p=0.0001, p=0.0002
-            result_array[iteration] = pd.concat(array_with_iterations_and_series[iteration], axis=1).agg("mean", 1)
+            if array_with_iterations_and_series[iteration] != []:
+                result_array[iteration] = pd.concat(array_with_iterations_and_series[iteration], axis=1).agg("mean", 1)
+            else:
+                result_array[iteration] = np.nan
         return result_array
 
-    def generate_plot(self, title, output_file, data_to_plot, all_models, max_t, logarithm=False):
+    def generate_plot(self, title, output_file, data_to_plot, all_models, max_t,
+                      logarithm=False, data_comparing_data_surviving=None):
         plt.clf()
         plt.title(f"{title} with RestrictedMarket p (MC={self.MC})")
         for i, iteration in enumerate(data_to_plot):
             plt.plot(data_to_plot[iteration], "-",
                      color=self.get_color(all_models, i),
                      label=str(all_models[i][self.COLORS_VARIABLE])[:5])
+        if data_comparing_data_surviving and self.COMPARING_DATA_IN_SURVIVING:
+            for i, iteration in enumerate(data_to_plot):
+                plt.plot(data_comparing_data_surviving[iteration], "-",
+                         color=self.get_color(all_models, i), alpha=0.3)
+
         plt.legend(loc='best', title=self.COLORS_VARIABLE)
         # max of ticks we want in x range: 10
         plt.xticks(range(0, max_t, divmod(max_t, 10)[0]))
@@ -155,10 +165,13 @@ class SurvivingRun(exp_runner.ExperimentRun):
         # experiment.generate_plot("Failures rationed", "_failures_rationed_log.png",
         #                            data_of_failures_rationed_avg, all_models, max_t, logarithm=True)
         experiment.generate_plot("Failures rationed acum", "_failures_rationed_acum.png",
-                                 data_of_failures_rationed_acum_avg, all_models, max_t)
+                                 data_of_failures_rationed_acum_avg, all_models, max_t,
+                                 data_comparing_data_surviving=data_of_failures_acum_avg)
         experiment.save_surviving_csv(data_of_failures_rationed_acum_avg, '_failures_rationed_acum', max_t)
         experiment.generate_plot("Failures rationed acum log", "_failures_rationed_acum_log.png",
-                                 data_of_failures_rationed_acum_avg, all_models, max_t, logarithm=True)
+                                 data_of_failures_rationed_acum_avg, all_models, max_t,
+                                 data_comparing_data_surviving=data_of_failures_acum_avg,
+                                 logarithm=True)
 
     def save_surviving_csv(self, data, name, max_t):
         with open(f"{self.OUTPUT_DIRECTORY}/{name}.csv", "w") as file:

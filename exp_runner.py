@@ -8,7 +8,6 @@ import random
 import warnings
 
 import numpy as np
-
 import interbank
 from interbank import Model
 import interbank_lenderchange
@@ -19,7 +18,6 @@ import matplotlib.pyplot as plt
 from itertools import product
 import lxml.etree
 import lxml.builder
-import gzip
 import argparse
 
 
@@ -28,7 +26,7 @@ class ExperimentRun:
     T = 1
     MC = 1
 
-    LIMIT_OUTLIER = 3
+    LIMIT_OUTLIER = 6
 
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
@@ -315,19 +313,41 @@ class ExperimentRun:
         for k in array_all_data.keys():
             if k.strip() == "t":
                 continue
-            mean_estimated = array_all_data[k].mean()
             mean_individual_execution = individual_execution[k].mean()
-            warnings.filterwarnings(
-                "ignore"
-            )  # it generates RuntimeWarning: overflow encountered in multiply
-            std_estimated = array_all_data[k].std()
 
+            # mean_estimated = array_all_data[k].mean()
+            # warnings.filterwarnings(
+            #     "ignore"
+            # )  # it generates RuntimeWarning: overflow encountered in multiply
+            # std_estimated = array_all_data[k].std()
             # we discard outliers: whatever is over μ±3σ or under μ±3σ:
-            if (not np.isnan(mean_estimated) and not np.isnan(std_estimated) and
-                not np.isnan(mean_individual_execution) and
-                not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <=
-                mean_individual_execution <=
-                (mean_estimated + self.LIMIT_OUTLIER * std_estimated))):
+            # if (not np.isnan(mean_estimated) and not np.isnan(std_estimated) and
+            #     not np.isnan(mean_individual_execution) and
+            #     not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <=
+            #     mean_individual_execution <=
+            #     (mean_estimated + self.LIMIT_OUTLIER * std_estimated))):
+            #     return False
+            means = []
+            for i in range(self.MC):
+                means.append(array_all_data[k][i * self.T:(i * self.T) + (self.T-1)].mean())
+            #Z-Score Method
+            #mean = np.mean(means)
+            #std = np.std(means)
+            #if ( mean_individual_execution - mean ) > 7:
+            #    print(f"{k} {filename_for_iteration}:{i} {mean_individual_execution} mean:{mean} std:{std}")
+            q1 = np.percentile(means, 25)
+            q3 = np.percentile(means, 75)
+            iqr = q3 - q1
+            lower_bound = q1 - self.LIMIT_OUTLIER * iqr
+            upper_bound = q3 + self.LIMIT_OUTLIER * iqr
+            # IQR Method (Non-parametric, more robust)
+            # How it works:
+            # Calculate Q1 (25th percentile) and Q3 (75th percentile)
+            # Compute IQR = Q3 - Q1
+            # Outliers are values outside [Q1 - 1.5IQR, Q3 + 1.5IQR]
+            if (not np.isnan(mean_individual_execution) and not np.isnan(iqr) and
+                not (lower_bound <= mean_individual_execution <= upper_bound)):
+                print(f"{k} {filename_for_iteration}:{i} {lower_bound:.3f} <= {mean_individual_execution:.3f} <= {upper_bound:.3f}")
                 return False
         return True
 
@@ -387,7 +407,8 @@ class ExperimentRun:
                                                                filename_for_iteration, i, clear_previous_results,
                                                                seeds_for_random[position_inside_seeds_for_random])
                         offset = 1
-                        while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check):
+                        while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check)\
+                                and offset <= 10:
                             self.discard_execution_of_iteration(filename_for_iteration, i)
                             result_mc = self.load_or_execute_model(model_configuration, model_parameters,
                                                                    filename_for_iteration, i, clear_previous_results,
@@ -455,6 +476,16 @@ class ExperimentRun:
                 break
             offset += 1
 
+    def clear_results(self):
+        try:
+            os.remove( self.OUTPUT_DIRECTORY + '/results.csv')
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove( self.OUTPUT_DIRECTORY + '/results.gdt')
+        except FileNotFoundError:
+            pass
+
 
 class Runner:
     def do(self, experiment_runner):
@@ -473,13 +504,21 @@ class Runner:
             help="Print combinations to generate",
         )
         parser.add_argument(
-            "--clear",
+            "--clear_results",
             default=False,
             action=argparse.BooleanOptionalAction,
             help="Ignore generated results.csv and create it again",
         )
+        parser.add_argument(
+            "--clear",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="Ignore generated models and create them again",
+        )
         args = parser.parse_args()
         experiment = experiment_runner()
+        if args.clear_results:
+            experiment.clear_results()
         if args.listnames:
             experiment.listnames()
         elif args.do:

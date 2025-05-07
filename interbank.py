@@ -97,7 +97,7 @@ class Config:
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
                            'rationing': True, 'leverage': False, 'systemic_leverage': False,
                            'num_of_rationed': True,
-                           'loans': False, 'c': True, 'demanded':True, 'loaned':True,
+                           'loans': False, 'c': True,
                            'reserves': True, 'deposits': True,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
                            'num_banks': True, 'bankruptcy_rationed': True}
@@ -222,8 +222,6 @@ class Statistics:
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
-        self.loaned = np.zeros(self.model.config.T, dtype=float)
-        self.demanded = np.zeros(self.model.config.T, dtype=float)
         self.leverage = np.zeros(self.model.config.T, dtype=float)
         self.systemic_leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
@@ -312,6 +310,7 @@ class Statistics:
         sum_of_equity_borrowers = 0
         leverage_of_borrowers = []
         for bank in self.model.banks:
+          if not bank.failed:
             sum_of_equity += bank.E
             if bank.get_loan_interest() is not None and bank.l > 0:
                 leverage_of_borrowers.append(bank.l / bank.E)
@@ -326,11 +325,22 @@ class Statistics:
             if len(self.model.banks)>0 else 0
 
     def compute_liquidity(self):
-        self.liquidity[self.model.t] = sum(map(lambda x: x.C, self.model.banks))
+        total_liquidity = 0
+        for bank in self.model.banks:
+            if not bank.failed:
+                total_liquidity += bank.C
+        self.liquidity[self.model.t] = total_liquidity
 
     def compute_fitness(self):
+        self.fitness[self.model.t] = np.nan
         if self.model.config.N > 0:
-            self.fitness[self.model.t] = sum(map(lambda x: x.mu, self.model.banks)) / self.model.config.N
+            total_fitness = 0
+            num_items = 0
+            for bank in self.model.banks:
+                if not bank.failed:
+                    total_fitness += bank.mu
+                    num_items += 1
+            self.fitness[self.model.t] = total_fitness / num_items
 
     def compute_policy(self):
         self.policy[self.model.t] = self.model.eta
@@ -342,19 +352,30 @@ class Statistics:
         self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
 
     def compute_deposits_and_reserves(self):
-        self.deposits[self.model.t] = sum(map(lambda x: x.D, self.model.banks))
-        self.reserves[self.model.t] = sum(map(lambda x: x.R, self.model.banks))
+        total_deposits = 0
+        total_reserves = 0
+        for bank in self.model.banks:
+            if not bank.failed:
+                total_deposits += bank.D
+                total_reserves += bank.R
+        self.deposits[self.model.t] = total_deposits
+        self.reserves[self.model.t] = total_reserves
 
     def compute_probability_of_lender_change_and_num_banks(self):
-        probabilities = [bank.P for bank in self.model.banks]
-        lender_capacities = [np.mean(bank.c) for bank in self.model.banks]
-        self.P[self.model.t] = sum(probabilities) / self.model.config.N
+        probabilities = []
+        lender_capacities = []
+        num_banks = 0
+        for bank in self.model.banks:
+            if not bank.failed:
+                probabilities.append(bank.P)
+                lender_capacities.append(np.mean(bank.c))
+                num_banks += 1
+        self.P[self.model.t] = sum(probabilities) / len(probabilities)
         self.P_max[self.model.t] = max(probabilities)
         self.c[self.model.t] = np.mean(lender_capacities)
         self.P_min[self.model.t] = min(probabilities)
         self.P_std[self.model.t] = np.std(probabilities)
-        # only if we don't replace banks makes sense to report how many banks we have in each step:
-        self.num_banks[self.model.t] = len(self.model.banks)
+        self.num_banks[self.model.t] = num_banks
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
         if export_datafile:
@@ -885,6 +906,7 @@ class Model:
         self.statistics.compute_interest_rates_and_loans()
         self.do_shock("shock2")
         self.do_repayments()
+        # replace_bankrupted_banks estaba aqui -----------------------------------
         self.log.debug_banks()
         if self.log.progress_bar:
             self.log.progress_bar.next()
@@ -893,13 +915,10 @@ class Model:
         self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
-        # self.statistics.compute_bad_debt()
-        # self.statistics.compute_rationing()
         self.statistics.compute_deposits_and_reserves()
-        # only N<=1 could happen if we remove banks:
-        if self.config.N > 1:
-            self.setup_links()
-            self.statistics.compute_probability_of_lender_change_and_num_banks()
+        self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
+        self.setup_links()
+        self.statistics.compute_probability_of_lender_change_and_num_banks()
         self.log.debug_banks()
         if self.save_graphs is not None and (self.save_graphs == '*' or self.t in self.save_graphs):
             filename = self.statistics.get_graph(self.t)
@@ -1145,8 +1164,6 @@ class Model:
             bank.rationing = rationing_of_bank
         self.statistics.num_of_rationed[self.t] = num_of_rationed
         self.statistics.rationing[self.t] = total_rationed
-        self.statistics.demanded[self.t] = total_demanded
-        self.statistics.loaned[self.t] = total_loans
         self.log.debug("loans", f"this step rationed total={total_rationed:.3f} in {num_of_rationed} banks ")
 
 
@@ -1228,10 +1245,9 @@ class Model:
                 if bank.d > 0:  # and we have less deposits (incrD=d)
                     bank.do_fire_sales(bank.d, f"fire sales due to not enough C", "repay")
 
-        self.estimate_average_values_for_replacement_of_banks()
-        self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
 
     def replace_bankrupted_banks(self):
+        self.estimate_average_values_for_replacement_of_banks()
         self.statistics.compute_bad_debt()
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
         num_banks_failed_rationed = 0
@@ -1284,6 +1300,10 @@ class Model:
             self.log.debug_banks()
 
     def setup_links(self):
+        # if only one bank, no necessity to create again the links:
+        if len(self.banks)<=1:
+            return
+
         # (equation 5)
         # p = probability borrower not failing
         # c = lending capacity

@@ -12,7 +12,7 @@ import exp_runner
 class ShockedMarketRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 10
+    MC = 50
 
     ALGORITHM = ShockedMarket
     OUTPUT_DIRECTORY = "c:\\experiments\\shockedmarket"

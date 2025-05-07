@@ -19,7 +19,7 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
     OUTPUT_DIRECTORY = "c:\\experiments\\surviving.psi"
 
     parameters = {
-        "p": [1],
+        "p": [0.1],
     }
     config = {
         "psi": [0, 0.3333, 0.6666, 0.999]
@@ -29,6 +29,8 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
     LENGTH_FILENAME_PARAMETER = 3
     LENGTH_FILENAME_CONFIG = 5
     COLORS_VARIABLE = 'psi'
+
+    COMPARING_DATA_IN_SURVIVING = True
 
 if __name__ == "__main__":
     runner = exp_surviving_runner.Runner()
