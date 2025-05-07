@@ -70,7 +70,7 @@ class Config:
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
-    psi: float = 0  # market power parameter : 0 perfect competence .. 1 monopoly
+    psi: float = 0.5  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # banks initial parameters
     # L + C + R = D + E
@@ -310,13 +310,13 @@ class Statistics:
         sum_of_equity_borrowers = 0
         leverage_of_borrowers = []
         for bank in self.model.banks:
-          if not bank.failed:
-            sum_of_equity += bank.E
-            if bank.get_loan_interest() is not None and bank.l > 0:
-                leverage_of_borrowers.append(bank.l / bank.E)
-            if bank.active_borrowers:
-                for borrower in bank.active_borrowers:
-                    sum_of_equity_borrowers += self.model.banks[borrower].E
+            if not bank.failed:
+                sum_of_equity += bank.E
+                if bank.l > 0:
+                    leverage_of_borrowers.append(bank.l / bank.E)
+                if bank.active_borrowers:
+                    for borrower in bank.active_borrowers:
+                        sum_of_equity_borrowers += self.model.banks[borrower].E
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
         self.leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(leverage_of_borrowers) \
@@ -904,13 +904,15 @@ class Model:
         self.do_loans()
         self.log.debug_banks()
         self.statistics.compute_interest_rates_and_loans()
+        self.statistics.compute_leverage_and_equity() # ???equity????
         self.do_shock("shock2")
         self.do_repayments()
         # replace_bankrupted_banks estaba aqui -----------------------------------
         self.log.debug_banks()
         if self.log.progress_bar:
             self.log.progress_bar.next()
-        self.statistics.compute_leverage_and_equity()
+        # compute_leverage_and_equity() ------------------------------------------
+        # self.statistics.compute_leverage_and_equity()
         self.statistics.compute_liquidity()
         self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_fitness()
