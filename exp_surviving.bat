@@ -1,4 +1,5 @@
 python exp_surviving.py --do
+python exp_surviving.psi.py --do
 python exp_surviving.4.py --do
 python exp_surviving.psi.05.py --do
 python exp_surviving.psi.099.py --do

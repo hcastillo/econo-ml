@@ -209,7 +209,7 @@ class ExperimentRun:
 
     def __filename_clean(self, value, max_length):
         value = str(value)
-        for r in "{}',: .":
+        for r in "{}[]',: .":
             value = value.replace(r, "")
         if value.endswith(".0"):
             # integer: 0 at left
@@ -229,8 +229,13 @@ class ExperimentRun:
         return value
 
     def get_filename_for_iteration(self, parameters, config):
-        return self.__filename_clean(parameters, self.LENGTH_FILENAME_PARAMETER) + \
-            self.__filename_clean(config, self.LENGTH_FILENAME_CONFIG)
+        return self.get_filename_for_parameters( parameters) + self.get_filename_for_config(config)
+
+    def get_filename_for_config(self, config):
+        return self.__filename_clean(config, self.LENGTH_FILENAME_CONFIG)
+
+    def get_filename_for_parameters(self, parameters):
+        return self.__filename_clean(parameters, self.LENGTH_FILENAME_PARAMETER)
 
     def __verify_directories__(self):
         if not os.path.isdir(self.OUTPUT_DIRECTORY):

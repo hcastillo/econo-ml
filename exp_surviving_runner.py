@@ -104,74 +104,59 @@ class SurvivingRun(exp_runner.ExperimentRun):
                 result[idx] = total
             return result
 
-    @staticmethod
-    def plot_surviving(experiment):
-        print("Plotting surviving...")
-        # now we open all the .gdt files:
-        data_of_surviving_banks = {}
-        data_of_failures_rationed = {}
-        data_of_failures_rationed_acum = {}
-        data_of_failures = {}
-        data_of_failures_acum = {}
+    def __init__(self):
+        self.data_of_surviving_banks = {}
+        self.data_of_failures_rationed = {}
+        self.data_of_failures_rationed_accum = {}
+        self.data_of_failures = {}
+        self.data_of_failures_accum = {}
+        self.all_models = []
 
-        all_models = []
-        for model_configuration in experiment.get_models(experiment.config):
-            for model_parameters in experiment.get_models(experiment.parameters):
+    def generate_data_surviving(self):
+        print("Generating surviving data...")
+        for model_configuration in self.get_models(self.config):
+            for model_parameters in self.get_models(self.parameters):
                 values_of_this_iteration = model_configuration.copy()
                 values_of_this_iteration.update(model_parameters)
-                all_models.append(values_of_this_iteration)
-                filename_for_iteration = experiment.get_filename_for_iteration(model_parameters, model_configuration)
-                data_of_surviving_banks[filename_for_iteration] = []
-                data_of_failures[filename_for_iteration] = []
-                data_of_failures_acum[filename_for_iteration] = []
-                data_of_failures_rationed[filename_for_iteration] = []
-                data_of_failures_rationed_acum[filename_for_iteration] = []
-                for i in range(experiment.MC):
-                    if os.path.isfile(f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
+                self.all_models.append(values_of_this_iteration)
+                filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
+                self.data_of_surviving_banks[filename_for_iteration] = []
+                self.data_of_failures[filename_for_iteration] = []
+                self.data_of_failures_accum[filename_for_iteration] = []
+                self.data_of_failures_rationed[filename_for_iteration] = []
+                self.data_of_failures_rationed_accum[filename_for_iteration] = []
+                for i in range(self.MC):
+                    if os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
                         result_mc = Statistics.read_gdt(
-                            f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-                        data_of_surviving_banks[filename_for_iteration].append(result_mc['num_banks'])
+                            f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+                        self.data_of_surviving_banks[filename_for_iteration].append(result_mc['num_banks'])
                         # bankruptcies and bankruptcies rationed are accumulated data:
                         # [1,2,1,0,1] -> [1,3,4,4,5]
-                        data_of_failures[filename_for_iteration].append(result_mc['bankruptcies'])
-                        data_of_failures_rationed[filename_for_iteration].append(result_mc['bankruptcy_rationed'])
-
+                        self.data_of_failures[filename_for_iteration].append(result_mc['bankruptcies'])
+                        self.data_of_failures_rationed[filename_for_iteration].append(result_mc['bankruptcy_rationed'])
         # we have now MC different series for each iteration, so let's estimate the average of all the MonteCarlos:
-        data_of_surviving_banks_avg = experiment.determine_average_of_series(data_of_surviving_banks)
-        data_of_failures_avg = experiment.determine_average_of_series(data_of_failures)
-        data_of_failures_acum_avg = experiment.accumulated_data(data_of_failures_avg)
-        data_of_failures_rationed_avg = \
-            experiment.determine_average_of_series(data_of_failures_rationed)
-        data_of_failures_rationed_acum_avg = experiment.accumulated_data(data_of_failures_rationed_avg)
+        self.data_of_surviving_banks_avg = self.determine_average_of_series(self.data_of_surviving_banks)
+        self.data_of_failures_avg = self.determine_average_of_series(self.data_of_failures)
+        self.data_of_failures_accum_avg = self.accumulated_data(self.data_of_failures_avg)
+        self.data_of_failures_rationed_avg = \
+            self.determine_average_of_series(self.data_of_failures_rationed)
+        self.data_of_failures_rationed_accum_avg = self.accumulated_data(self.data_of_failures_rationed_avg)
+        self.max_t = self.determine_max_t([self.data_of_surviving_banks_avg,
+                                           self.data_of_failures_avg,
+                                           self.data_of_failures_rationed_avg])
 
-        max_t = experiment.determine_max_t([data_of_surviving_banks_avg, data_of_failures_avg,
-                                            data_of_failures_rationed_avg])
-        # experiment.generate_plot("Surviving banks", "_surviving.png",
-        #                           data_of_surviving_banks_avg, all_models, max_t)
-        #experiment.generate_plot("Surviving banks log", "_surviving_log.png",
-        #                           data_of_surviving_banks_avg, all_models, max_t, logarithm=True)
-        experiment.save_surviving_csv(data_of_surviving_banks_avg, '_surviving', max_t)
-        # experiment.generate_plot("Failures", "_failures.png",
-        #                            data_of_failures_avg, all_models, max_t)
-        # experiment.generate_plot("Failures log", "_failures_log.png",
-        #                            data_of_failures_avg, all_models, max_t, logarithm=True)
-        # experiment.generate_plot("Failures acum", "_rationed_acum.png",
-        #                            data_of_failures_acum_avg, all_models, max_t)
-        # experiment.generate_plot("Failures acum log", "_rationed_acum_log.png",
-        #                            data_of_failures_acum_avg, all_models, max_t, logarithm=True)
-        # experiment.generate_plot("Failures rationed", "_failures_rationed.png",
-        #                            data_of_failures_rationed_avg, all_models, max_t)
-        experiment.save_surviving_csv(data_of_failures_rationed_avg, '_failures_rationed', max_t)
-        # experiment.generate_plot("Failures rationed", "_failures_rationed_log.png",
-        #                            data_of_failures_rationed_avg, all_models, max_t, logarithm=True)
-        experiment.generate_plot("Failures rationed acum", "_failures_rationed_acum.png",
-                                 data_of_failures_rationed_acum_avg, all_models, max_t,
-                                 data_comparing_data_surviving=data_of_failures_acum_avg)
-        experiment.save_surviving_csv(data_of_failures_rationed_acum_avg, '_failures_rationed_acum', max_t)
-        experiment.generate_plot("Failures rationed acum log", "_failures_rationed_acum_log.png",
-                                 data_of_failures_rationed_acum_avg, all_models, max_t,
-                                 data_comparing_data_surviving=data_of_failures_acum_avg,
-                                 logarithm=True)
+    def plot_surviving(self):
+        print("Plotting surviving data...")
+        self.save_surviving_csv(self.data_of_surviving_banks_avg, '_surviving', self.max_t)
+        self.save_surviving_csv(self.data_of_failures_rationed_avg, '_failures_rationed', self.max_t)
+        self.generate_plot("Failures rationed accum", "_failures_rationed_accum.png",
+                           self.data_of_failures_rationed_accum_avg, self.all_models, self.max_t,
+                           data_comparing_data_surviving=self.data_of_failures_accum_avg)
+        self.save_surviving_csv(self.data_of_failures_rationed_accum_avg, '_failures_rationed_accum', self.max_t)
+        self.generate_plot("Failures rationed accum log", "_failures_rationed_accum_log.png",
+                           self.data_of_failures_rationed_accum_avg, self.all_models, self.max_t,
+                           data_comparing_data_surviving=self.data_of_failures_accum_avg,
+                           logarithm=True)
 
     def save_surviving_csv(self, data, name, max_t):
         with open(f"{self.OUTPUT_DIRECTORY}/{name}.csv", "w") as file:

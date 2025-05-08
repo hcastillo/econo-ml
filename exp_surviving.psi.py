@@ -30,11 +30,24 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
     LENGTH_FILENAME_CONFIG = 5
     COLORS_VARIABLE = 'psi'
 
-    COMPARING_DATA_IN_SURVIVING = True
+    COMPARING_DATA_IN_SURVIVING = False
+
+    def plot_surviving(self):
+        print("Plotting surviving data...")
+        self.save_surviving_csv(self.data_of_surviving_banks_avg, '_surviving', self.max_t)
+        self.save_surviving_csv(self.data_of_failures_rationed_avg, '_failures_rationed', self.max_t)
+        self.generate_plot(f"Failures rationed accum p={self.parameters['p']}",
+                           "_failures_rationed_accum_"+self.get_filename_for_parameters(self.parameters)+".png",
+                           self.data_of_failures_rationed_accum_avg, self.all_models, self.max_t,
+                           data_comparing_data_surviving=self.data_of_failures_accum_avg)
+        self.save_surviving_csv(self.data_of_failures_rationed_accum_avg,
+                                '_failures_rationed_accum_'+self.get_filename_for_parameters(self.parameters),
+                                self.max_t)
 
 if __name__ == "__main__":
     runner = exp_surviving_runner.Runner()
     experiment = runner.do(RestrictedMarketSurvivingRun)
     if experiment:
-        experiment.plot_surviving(experiment)
+        experiment.generate_data_surviving()
+        experiment.plot_surviving()
 

@@ -70,7 +70,7 @@ class Config:
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
-    psi: float = 0.5  # market power parameter : 0 perfect competence .. 1 monopoly
+    psi: float = 0.0 # market power parameter : 0 perfect competence .. 1 monopoly
 
     # banks initial parameters
     # L + C + R = D + E
@@ -135,6 +135,8 @@ class Config:
                 try:
                     if isinstance(current_value, int):
                         setattr(self, name_config, int(value_config))
+                    elif isinstance(current_value, float):
+                        setattr(self, name_config, float(value_config))
                     elif isinstance(current_value, bool):
                         setattr(self, name_config, value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'))
                     else:
@@ -340,7 +342,7 @@ class Statistics:
                 if not bank.failed:
                     total_fitness += bank.mu
                     num_items += 1
-            self.fitness[self.model.t] = total_fitness / num_items
+            self.fitness[self.model.t] = total_fitness / num_items if num_items > 0 else np.nan
 
     def compute_policy(self):
         self.policy[self.model.t] = self.model.eta
@@ -370,11 +372,11 @@ class Statistics:
                 probabilities.append(bank.P)
                 lender_capacities.append(np.mean(bank.c))
                 num_banks += 1
-        self.P[self.model.t] = sum(probabilities) / len(probabilities)
-        self.P_max[self.model.t] = max(probabilities)
-        self.c[self.model.t] = np.mean(lender_capacities)
-        self.P_min[self.model.t] = min(probabilities)
-        self.P_std[self.model.t] = np.std(probabilities)
+        self.P[self.model.t] = sum(probabilities) / len(probabilities) if len(probabilities) > 0 else np.nan
+        self.P_max[self.model.t] = max(probabilities) if probabilities else np.nan
+        self.c[self.model.t] = np.mean(lender_capacities) if lender_capacities else np.nan
+        self.P_min[self.model.t] = min(probabilities) if probabilities else np.nan
+        self.P_std[self.model.t] = np.std(probabilities) if probabilities else np.nan
         self.num_banks[self.model.t] = num_banks
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):

@@ -29,4 +29,5 @@ if __name__ == "__main__":
     runner = exp_surviving_runner.Runner()
     experiment = runner.do(RestrictedMarketSurvivingRun)
     if experiment:
-        experiment.plot_surviving(experiment)
+        experiment.generate_data_surviving()
+        experiment.plot_surviving()
