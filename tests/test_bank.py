@@ -1,11 +1,13 @@
 import unittest
 import interbank
+import interbank_lenderchange
 
 
 class BankTestCase(unittest.TestCase):
     def setUp(self):
         self.model = interbank.Model()
         self.model.test = True
+        self.model.config.lender_change = interbank_lenderchange.determine_algorithm("Boltzmann")
         self.model.configure(N=10)
         self.model.initialize()
 

@@ -2,6 +2,7 @@
 
 import unittest
 import interbank
+import interbank_lenderchange
 import tests.interbank_testclass
 from mock import patch
 
@@ -30,12 +31,13 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
 
     @patch.object(interbank.Model, "do_shock", tests.interbank_testclass.mockedShock)
     def setUp(self):
-        previous = interbank.Config.ro 
+        previous = interbank.Config.ro
         interbank.Config.ro = 0.3
         self.configureTest(N=2,T=1,
                            shocks=[
                                {"shock1": [0, 1], "shock2": [-3, 0], },
                            ])
+        self.model.config.lender_change = interbank_lenderchange.determine_algorithm("Boltzmann")
         self.initialValues()
         self.doTest()
         interbank.Config.ro = previous

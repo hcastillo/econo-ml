@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 import interbank
+import interbank_lenderchange
 import tests.interbank_testclass
 from mock import patch
 
@@ -20,6 +21,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
                             shocks=[
                                 {"shock1": [-13, 13], "shock2": [20, -20], },
                             ])
+        self.model.config.lender_change = interbank_lenderchange.determine_algorithm("Boltzmann")
         self.initialValues()
         self.interest_rate_for_loan_of_bank0 = self.model.banks[0].r
         self.doTest()

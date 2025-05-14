@@ -64,7 +64,7 @@ class Config:
     ji: float = 0.0015  # ji Χ
 
     # liquidation cost of collateral
-    xi: float = 0.3 ##0.6  # xi ξ
+    xi: float = 0.9 ##0.6  # xi ξ
     ro: float = 0.3 # 0.3  # ro ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
@@ -295,12 +295,15 @@ class Statistics:
             for bank in self.model.banks:
                 if bank.get_loan_interest() is not None and bank.l > 0:
                     avg_prob_bankruptcy.append((1 - bank.E / maxE))
-
-        self.interest_rate[self.model.t] = np.mean(interests_rates_of_borrowers) if interests_rates_of_borrowers else np.nan
-        self.asset_i[self.model.t] = np.mean(asset_i) if asset_i else np.nan
-        self.asset_j[self.model.t] = np.mean(asset_j) if asset_j else np.nan
-        self.loans[self.model.t] = sum_of_loans / num_of_banks_that_are_lenders if num_of_banks_that_are_lenders else np.nan
-        self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy) if avg_prob_bankruptcy else np.nan
+        avg_prob_bankruptcy = sum(map(lambda x: x, avg_prob_bankruptcy)) / len(
+            avg_prob_bankruptcy) if avg_prob_bankruptcy else 0
+        self.interest_rate[self.model.t] = (sum(map(lambda x: x, interests_rates_of_borrowers)) /
+                                            len(interests_rates_of_borrowers)) if interests_rates_of_borrowers else 0
+        self.asset_i[self.model.t] = sum(map(lambda x: x, asset_i)) / len(asset_i) if len(asset_i) > 0 else np.nan
+        self.asset_j[self.model.t] = sum(map(lambda x: x, asset_j)) / len(asset_j) if len(asset_j) > 0 else np.nan
+        self.loans[
+            self.model.t] = sum_of_loans / num_of_banks_that_are_lenders if num_of_banks_that_are_lenders else np.nan
+        self.prob_bankruptcy[self.model.t] = avg_prob_bankruptcy
         self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
         self.active_borrowers[self.model.t] = num_of_banks_that_are_borrowers
 
@@ -318,8 +321,9 @@ class Statistics:
                         sum_of_equity_borrowers += self.model.banks[borrower].E
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
-        self.leverage[self.model.t] = np.mean(leverage_of_borrowers) if leverage_of_borrowers else np.nan
-        self.systemic_leverage[self.model.t] = sum(leverage_of_borrowers) / len(self.model.banks) \
+        self.leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(leverage_of_borrowers) \
+            if len(leverage_of_borrowers)>0 else 0
+        self.systemic_leverage[self.model.t] = sum(map(lambda x: x, leverage_of_borrowers)) / len(self.model.banks) \
             if len(self.model.banks)>0 else 0
 
     def compute_liquidity(self):
@@ -344,10 +348,10 @@ class Statistics:
         self.policy[self.model.t] = self.model.eta
 
     def compute_bad_debt(self):
-        self.B[self.model.t] = sum(bank.B for bank in self.model.banks)
+        self.B[self.model.t] = sum(map(lambda x: x.B, self.model.banks))
 
     def compute_rationing(self):
-        self.rationing[self.model.t] = sum(bank.rationing for bank in self.model.banks)
+        self.rationing[self.model.t] = sum(map(lambda x: x.rationing, self.model.banks))
 
     def compute_deposits_and_reserves(self):
         total_deposits = 0
@@ -855,16 +859,6 @@ class Model:
         if self.backward_enabled:
             self.banks_backward_copy = []
 
-    def configure_json(self, json_string:str):
-        import re, json
-        json_string = (json_string.strip().replace("=",":").replace(" ",", ").
-                       replace('True','true').replace('False','false'))
-        if not json_string.startswith('{'):
-            json_string = '{' + json_string
-        if not json_string.endswith('}'):
-            json_string += '}'
-        self.configure(**json.loads(re.sub(r'(?<=\{|\s)(\w+)(?=\s*:)', r'"\1"', json_string)))
-
     def configure(self, **configuration):
         for attribute in configuration:
             if attribute.startswith('lc'):
@@ -912,12 +906,15 @@ class Model:
         self.do_loans()
         self.log.debug_banks()
         self.statistics.compute_interest_rates_and_loans()
-        self.statistics.compute_leverage_and_equity()
+        self.statistics.compute_leverage_and_equity() # ???equity????
         self.do_shock("shock2")
         self.do_repayments()
+        # replace_bankrupted_banks estaba aqui -----------------------------------
         self.log.debug_banks()
         if self.log.progress_bar:
             self.log.progress_bar.next()
+        # compute_leverage_and_equity() ------------------------------------------
+        # self.statistics.compute_leverage_and_equity()
         self.statistics.compute_liquidity()
         self.statistics.compute_credit_channels_and_best_lender()
         self.statistics.compute_fitness()
@@ -1117,33 +1114,32 @@ class Model:
         for bank_index, bank in enumerate(self.banks):
             # we don't save directly in bank.rationing because it if fails it's replaced and we lost the value:
             rationing_of_bank = 0
-            lender = bank.get_lender()
             # decrement in which we should borrow
             if bank.d > 0:
                 total_demanded += bank.d
-                if lender is None or lender.d > 0:
+                if bank.get_lender() is None or bank.get_lender().d > 0:
                     bank.l = 0
                     rationing_of_bank = bank.d
                     total_rationed += rationing_of_bank
                     num_of_rationed += 1
                     bank.do_fire_sales(rationing_of_bank,
-                                       f"rationing={rationing_of_bank:.3f} as no lender for this bank" if lender is None else
-                                       f"rationing={rationing_of_bank:.3f} as lender {lender.get_id(short=True)} has no money", "loans")
+                                       f"rationing={rationing_of_bank:.3f} as no lender for this bank" if bank.get_lender() is None else
+                                       f"rationing={rationing_of_bank:.3f} as lender {bank.get_lender().get_id(short=True)} has no money", "loans")
                 else:
                     # if the lender can give us money, but not enough to cover the loan we need also fire sale L:
-                    if bank.d > lender.s:
-                        rationing_of_bank = bank.d - lender.s
+                    if bank.d > bank.get_lender().s:
+                        rationing_of_bank = bank.d - bank.get_lender().s
                         total_rationed += rationing_of_bank
                         num_of_rationed += 1
                         bank.do_fire_sales(rationing_of_bank,
-                                           f"lender.s={lender.s:.3f} but need d={bank.d:.3f}, rationing={rationing_of_bank:.3f}", "loans")
+                                           f"lender.s={bank.get_lender().s:.3f} but need d={bank.d:.3f}, rationing={rationing_of_bank:.3f}", "loans")
                         # only if lender has money, because if it .s=0, all is obtained by fire sales:
-                        if lender.s > 0:
-                            bank.l = lender.s  # amount of loan (wrote in the borrower)
+                        if bank.get_lender().s > 0:
+                            bank.l = bank.get_lender().s  # amount of loan (wrote in the borrower)
                             # amount of loan (wrote in the lender)
-                            lender.active_borrowers[bank_index] = lender.s
-                            lender.C -= bank.l  # amount of loan that reduces lender capital
-                            lender.s = 0
+                            bank.get_lender().active_borrowers[bank_index] = bank.get_lender().s
+                            bank.get_lender().C -= bank.l  # amount of loan that reduces lender capital
+                            bank.get_lender().s = 0
                         else:
                             bank.l = 0
                         total_loans += bank.l
@@ -1155,7 +1151,7 @@ class Model:
                         bank.get_lender().s -= bank.d  # the loan reduces our lender's capacity to borrow to others
                         bank.get_lender().C -= bank.d  # amount of loan that reduces lender capital
                         self.log.debug("loans",
-                                       f"{bank.get_id()} new loan l={bank.d:.3f} from {lender.get_id()}")
+                                       f"{bank.get_id()} new loan l={bank.d:.3f} from {bank.get_lender().get_id()}")
 
             # the shock can be covered by own capital
             else:
