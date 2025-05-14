@@ -33,8 +33,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
         self.configureTest(N=2, T=1,
                            shocks=[
                                {"shock1": [-5, 5], "shock2": [0, 0], },
-                           ])
-        self.model.config.lender_change = interbank_lenderchange.determine_algorithm("Boltzmann")
+                           ], lc="Boltzmann")
         self.initialValues()
         self.doTest()
 

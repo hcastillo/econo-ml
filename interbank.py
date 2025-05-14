@@ -32,6 +32,9 @@ import lxml.builder
 import gzip
 
 
+LENDER_CHANGE_DEFAULT   = 'ShockedMarket'
+LENDER_CHANGE_DEFAULT_P = 0.333
+
 class Config:
     """
     Configuration parameters for the interbank network
@@ -51,6 +54,9 @@ class Config:
     #    - reintroduce=False we reintroduce bankrupted banks with initial values
     #    - reintroduce=True we reintroduce with median of current values
     reintroduce_with_median = False
+
+    # if the then a gdt with all the networth of each firm is generated:
+    all_networth = False
 
     # shocks parameters:
     mi: float = 0.7  # mi µ
@@ -891,6 +897,7 @@ class Model:
 
         if not self.config.lender_change:
             self.config.lender_change = lc.determine_algorithm()
+            self.config.lender_change.set_parameter('p',0.5)
         self.policy_changes = 0
         if export_datafile:
             self.export_datafile = export_datafile
@@ -1648,14 +1655,16 @@ class Utils:
         parser.add_argument("--n", type=int, default=Config.N, help=f"Number of banks")
         parser.add_argument("--eta", type=float, default=Model.eta, help=f"Policy recommendation")
         parser.add_argument("--t", type=int, default=Config.T, help=f"Time repetitions")
-        parser.add_argument("--lc_p", type=float, default=None,
-                            help=f"For Erdos-Renyi bank lender's change value of p=0.0x")
-        parser.add_argument("--lc_m", type=int, default=None,
+        parser.add_argument("--lc_p",  "--p", type=float, default=LENDER_CHANGE_DEFAULT_P,
+                            help=f"For Erdos-Renyi bank lender's change value of p")
+        parser.add_argument("--lc_m", "--m", type=int, default=None,
                             help=f"For Preferential bank lender's change value of graph grade m")
-        parser.add_argument("--lc", type=str, default="default",
+        parser.add_argument("--lc", type=str, default=LENDER_CHANGE_DEFAULT,
                             help="Bank lender's change method (?=list)")
         parser.add_argument("--lc_ini_graph_file", type=str, default=None,
                             help="Load a graph in json networkx.node_link_data() format")
+        parser.add_argument("--all_networth", action="store_true", default=False,
+                            help="Store in a gdt the individual networth evolution of each individual bank")
         parser.add_argument("--plot_format", type=str, default="none",
                             help="Generate plots with the specified format (svg,png,pdf,gif,agr)")
         parser.add_argument("--output_format", type=str, default="gdt",
@@ -1677,10 +1686,9 @@ class Utils:
             model.config.N = args.n
         if args.eta != model.eta:
             model.eta = args.eta
-        if args.no_replace:
-            model.config.allow_replacement_of_bankrupted = False
-        if args.reintr_with_median:
-            model.config.reintroduce_with_median = True
+        model.config.allow_replacement_of_bankrupted = args.no_replace
+        model.config.all_networth = args.all_networth
+        model.config.reintroduce_with_median = args.reintr_with_median
         if args.debug:
             model.do_debug(args.debug)
         model.config.define_values_from_args(other_possible_config_args)

@@ -1,6 +1,6 @@
 import unittest
 import interbank
-
+import interbank_lenderchange
 
 # 1. borrower obtains a loan,
 # -------------------
@@ -9,8 +9,10 @@ class InterbankTest(unittest.TestCase):
     shocks = []
     model = None
 
-    def configureTest(self, shocks: list, N: int = None, T: int = None):
+    def configureTest(self, shocks: list, N: int = None, T: int = None, lc : str = None):
         self.model = interbank.Model()
+        if lc:
+            self.model.config.lender_change = interbank_lenderchange.determine_algorithm(lc)
         self.model.test = True
         InterbankTest.shocks = shocks
         if N:

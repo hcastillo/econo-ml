@@ -27,15 +27,15 @@ import warnings
 
 
 def determine_algorithm(given_name: str = "default"):
-    DEFAULT_METHOD = "Boltzmann"
+    default_method = "Boltzmann"
 
     if given_name == "default":
-        print(f"selected default method {DEFAULT_METHOD}")
-        given_name = DEFAULT_METHOD
+        print(f"selected default method {default_method}")
+        given_name = default_method
     if given_name == '?':
         for name, obj in inspect.getmembers(sys.modules[__name__]):
             if inspect.isclass(obj) and obj.__doc__:
-                print("\t" + obj.__name__ + (" (default)" if name == DEFAULT_METHOD else '') + ':\n\t', obj.__doc__)
+                print("\t" + obj.__name__ + (" (default)" if name == default_method else '') + ':\n\t', obj.__doc__)
         sys.exit(0)
     else:
         for name, obj in inspect.getmembers(sys.modules[__name__]):
@@ -517,7 +517,7 @@ class Preferential(Boltzmann):
     GRAPH_NAME = "barabasi_pref"
 
     def __str__(self):
-        if 'p' in self.parameter:
+        if 'm' in self.parameter:
             return f"Preferential.m={self.parameter['m']}"
         else:
             return f"Preferential"
