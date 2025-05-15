@@ -32,7 +32,7 @@ import lxml.builder
 import gzip
 
 
-LENDER_CHANGE_DEFAULT   = 'ShockedMarket'
+LENDER_CHANGE_DEFAULT = 'ShockedMarket'
 LENDER_CHANGE_DEFAULT_P = 0.333
 
 class Config:
@@ -55,12 +55,12 @@ class Config:
     #    - reintroduce=True we reintroduce with median of current values
     reintroduce_with_median = False
 
-    # if the then a gdt with all the networth of each firm is generated:
-    all_networth = False
+    # if the then a gdt with all the data of time evolution of equity of each bank is generated:
+    detailed_equity = False
 
     # shocks parameters:
-    mi: float = 0.7  # mi µ
-    omega: float = 0.55 # omega ω
+    mi: float = 0.7      # mi µ
+    omega: float = 0.55  # omega ω
 
     # Lender's change mechanism
     lender_change: lc.LenderChange = None
@@ -70,10 +70,10 @@ class Config:
     ji: float = 0.0015  # ji Χ
 
     # liquidation cost of collateral
-    xi: float = 0.3 ##0.6  # xi ξ
-    ro: float = 0.3 # 0.3  # ro ρ fire sale cost
+    xi: float = 0.3    # xi ξ, previous 0.6
+    ro: float = 0.3    # ro ρ fire sale cost
 
-    beta: float = 5  # β beta intensity of breaking the connection (5)
+    beta: float = 5    # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     psi: float = 0.0 # market power parameter : 0 perfect competence .. 1 monopoly
@@ -226,6 +226,8 @@ class Statistics:
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
         self.asset_j = np.zeros(self.model.config.T, dtype=float)
         self.equity = np.zeros(self.model.config.T, dtype=float)
+        if self.model.config.detailed_equity:
+            self.detailed_equity = np.full((self.model.config.N, self.model.config.T), np.nan)
         self.equity_borrowers = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
@@ -314,7 +316,7 @@ class Statistics:
         sum_of_equity = 0
         sum_of_equity_borrowers = 0
         leverage_of_borrowers = []
-        for bank in self.model.banks:
+        for idx, bank in enumerate(self.model.banks):
             if not bank.failed:
                 sum_of_equity += bank.E
                 if bank.l > 0:
@@ -322,11 +324,13 @@ class Statistics:
                 if bank.active_borrowers:
                     for borrower in bank.active_borrowers:
                         sum_of_equity_borrowers += self.model.banks[borrower].E
+                if self.model.config.detailed_equity:
+                    self.detailed_equity[idx][self.model.t] = bank.E
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
         self.leverage[self.model.t] = np.mean(leverage_of_borrowers) if leverage_of_borrowers else np.nan
         self.systemic_leverage[self.model.t] = sum(leverage_of_borrowers) / len(self.model.banks) \
-            if len(self.model.banks)>0 else 0
+            if len(self.model.banks) > 0 else 0
 
     def compute_liquidity(self):
         total_liquidity = 0
@@ -482,16 +486,16 @@ class Statistics:
                 savefile.write(f"# {line_header}\n")
             savefile.write(f"# pd.read_csv('file{self.output_format}',header={len(header) + 1}',"
                            f" delimiter='{delimiter}')\nt")
-            for element_name, _ in self.enumerate_results():
+            for element_name, _ in self.enumerate_statistics_results():
                 savefile.write(f"{delimiter}{element_name}")
             savefile.write("\n")
             for i in range(self.model.config.T):
                 savefile.write(f"{i}")
-                for _, element in self.enumerate_results():
+                for _, element in self.enumerate_statistics_results():
                     savefile.write(f"{delimiter}{element[i]}")
                 savefile.write(f"\n")
 
-    def __generate_gdt(self, export_datafile, header):
+    def __generate_gdt_file(self, filename, enumerate_results, header):
         E = lxml.builder.ElementMaker()
         gretl_data = E.gretldata
         DESCRIPTION = E.description
@@ -499,12 +503,12 @@ class Statistics:
         VARIABLE = E.variable
         OBSERVATIONS = E.observations
         OBS = E.obs
-        variables = VARIABLES(count=f"{sum(1 for _ in self.enumerate_results())}")
+        variables = VARIABLES(count=f"{sum(1 for _ in enumerate_results())}")
         header_text = ""
         for item in header:
             header_text += item + " "
         first = True
-        for variable_name, _ in self.enumerate_results():
+        for variable_name, _ in enumerate_results():
             if variable_name == 'leverage':
                 variable_name += "_"
             if first:
@@ -516,7 +520,7 @@ class Statistics:
         observations = OBSERVATIONS(count=f"{self.model.config.T}", labels="false")
         for i in range(self.model.config.T):
             string_obs = ''
-            for _, variable in self.enumerate_results():
+            for _, variable in enumerate_results():
                 string_obs += f"{variable[i]}  "
             observations.append(OBS(string_obs))
         gdt_result = gretl_data(
@@ -526,11 +530,18 @@ class Statistics:
             version="1.4", name='interbank', frequency="special:1", startobs="1",
             endobs=f"{self.model.config.T}", type="time-series"
         )
-        with gzip.open(self.get_export_path(export_datafile), 'w') as output_file:
+        with gzip.open(filename, 'w') as output_file:
             output_file.write(
                 b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(
                 lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
+
+    def __generate_gdt_equity(self, export_datafile):
+        if self.model.config.detailed_equity:
+            self.__generate_gdt_file(export_datafile, self.enumerate_equity_results, {})
+
+    def __generate_gdt(self, export_datafile, header):
+        self.__generate_gdt_file(export_datafile, self.enumerate_statistics_results, header)
 
     @staticmethod
     def __transform_line_from_string(line_with_values):
@@ -576,16 +587,23 @@ class Statistics:
                 self.__generate_csv_or_txt(self.get_export_path(export_datafile), header, ';')
                 self.output_format = '.gdt'
                 self.__generate_gdt(self.get_export_path(export_datafile), header)
+                self.__generate_gdt_equity(self.get_export_path(export_datafile+"_equity"))
             elif self.output_format.lower() == '.csv':
                 self.__generate_csv_or_txt(self.get_export_path(export_datafile), header, ';')
             elif self.output_format.lower() == '.txt':
                 self.__generate_csv_or_txt(self.get_export_path(export_datafile), header, '\t')
             else:
                 self.__generate_gdt(self.get_export_path(export_datafile), header)
+                self.__generate_gdt_equity(self.get_export_path(export_datafile+"_equity"))
 
-    def enumerate_results(self):
+    def enumerate_statistics_results(self):
         for element in Config.ELEMENTS_STATISTICS:
             yield self.get_name(element), getattr(self, element)
+
+    def enumerate_equity_results(self):
+        for bank_i in range(self.model.config.N):
+            yield f"equity_{bank_i}", self.model.statistics.detailed_equity[bank_i]
+
 
     def get_name(self, variable):
         match variable:
@@ -599,7 +617,7 @@ class Statistics:
 
     def get_data(self):
         result = pd.DataFrame()
-        for variable_name, variable in self.enumerate_results():
+        for variable_name, variable in self.enumerate_statistics_results():
             result[variable_name] = np.array(variable)
         return result.iloc[0:self.model.t]
 
@@ -1663,8 +1681,8 @@ class Utils:
                             help="Bank lender's change method (?=list)")
         parser.add_argument("--lc_ini_graph_file", type=str, default=None,
                             help="Load a graph in json networkx.node_link_data() format")
-        parser.add_argument("--all_networth", action="store_true", default=False,
-                            help="Store in a gdt the individual networth evolution of each individual bank")
+        parser.add_argument("--detailed_equity", action="store_true", default=False,
+                            help="Store in a gdt the individual E evolution of each individual bank")
         parser.add_argument("--plot_format", type=str, default="none",
                             help="Generate plots with the specified format (svg,png,pdf,gif,agr)")
         parser.add_argument("--output_format", type=str, default="gdt",
@@ -1687,7 +1705,7 @@ class Utils:
         if args.eta != model.eta:
             model.eta = args.eta
         model.config.allow_replacement_of_bankrupted = args.no_replace
-        model.config.all_networth = args.all_networth
+        model.config.detailed_equity = args.detailed_equity
         model.config.reintroduce_with_median = args.reintr_with_median
         if args.debug:
             model.do_debug(args.debug)

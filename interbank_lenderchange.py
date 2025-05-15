@@ -702,9 +702,9 @@ class ShockedMarket(RestrictedMarket):
 
     def __str__(self):
         if 'p' in self.parameter:
-            return f"Shocked.p={self.parameter['p']}"
+            return f"ShockedMarket.p={self.parameter['p']}"
         else:
-            return f"Shocked"
+            return f"ShockedMarket"
 
 
     def step_setup_links(self, this_model):
