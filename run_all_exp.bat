@@ -13,8 +13,8 @@ python exp_surviving.psi.05.py --do
 python exp_surviving.psi.099.py --do
 
 
-copy c:\experiments\surviving.psi.05\_failures_rationed_acum.csv c:\experiments\surviving.4\_failures_rationed_acum.psi05.csv 
-copy c:\experiments\surviving.psi.05\_failures_rationed_acum.png c:\experiments\surviving.4\_failures_rationed_acum.psi05.png
-copy c:\experiments\surviving.psi.1\_failures_rationed_acum.csv c:\experiments\surviving.4\_failures_rationed_acum.psi1.csv 
-copy c:\experiments\surviving.psi.1\_failures_rationed_acum.png c:\experiments\surviving.4\_failures_rationed_acum.psi1.png
+copy c:\experiments\surviving.psi.05\_failures_rationed_accum.csv c:\experiments\surviving.4\_failures_rationed_accum.psi05.csv 
+copy c:\experiments\surviving.psi.05\_failures_rationed_accum.png c:\experiments\surviving.4\_failures_rationed_accum.psi05.png
+copy c:\experiments\surviving.psi.1\_failures_rationed_accum.csv c:\experiments\surviving.4\_failures_rationed_accum.psi1.csv 
+copy c:\experiments\surviving.psi.1\_failures_rationed_accum.png c:\experiments\surviving.4\_failures_rationed_accum.psi1.png
 

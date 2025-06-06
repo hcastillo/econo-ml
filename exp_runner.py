@@ -351,7 +351,8 @@ class ExperimentRun:
             # Compute IQR = Q3 - Q1
             # Outliers are values outside [Q1 - 1.5IQR, Q3 + 1.5IQR]
             if (not np.isnan(mean_individual_execution) and not np.isnan(iqr) and
-                not (lower_bound <= mean_individual_execution <= upper_bound)):
+                not (lower_bound <= mean_individual_execution <= upper_bound) and
+                not (lower_bound==upper_bound)):
                 print(f"{k} {filename_for_iteration}:{i} {lower_bound:.3f} <= {mean_individual_execution:.3f} <= {upper_bound:.3f}")
                 return False
         return True

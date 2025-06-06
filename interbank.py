@@ -36,33 +36,78 @@ LENDER_CHANGE_DEFAULT_P = 0.333
 
 class Config:
     """
-    Configuration parameters for the interbank network
+        Configuration parameters for the interbank network
     """
-    T: int = 1000
-    N: int = 100
+    T: int = 1000  # time (1000)
+    N: int = 100  # number of banks (50)
+
     reserves: float = 0.02
+
+    # seed applied for random values (set during initialize)
     seed = None
+
+    # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
+
+    # If true allow_replacement, then:
+    #    - reintroduce=False we reintroduce bankrupted banks with initial values
+    #    - reintroduce=True we reintroduce with median of current values
     reintroduce_with_median = False
+
+    # if the then a gdt with all the data of time evolution of equity of each bank is generated:
     detailed_equity = False
-    mi: float = 0.7
-    omega: float = 0.55
+
+    # shocks parameters:
+    mi: float = 0.7  # mi µ
+    omega: float = 0.55  # omega ω
+
+    # Lender's change mechanism
     lender_change: lc.LenderChange = None
-    phi: float = 0.025
-    ji: float = 0.015
-    xi: float = 0.3
-    ro: float = 0.3
-    beta: float = 5
-    alfa: float = 0.1
-    psi_endogenous = False
-    psi: float = 0.0
-    L_i0: float = 120
-    C_i0: float = 30
-    D_i0: float = 135
-    E_i0: float = 15
-    r_i0: float = 0.02
+
+    # screening costs
+    phi: float = 0.025  # phi Φ
+    ji: float = 0.015  # ji Χ
+
+    # liquidation cost of collateral
+    xi: float = 0.3  # xi ξ, previous 0.6
+    ro: float = 0.3  # ro ρ fire sale cost
+
+    beta: float = 5  # β beta intensity of breaking the connection (5)
+    alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
+
+    # If true, psi variable will be ignored:
+    psi_endogenous = True
+    psi: float = 0.0  # market power parameter : 0 perfect competence .. 1 monopoly
+
+    # banks initial parameters
+    # L + C + R = D + E
+    # but R = 0.02*D and C_i0= 30-2.7=27.3 and R=2.7
+    L_i0: float = 120  # long term assets
+    C_i0: float = 30  # capital BEFORE RESERVES ESTIMATION, after it will be 27.3
+    # R_i0=2.7
+    D_i0: float = 135  # deposits
+    E_i0: float = 15  # equity
+    r_i0: float = 0.02  # initial rate
+
+    # if enabled and != [] the values of t in the array (for instance [150,350]) will generate
+    # a graph with the relations of the firms. If * all the instants will generate a graph, and also an animated gif
+    # with the results
     GRAPHS_MOMENTS = []
-    ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate': True, 'asset_i': True, 'asset_j': True, 'equity': True, 'equity_borrowers': True, 'bankruptcy': True, 'potential_credit_channels': True, 'P': True, 'best_lender': True, 'policy': False, 'fitness': False, 'best_lender_clients': False, 'rationing': True, 'leverage': False, 'systemic_leverage': False, 'num_of_rationed': True, 'loans': False, 'c': True, 'reserves': True, 'deposits': True, 'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False, 'num_banks': True, 'bankruptcy_rationed': True}
+
+    # what elements are in the results.csv file, and also which are plot.
+    # 1 if also plot, 0 not to plot:
+    ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate': True, 'asset_i': True, 'asset_j': True,
+                           'equity': True, 'equity_borrowers': True, 'bankruptcy': True,
+                           'potential_credit_channels': True,
+                           'P': True, 'best_lender': True,
+                           'policy': False, 'fitness': False, 'best_lender_clients': False,
+                           'rationing': True, 'leverage': False, 'systemic_leverage': False,
+                           'num_of_rationed': True,
+                           'loans': False, 'c': True,
+                           'reserves': True, 'deposits': True,
+                           'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
+                           'num_banks': True, 'bankruptcy_rationed': True}
+
 
     def __str__(self, separator=''):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -225,15 +270,16 @@ class Statistics:
 
     def compute_interest_rates_and_loans(self):
         interests_rates_of_borrowers = []
+        psi_of_lenders = []
         asset_i = []
         asset_j = []
         sum_of_loans = 0
-        maxE = 0
+        self.model.maxE = 0
         num_of_banks_that_are_lenders = 0
         num_of_banks_that_are_borrowers = 0
         for bank in self.model.banks:
-            if bank.E > maxE:
-                maxE = bank.E
+            if bank.E > self.model.maxE:
+                self.model.maxE = bank.E
             if bank.incrD >= 0:
                 if bank.active_borrowers:
                     asset_i.append(bank.asset_i)
@@ -243,17 +289,20 @@ class Statistics:
                 num_of_banks_that_are_lenders += 1
                 for bank_that_is_borrower in bank.active_borrowers:
                     sum_of_loans += bank.active_borrowers[bank_that_is_borrower]
+                psi_of_lenders.append(bank.psi)
             elif bank.l > 0:
                 num_of_banks_that_are_borrowers += 1
                 interests_rates_of_borrowers.append(bank.get_loan_interest())
+
         avg_prob_bankruptcy = []
-        if maxE > 0:
+        if self.model.maxE > 0:
             for bank in self.model.banks:
                 if bank.get_loan_interest() is not None and bank.l > 0:
-                    avg_prob_bankruptcy.append(1 - bank.E / maxE)
+                    avg_prob_bankruptcy.append(1 - bank.E / self.model.maxE)
         self.interest_rate[self.model.t] = np.mean(interests_rates_of_borrowers) if interests_rates_of_borrowers else np.nan
         self.asset_i[self.model.t] = np.mean(asset_i) if asset_i else np.nan
         self.asset_j[self.model.t] = np.mean(asset_j) if asset_j else np.nan
+        self.psi[self.model.t] = np.mean(psi_of_lenders) if psi_of_lenders else np.nan
         self.loans[self.model.t] = sum_of_loans / num_of_banks_that_are_lenders if num_of_banks_that_are_lenders else np.nan
         self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy) if avg_prob_bankruptcy else np.nan
         self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
@@ -276,12 +325,6 @@ class Statistics:
             else:
                 self.model.statistics.save_detailed_equity('')
         self.model.statistics.save_detailed_equity('\n')
-        if self.model.config.psi_endogenous:
-            if self.model.banks[0].psi is None:
-                maxE = np.max([bank.E for bank in self.model.banks])
-                for bank in self.model.banks:
-                    bank.psi = bank.E / maxE
-            self.psi[self.model.t] = sum((bank.psi for bank in self.model.banks)) / len(self.model.banks) if len(self.model.banks) > 0 else 0
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
         self.leverage[self.model.t] = np.mean(leverage_of_borrowers) if leverage_of_borrowers else np.nan
@@ -782,6 +825,7 @@ class Model:
     save_graphs = None
     save_graphs_results = []
     log = None
+    maxE = Config.E_i0
     statistics = None
     config = None
     export_datafile = None
@@ -1190,10 +1234,10 @@ class Model:
     def setup_links(self):
         if len(self.banks) <= 1:
             return
-        maxE = max(self.banks, key=lambda k: k.E).E
+        self.maxE = max(self.banks, key=lambda k: k.E).E
         maxC = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
-            bank.p = bank.E / maxE
+            bank.p = bank.E / self.maxE
             bank.lambda_ = bank.l / bank.E
             bank.incrD = 0
         max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
@@ -1206,7 +1250,7 @@ class Model:
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c.append(c)
             if self.config.psi_endogenous:
-                bank.psi = bank.E / maxE
+                bank.psi = bank.E / self.maxE
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i = 0
@@ -1220,6 +1264,8 @@ class Model:
                             bank_i.rij[j] = self.config.r_i0
                         else:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+                            if psi==1:
+                                psi=0.99999999999999
                             bank_i.rij[j] = ((self.config.ji * bank_i.A - self.config.phi * self.banks[j].A
                                              - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
                                              /
@@ -1307,7 +1353,7 @@ class Bank:
         self.s = 0
         self.d = 0
         self.B = 0
-        self.psi = None
+        self.psi = self.E / self.model.maxE if self.model.config.psi_endogenous else None
         self.incrD = 0
         self.paid_profits = 0
         self.paid_loan = 0
