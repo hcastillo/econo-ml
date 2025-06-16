@@ -57,7 +57,7 @@ class Config:
     # if the then a gdt with all the data of time evolution of equity of each bank is generated:
     detailed_equity = False
 
-    # shocks parameters:
+    # shocks parameters: mi=0.7 omega=0.55 for perfect balance
     mi: float = 0.7  # mi µ
     omega: float = 0.55  # omega ω
 
@@ -76,8 +76,8 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # If true, psi variable will be ignored:
-    psi_endogenous = True
-    psi: float = 0.0  # market power parameter : 0 perfect competence .. 1 monopoly
+    psi_endogenous = False
+    psi: float = 0.69  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # banks initial parameters
     # L + C + R = D + E
@@ -105,6 +105,7 @@ class Config:
                            'num_of_rationed': True,
                            'loans': False, 'c': True,
                            'reserves': True, 'deposits': True,
+                           'psi': True, 'systemic_psi': True,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
                            'num_banks': True, 'bankruptcy_rationed': True}
 
@@ -187,6 +188,7 @@ class Statistics:
     prob_bankruptcy = []
     num_of_rationed = []
     psi = []
+    systemic_psi = []
     num_banks = []
     bankruptcy_rationed = []
     model = None
@@ -243,8 +245,8 @@ class Statistics:
         self.bankruptcy = np.zeros(self.model.config.T, dtype=int)
         self.bankruptcy_rationed = np.zeros(self.model.config.T, dtype=int)
         self.num_of_rationed = np.zeros(self.model.config.T, dtype=int)
-        if self.model.config.psi_endogenous:
-            self.psi = np.zeros(self.model.config.T, dtype=float)
+        self.psi = np.zeros(self.model.config.T, dtype=float)
+        self.systemic_psi = np.zeros(self.model.config.T, dtype=float)
 
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
@@ -271,6 +273,7 @@ class Statistics:
     def compute_interest_rates_and_loans(self):
         interests_rates_of_borrowers = []
         psi_of_lenders = []
+        psi_of_alls = []
         asset_i = []
         asset_j = []
         sum_of_loans = 0
@@ -299,11 +302,18 @@ class Statistics:
             for bank in self.model.banks:
                 if bank.get_loan_interest() is not None and bank.l > 0:
                     avg_prob_bankruptcy.append(1 - bank.E / self.model.maxE)
-        self.interest_rate[self.model.t] = np.mean(interests_rates_of_borrowers) if interests_rates_of_borrowers else np.nan
+        self.interest_rate[self.model.t] = np.mean(interests_rates_of_borrowers) \
+            if interests_rates_of_borrowers else 0.0
         self.asset_i[self.model.t] = np.mean(asset_i) if asset_i else np.nan
         self.asset_j[self.model.t] = np.mean(asset_j) if asset_j else np.nan
-        self.psi[self.model.t] = np.mean(psi_of_lenders) if psi_of_lenders else np.nan
-        self.loans[self.model.t] = sum_of_loans / num_of_banks_that_are_lenders if num_of_banks_that_are_lenders else np.nan
+        if self.model.config.psi_endogenous:
+            self.psi[self.model.t] = np.mean(psi_of_lenders) if psi_of_lenders else 0.0
+            self.systemic_psi[self.model.t] = sum(bank.psi for bank in self.model.banks) / len(self.model.banks)
+        else:
+            self.psi[self.model.t] = self.model.config.psi
+            self.systemic_psi[self.model.t] = self.model.config.psi
+        self.loans[self.model.t] = sum_of_loans / num_of_banks_that_are_lenders \
+            if num_of_banks_that_are_lenders else np.nan
         self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy) if avg_prob_bankruptcy else np.nan
         self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
         self.active_borrowers[self.model.t] = num_of_banks_that_are_borrowers
@@ -327,8 +337,11 @@ class Statistics:
         self.model.statistics.save_detailed_equity('\n')
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
-        self.leverage[self.model.t] = np.mean(leverage_of_borrowers) if leverage_of_borrowers else np.nan
-        self.systemic_leverage[self.model.t] = sum(leverage_of_borrowers) / len(self.model.banks) if len(self.model.banks) > 0 else 0
+        self.leverage[self.model.t] = np.mean(leverage_of_borrowers) if leverage_of_borrowers else 0.0
+        # systemic_leverage = how the system is in relation to the total population of banks (big value  of 10 borrowers
+        # against a population of 100 banks means that there is a risk
+        self.systemic_leverage[self.model.t] = sum(leverage_of_borrowers) / len(self.model.banks) \
+            if len(self.model.banks) > 0 else 0
 
     def compute_liquidity(self):
         total_liquidity = 0
@@ -572,8 +585,6 @@ class Statistics:
     def enumerate_statistics_results(self):
         for element in Config.ELEMENTS_STATISTICS:
             yield (self.get_name(element), getattr(self, element))
-        if self.model.config.psi_endogenous:
-            yield ('psi', self.psi)
 
     def get_name(self, variable):
         match variable:
@@ -1270,9 +1281,10 @@ class Model:
                                              - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
                                              /
                                              (self.banks[j].p * bank_i.c[j] * (1 - psi)))
-                            bank_i.asset_i += self.config.ji * bank_i.A
-                            bank_i.asset_j += self.config.phi * self.banks[j].A
-                            bank_i.asset_j += 1 - self.banks[j].p
+                            #TODO quitar ji y phi
+                            bank_i.asset_i += bank_i.A
+                            bank_i.asset_j += self.banks[j].A
+                            # bank_i.asset_j += 1 - self.banks[j].p
                         if bank_i.rij[j] < 0:
                             bank_i.rij[j] = self.config.r_i0
                 except ZeroDivisionError:

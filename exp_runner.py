@@ -38,6 +38,8 @@ class ExperimentRun:
 
     ALGORITHM = interbank_lenderchange.ShockedMarket
 
+    EXTRA_MODEL_CONFIGURATION = {}
+
     ALLOW_REPLACEMENT_OF_BANKRUPTED = True
 
     config = {  # items should be iterable:
@@ -66,9 +68,12 @@ class ExperimentRun:
             i = i.strip()
             if i != "t":
                 mean = []
-                for j in array_with_data[i]:
+                mean_comparing = []
+                for j in range(len(array_with_data[i])):
                     # mean is 0, std is 1:
-                    mean.append(j[0])
+                    mean.append(array_with_data[i][j][0])
+                    if array_comparing and i in array_comparing and j<len(array_comparing[i]):
+                        mean_comparing.append(array_comparing[i][j][0])
                 plt.clf()
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
@@ -77,7 +82,10 @@ class ExperimentRun:
                          label=self.ALGORITHM.__name__ if array_comparing else "")
                 if array_comparing and i in array_comparing:
                     ax = plt.gca()
-                    ax.plot(0, array_comparing[i][0][0], "or", label=self.COMPARING_LABEL)
+                    if len(mean_comparing)==1:
+                        ax.plot(0, mean_comparing, "or", label=self.COMPARING_LABEL)
+                    else:
+                        ax.plot(array_with_x_values, mean_comparing, "r-", label=self.COMPARING_LABEL)
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
                 if array_comparing:
                     plt.legend(loc='best')
@@ -94,8 +102,9 @@ class ExperimentRun:
                 if not i.startswith('std_'):
                     array_with_data[i] = []
             for i in array_with_data.keys():
-                for j in range(len(dataframe[i])):
-                    array_with_data[i].append([dataframe[i][j], dataframe['std_' + i][j]])
+                if i!='psi.1':
+                    for j in range(len(dataframe[i])):
+                        array_with_data[i].append([dataframe[i][j], dataframe['std_' + i][j]])
             for j in dataframe[name_for_x_column]:
                 array_with_x_values.append(f"{name_for_x_column}={j}")
             return array_with_data, array_with_x_values
@@ -192,7 +201,7 @@ class ExperimentRun:
 
         model.configure(T=self.T, N=self.N,
                         allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
-
+        model.configure(**self.EXTRA_MODEL_CONFIGURATION)
         model.initialize(seed=seed_random, save_graphs_instants=None,
                          export_datafile=filename,
                          generate_plots=False)
@@ -308,7 +317,7 @@ class ExperimentRun:
         results_comparing = None
         if self.COMPARING_DATA:
             results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")
-            if len(results_x_comparing) != len(results_x_axis) and len(results_x_comparing) != 1:
+            if len(results_x_comparing) not in (len(results_x_axis),1):
                 results_comparing = None
         return results_comparing
 
@@ -380,7 +389,6 @@ class ExperimentRun:
             results_x_axis = []
         else:
             results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
-            results_comparing = self.load_comparing(results_to_plot, results_x_axis)
         if not results_to_plot:
             self.__verify_directories__()
             seeds_for_random = self.generate_random_seeds_for_this_execution()
@@ -451,6 +459,7 @@ class ExperimentRun:
             self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
         else:
             print(f"Loaded data from previous work from {self.OUTPUT_DIRECTORY}")
+        results_comparing = self.load_comparing(results_to_plot, results_x_axis)
         if self.log_replaced_data:
             print(self.log_replaced_data)
         print("Plotting...")

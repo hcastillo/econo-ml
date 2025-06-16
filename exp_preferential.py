@@ -17,7 +17,7 @@ class PreferentialRun(exp_runner.ExperimentRun):
 
     OUTPUT_DIRECTORY = "c:\\experiments\\preferential"
     ALGORITHM = Preferential
-    COMPARING_DATA = "experiments/boltzmann"
+    COMPARING_DATA = "c:\\experiments\\boltzmann"
     COMPARING_LABEL = "Boltzmann"
 
     parameters = {  # items should be iterable:
