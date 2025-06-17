@@ -217,8 +217,8 @@ class ExperimentRun:
         return (dict(zip(parameters.keys(), values)) for values in sorted(product(*parameters.values())))
 
     def __filename_clean(self, value, max_length):
-        value = str(value)
-        for r in "{}[]',: .":
+        value = str(value).replace("np.float64(","").replace("np.float(","")
+        for r in "{}[]()',: .":
             value = value.replace(r, "")
         if value.endswith(".0"):
             # integer: 0 at left
