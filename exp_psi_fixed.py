@@ -47,8 +47,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
             model.config.lender_change.set_parameter("p", execution_parameters["p"])
         model.configure(T=self.T, N=self.N,
                         allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
-        print(MarketPowerRun.psi[execution_parameters["p"]])
-        value_of_p = float(MarketPowerRun.psi[execution_parameters["p"]])
+        value_of_p = np.mean(MarketPowerRun.psi[execution_parameters["p"]])
         extra_config = { 'psi_endogenous':False, 'psi': value_of_p  }
         model.configure(**extra_config)
         model.initialize(seed=seed_random, save_graphs_instants=None,
