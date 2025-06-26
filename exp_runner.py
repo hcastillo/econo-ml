@@ -38,6 +38,8 @@ class ExperimentRun:
 
     ALGORITHM = interbank_lenderchange.ShockedMarket
 
+    NAME_OF_X_SERIES = None
+
     EXTRA_MODEL_CONFIGURATION = {}
 
     ALLOW_REPLACEMENT_OF_BANKRUPTED = True
@@ -77,15 +79,21 @@ class ExperimentRun:
                 plt.clf()
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
-                plt.title(title)
+
                 plt.plot(array_with_x_values, mean, "b-",
-                         label=self.ALGORITHM.__name__ if array_comparing else "")
+                         label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES else self.ALGORITHM.__name__ if array_comparing else "")
+                logarithm_plot = False
                 if array_comparing and i in array_comparing:
                     ax = plt.gca()
                     if len(mean_comparing)==1:
                         ax.plot(0, mean_comparing, "or", label=self.COMPARING_LABEL)
                     else:
                         ax.plot(array_with_x_values, mean_comparing, "r-", label=self.COMPARING_LABEL)
+                    if abs(mean[0]-mean_comparing[0])>1e6 and abs(mean[-1]-mean_comparing[-1])>1e6:
+                        ax.set_yscale('log')
+                        logarithm_plot = True
+
+                plt.title(title + (' (log)' if logarithm_plot else ''))
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
                 if array_comparing:
                     plt.legend(loc='best')
@@ -174,7 +182,7 @@ class ExperimentRun:
             for j in array_with_data:
                 string_obs += f"{array_with_data[j][i][0]}  {array_with_data[j][i][1]}  "
             observations.append(OBS(string_obs))
-        header_text = f"MC={self.MC} N={self.N} T={self.T} {self.ALGORITHM.__name__}"
+        header_text = f"MC={self.MC} N={self.N} T={self.T} {self.ALGORITHM.__name__ if not self.NAME_OF_X_SERIES else self.NAME_OF_X_SERIES}"
         gdt_result = GRETLDATA(
             DESCRIPTION(header_text),
             variables,

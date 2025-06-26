@@ -82,7 +82,6 @@ class MarketPowerRun(exp_runner.ExperimentRun):
             print(f"p={value_of_p:-15} psi={total[-1]:-7}")
         print("average_of_all=",np.average(total))
 
-
 if __name__ == "__main__":
     runner = exp_runner.Runner()
     load_values = MarketPowerRun()

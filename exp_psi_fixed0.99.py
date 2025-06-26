@@ -20,11 +20,11 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 40
 
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "c:\\experiments\\psi_fixed1"
-    COMPARING_DATA = "not_exists"
-    COMPARING_LABEL = None
+    OUTPUT_DIRECTORY = "c:\\experiments\\psi_fixed0.99"
+    COMPARING_DATA = "c:\\experiments\\psi_fixed0.10"
+    COMPARING_LABEL = "psi0.10"
 
-    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':False, 'psi': 0.6899999999999997 }
+    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':False, 'psi': 0.999 }
 
     parameters = {
         "p": np.linspace(0.0001, 1, num=10)
