@@ -65,11 +65,11 @@ class Config:
     lender_change: lc.LenderChange = None
 
     # screening costs
-    phi: float = 0.025  # phi Φ   0.015 0.020 0.025 0.030 0.035
-    ji: float = 0.015  # ji Χ     0.010 0.012 0.015 0.017 0.020
+    phi: float = 0.025  # phi Φ
+    ji: float = 0.015  # ji Χ
 
     # liquidation cost of collateral
-    xi: float = 0.3  # xi ξ, previous 0.6   0.1 0.2 0.3 0.4 0.5
+    xi: float = 0.3  # xi ξ, previous 0.6
     ro: float = 0.3  # ro ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
@@ -316,16 +316,13 @@ class Statistics:
     def compute_leverage_and_equity(self):
         sum_of_equity = 0
         sum_of_equity_borrowers = 0
-        leverage_of_lenders = []
+        leverage_of_borrowers = []
         self.model.statistics.save_detailed_equity(self.model.t)
         for bank in self.model.banks:
             if not bank.failed:
                 sum_of_equity += bank.E
-                if bank.l == 0:
-                    amount_of_loan = 0
-                    if bank.get_lender() is not None and bank.get_lender().l > 0:
-                        amount_of_loan = bank.get_lender().l
-                    leverage_of_lenders.append(amount_of_loan/ bank.E)
+                if bank.l > 0:
+                    leverage_of_borrowers.append(bank.l / bank.E)
                 if bank.active_borrowers:
                     for borrower in bank.active_borrowers:
                         sum_of_equity_borrowers += self.model.banks[borrower].E
@@ -335,10 +332,10 @@ class Statistics:
         self.model.statistics.save_detailed_equity('\n')
         self.equity[self.model.t] = sum_of_equity
         self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
-        self.leverage[self.model.t] = np.mean(leverage_of_lenders) if leverage_of_lenders else 0.0
+        self.leverage[self.model.t] = np.mean(leverage_of_borrowers) if leverage_of_borrowers else 0.0
         # systemic_leverage = how the system is in relation to the total population of banks (big value  of 10 borrowers
         # against a population of 100 banks means that there is a risk
-        self.systemic_leverage[self.model.t] = sum(leverage_of_lenders) / len(self.model.banks) \
+        self.systemic_leverage[self.model.t] = sum(leverage_of_borrowers) / len(self.model.banks) \
             if len(self.model.banks) > 0 else 0
 
     def compute_liquidity(self):
@@ -1259,11 +1256,7 @@ class Model:
         maxC = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
             bank.p = bank.E / self.maxE
-            if bank.get_lender() is not None and bank.get_lender().l > 0:
-                bank.lambda_ = bank.get_lender().l / bank.E
-            else:
-                bank.lambda_ = 0
-            # bank.lambda_ = bank.l / bank.E
+            bank.lambda_ = bank.l / bank.E
             bank.incrD = 0
         max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
         for bank in self.banks:

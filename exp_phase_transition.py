@@ -2,17 +2,12 @@
 # coding: utf-8
 """
 Executor for the interbank model using different values for the lc ShockedMarket
-
-We determine the average of psi for the endogenous execution c:\\experiments\\psi_endogenous
-(psi_fixed_average) and also for each p (psi_fixed_by_p), to compare properly later the results
-
 @author: hector@bith.net
 """
 import numpy as np
 from interbank_lenderchange import ShockedMarket
 import exp_runner
-from interbank import Model
-import interbank
+
 
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
@@ -20,19 +15,15 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 40
 
     ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "c:\\experiments\\psi_fixed0.99"
-    COMPARING_DATA = "c:\\experiments\\psi_fixed0.10"
-    COMPARING_LABEL = "psi0.10"
-
-    NAME_OF_X_SERIES = "psi0.99"
-
-    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':False, 'psi': 0.999 }
+    OUTPUT_DIRECTORY = "c:\\experiments\\5_phi_phase_transition"
 
     parameters = {
-        "p": np.linspace(0.0001, 1, num=10)
+        "p": np.linspace(0.0001, 0.3, num=10)
     }
 
 
+    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':True }
+    
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 
