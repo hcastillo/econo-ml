@@ -5,23 +5,25 @@ Executor for the interbank model using different values for the lc ShockedMarket
 @author: hector@bith.net
 """
 import numpy as np
-from interbank_lenderchange import ShockedMarket
+from interbank_lenderchange import ShockedMarket3
 import exp_runner
 
 
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 10
+    MC = 40
 
-    ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "c:\\experiments\\2_phi"
-    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':True }
+    ALGORITHM = ShockedMarket3
+    OUTPUT_DIRECTORY = "c:\\experiments\\05_phi_phase_transition"
 
     parameters = {
-        "phi": [ 0.015 ,0.020 ,0.025 ,0.030 ,0.035]
+        "p": np.linspace(0.0001, 0.3, num=10)
     }
 
+
+    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':True }
+    
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 1
 

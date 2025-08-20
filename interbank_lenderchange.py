@@ -10,6 +10,8 @@ LenderChange is a class used from interbank.py to control the change of lender i
                             lender for each bank, it replicates the situation after a crisis when banks do not credit
     - ShockedMarket      using an Erdos Renyi graph with p=parameter['p']. In each step a new random Erdos Renyi is
                             used
+    - ShockedMarket2     Erdos Renyi graph not directed and in each step, we randomly choose a direction
+
     - SmallWorld         using a Watts and Strogatz algorithm with parameter['p'] and k=5
                             (Each node is joined with its k nearest neighbors in a ring topology)
 @author: hector@bith.net
@@ -69,7 +71,7 @@ def draw(original_graph, new_guru_look_for=False, title=None, show=False):
             graph_to_draw.remove_edge(i, j)
     if hasattr(original_graph, "type") and original_graph.type == "barabasi_albert":
         graph_to_draw, guru = get_graph_from_guru(graph_to_draw.to_undirected())
-    if hasattr(original_graph, "type") and original_graph.type == "erdos_renyi":
+    if hasattr(original_graph, "type") and original_graph.type == "erdos_renyi" and graph_to_draw.is_directed():
         for node in list(graph_to_draw.nodes()):
             if not graph_to_draw.edges(node) and not graph_to_draw.in_edges(node):
                 graph_to_draw.remove_node(node)
@@ -332,6 +334,9 @@ class LenderChange:
 
     def initialize_bank_relationships(self, this_model):
         """ Call once at initialize() model """
+        pass
+
+    def extra_relationships_change(self, this_model):
         pass
 
     def step_setup_links(self, this_model):
@@ -710,6 +715,61 @@ class ShockedMarket(RestrictedMarket):
     def step_setup_links(self, this_model):
         """ At the end of each step, a new graph is generated """
         self.initialize_bank_relationships(this_model, save_graph=self.SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP)
+
+
+class ShockedMarket2(ShockedMarket):
+    """ Erdos Renyi graph not directed and in each step, we randomly choose a direction.
+    """
+    SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = False
+
+    def __str__(self):
+        if 'p' in self.parameter:
+            return f"ShockedMarket2.p={self.parameter['p']}"
+        else:
+            return f"ShockedMarket2"
+
+    def extra_relationships_change(self, this_model):
+        for bank in this_model.banks:
+            if bank.incrD < 0: # borrowers
+                # we search all the possible lenders and we randomly choose one with incrD>0:
+                possible_lenders = []
+                for (_,j) in self.banks_graph.edges(bank.id):
+                    if this_model.banks[j].incrD> 0:
+                        possible_lenders.append(j)
+                if possible_lenders:
+                    bank.lender = random.choice(possible_lenders)
+                else:
+                    bank.lender = None
+
+
+class ShockedMarket3(ShockedMarket2):
+    """ Erdos Renyi graph not directed and in each step with no limits in number of edges,
+        and we randomly choose a direction.
+    """
+    SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP = False
+
+    def __str__(self):
+        if 'p' in self.parameter:
+            return f"ShockedMarket3.p={self.parameter['p']}"
+        else:
+            return f"ShockedMarket3"
+
+    def generate_banks_graph(self, this_model):
+        result = nx.erdos_renyi_graph(n=this_model.config.N, p=self.parameter['p'])
+        return result, f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
+
+    def extra_relationships_change(self, this_model):
+        for bank in this_model.banks:
+            if bank.incrD < 0: # borrowers
+                # we search all the possible lenders and we randomly choose one with incrD>0:
+                possible_lenders = []
+                for (_,j) in self.banks_graph.edges(bank.id):
+                    if this_model.banks[j].incrD> 0:
+                        possible_lenders.append(j)
+                if possible_lenders:
+                    bank.lender = random.choice(possible_lenders)
+                else:
+                    bank.lender = None
 
 
 class SmallWorld(ShockedMarket):

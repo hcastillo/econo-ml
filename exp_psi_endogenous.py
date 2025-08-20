@@ -5,18 +5,18 @@ Executor for the interbank model using different values for the lc ShockedMarket
 @author: hector@bith.net
 """
 import numpy as np
-from interbank_lenderchange import ShockedMarket
+from interbank_lenderchange import ShockedMarket3
 import exp_runner
 
 
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 40
+    MC = 10
 
-    ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "c:\\experiments\\psi_endogenous"
-    COMPARING_DATA = "c:\\experiments\\psi_fixed" # "c:\\experiments\\psi_fixed0.63"
+    ALGORITHM = ShockedMarket3
+    OUTPUT_DIRECTORY = "c:\\experiments\\0psi_endogenous"
+    COMPARING_DATA = "c:\\experiments\\0psi_fixed" # "c:\\experiments\\psi_fixed0.63"
     COMPARING_LABEL = "psi_fixed"  # "psi_fixed=0.63"
 
     NAME_OF_X_SERIES = "psi_endogenous"

@@ -9,7 +9,7 @@ We determine the average of psi for the endogenous execution c:\\experiments\\ps
 @author: hector@bith.net
 """
 import numpy as np
-from interbank_lenderchange import ShockedMarket
+from interbank_lenderchange import ShockedMarket3
 import exp_runner
 from interbank import Model
 import interbank
@@ -17,14 +17,14 @@ import interbank
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 40
+    MC = 10
 
-    ALGORITHM = ShockedMarket
-    OUTPUT_DIRECTORY = "c:\\experiments\\psi_fixed"
+    ALGORITHM = ShockedMarket3
+    OUTPUT_DIRECTORY = "c:\\experiments\\0psi_fixed"
     COMPARING_DATA = "not_exists"
     COMPARING_LABEL = None
 
-    PSI_ENDOGENOUS_DATA = "c:\\experiments\\psi_endogenous"
+    PSI_ENDOGENOUS_DATA = "c:\\experiments\\0psi_endogenous"
 
     parameters = {
         "p": np.linspace(0.0001, 1, num=10)
