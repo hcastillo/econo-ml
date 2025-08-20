@@ -110,8 +110,6 @@ class MarketPowerRun(exp_runner.ExperimentRun):
                                                                             result_iteration['bankruptcies'])
                     correlation_coefficient1, p_value1 = scipy.stats.pearsonr(result_iteration['interest_rate'][1:],
                                                                               result_iteration['bankruptcies'][:-1])
-                    correlation_coefficient2, p_value2 = scipy.stats.pearsonr(result_iteration['interest_rate'][2:],
-                                                                              result_iteration['bankruptcies'][:-2])
 
                     if 'correlation' in results_to_plot:
                         results_to_plot['correlation'].append([correlation_coefficient, p_value])
@@ -120,7 +118,6 @@ class MarketPowerRun(exp_runner.ExperimentRun):
                     correlation_file.write(f"{filename_for_iteration} = {model_configuration} {model_parameters}\n")
                     correlation_file.write(self.format_correlation_values(0, correlation_coefficient, p_value))
                     correlation_file.write(self.format_correlation_values(1, correlation_coefficient1, p_value1))
-                    correlation_file.write(self.format_correlation_values(2, correlation_coefficient2, p_value2))
                     if self.ALGORITHM.GRAPH_NAME:
                         self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
@@ -144,7 +141,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     def format_correlation_values(self, delay, correlation_coefficient, p_value):
         result = f"\tt={delay} "
         result += f"pearson={correlation_coefficient} p_value={p_value}"
-        result += " ***\n" if  p_value < 0.05 and correlation_coefficient >= 0.1 else "\n"
+        result += " !!!\n" if p_value < 0.1 and correlation_coefficient > 0 else "\n"
         return result
 
     def __get_value_for(self, param):
