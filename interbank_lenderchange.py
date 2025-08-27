@@ -442,7 +442,7 @@ class Boltzmann(LenderChange):
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
-            bank.r = this_model.config.r_i0
+            #bank.r = this_model.config.r_i0
             bank.mu = 0
             bank.asset_i = 0
             bank.asset_j = 0
@@ -609,7 +609,7 @@ class Preferential(Boltzmann):
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
-            bank.r = this_model.config.r_i0
+            #bank.r = this_model.config.r_i0
             bank.mu = 0
         if self.banks_graph and self.banks_graph.out_edges() and self.banks_graph.out_edges(bank.id):
             return list(self.banks_graph.out_edges(bank.id))[0][1]
@@ -684,7 +684,7 @@ class RestrictedMarket(LenderChange):
         """ We return the same lender we have created in self.banks_graph """
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
         bank.rij[bank.id] = 0
-        bank.r = this_model.config.r_i0
+        #bank.r = this_model.config.r_i0
         bank.mu = 0
         bank.asset_i = 0
         bank.asset_j = 0
@@ -811,7 +811,7 @@ class SmallWorld(ShockedMarket):
         """ Same lender we have created in self.banks_graph """
         bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
         bank.rij[bank.id] = 0
-        bank.r = this_model.config.r_i0
+        #bank.r = this_model.config.r_i0
         bank.mu = 0
         bank.asset_i = 0
         bank.asset_j = 0

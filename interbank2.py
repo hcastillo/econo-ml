@@ -955,6 +955,7 @@ class Model:
         if self.backward_enabled:
             self.banks_backward_copy = copy.deepcopy(self.banks)
         self.do_shock('shock1')
+        self.setup_links()
         self.statistics.compute_potential_lenders()
         self.do_loans()
         self.log.debug_banks()
@@ -971,7 +972,6 @@ class Model:
         self.statistics.compute_policy()
         self.statistics.compute_deposits_and_reserves()
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
-        self.setup_links()
         self.statistics.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
         self.log.debug_banks()
         if self.save_graphs is not None and (self.save_graphs == '*' or self.t in self.save_graphs):
@@ -1139,16 +1139,6 @@ class Model:
             self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
-        # first we normalize the banks ir to avoid values greater than 1:
-        max_r = 0
-        for bank in self.banks:
-            if not bank.get_loan_interest() is None and bank.get_loan_interest() >max_r:
-                max_r = bank.get_loan_interest()
-        for bank in self.banks:
-            if not bank.lender is None:
-                self.banks[bank.lender].rij[bank.id] = self.banks[bank.lender].rij[bank.id] / max_r
-
-
         self.config.lender_change.extra_relationships_change(self)
         num_of_rationed = 0
         total_rationed = 0
@@ -1332,36 +1322,31 @@ class Model:
             bank_i.asset_i = 0
             bank_i.asset_j = 0
             for j in range(self.config.N):
-                try:
-                    if j == bank_i.id:
-                        bank_i.rij[j] = 0
+                if j == bank_i.id:
+                    bank_i.rij[j] = 0
+                else:
+                    if self.banks[j].p == 0 or bank_i.c[j] == 0:
+                        bank_i.rij[j] = self.config.r_i0
                     else:
-                        if self.banks[j].p == 0 or bank_i.c[j] == 0:
-                            bank_i.rij[j] = self.config.r_i0
-                        else:
-                            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-                            if psi==1:
-                                psi=0.99999999999999
-                            bank_i.rij[j] = ((self.config.ji * bank_i.A - self.config.phi * self.banks[j].A
-                                             - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
-                                             /
-                                             (self.banks[j].p * bank_i.c[j] * (1 - psi)))
-
-
-                            bank_i.asset_i += bank_i.A
-                            bank_i.asset_j += self.banks[j].A
-                            # bank_i.asset_j += 1 - self.banks[j].p
-                        if bank_i.rij[j] < 0:
-                            bank_i.rij[j] = self.config.r_i0
-                except ZeroDivisionError:
-                    bank_i.rij[j] = self.config.r_i0
-            bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
+                        psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+                        if psi == 1:
+                            psi = 0.99999999999999
+                        bank_i.rij[j] = ((self.config.ji * bank_i.A - self.config.phi * self.banks[j].A
+                                          - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
+                                         /
+                                         (self.banks[j].p * bank_i.c[j] * (1 - psi)))
+                        bank_i.asset_i += bank_i.A
+                        bank_i.asset_j += self.banks[j].A
+                        # bank_i.asset_j += 1 - self.banks[j].p
+                    if bank_i.rij[j] < 0:
+                        bank_i.rij[j] = self.config.r_i0
             bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
-            if bank_i.r < min_r:
-                min_r = bank_i.r
+            if bank_i.get_loan_interest() < min_r:
+                min_r = bank_i.get_loan_interest()
+
         for bank in self.banks:
-            bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (min_r / bank.r)
+            bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (min_r / bank.get_loan_interest())
         self.config.lender_change.step_setup_links(self)
         for bank in self.banks:
             log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
@@ -1398,11 +1383,9 @@ class Bank:
 
     def get_loan_interest(self):
         if self.lender is None or self.lender >= len(self.model.banks):
-            return None
+            return self.model.config.r_i0
         else:
             return self.model.banks[self.lender].rij[self.id]
-            #import math
-            #return math.sqrt(math.sqrt(self.model.banks[self.lender].rij[self.id]))/20
 
 
     def get_id(self, short: bool=False):
@@ -1422,7 +1405,6 @@ class Bank:
         self.D = self.model.value_for_reintroduced_banks_D
         self.E = self.model.value_for_reintroduced_banks_E
         self.A = 0
-        self.r = 0
         self.rij: list[Any] = [0] * self.model.config.N
         self.c: list[Any] = []
         self.h = 0

@@ -22,7 +22,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
                                 {"shock1": [-13, 13], "shock2": [20, -20], },
                             ], lc="Boltzmann")
         self.initialValues()
-        self.interest_rate_for_loan_of_bank0 = self.model.banks[0].r
+        self.interest_rate_for_loan_of_bank0 = self.model.banks[0].get_loan_interest()
         self.doTest()
 
     def test_values_after_execution(self):

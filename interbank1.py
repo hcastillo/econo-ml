@@ -30,6 +30,7 @@ import numpy as np
 import lxml.etree
 import lxml.builder
 import gzip
+import scipy.stats
 
 LENDER_CHANGE_DEFAULT = 'ShockedMarket'
 LENDER_CHANGE_DEFAULT_P = 0.333
@@ -76,8 +77,8 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # If true, psi variable will be ignored:
-    psi_endogenous = True
-    psi: float = 0.0  # market power parameter : 0 perfect competence .. 1 monopoly
+    psi_endogenous = False
+    psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # banks initial parameters
     # L + C + R = D + E
@@ -202,6 +203,8 @@ class Statistics:
     create_gif = False
     OUTPUT_DIRECTORY = 'output'
     NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
+    # cross correlation of interest rate against bankruptcies
+    correlation = []
 
     def __init__(self, in_model):
         self.detailed_equity = None
@@ -301,10 +304,7 @@ class Statistics:
             elif bank.l > 0:
                 num_of_banks_that_are_borrowers += 1
                 interests_rates_of_borrowers.append(bank.get_loan_interest())
-            if bank.get_loan_interest() is not None and bank.l > 0:
-                bank.has_a_loan = True
-            else:
-                bank.has_a_loan = False
+            bank.has_a_loan = bank.get_loan_interest() is not None and bank.l > 0
 
 
         self.interest_rate[self.model.t] = np.mean(interests_rates_of_borrowers) \
@@ -413,6 +413,30 @@ class Statistics:
         self.P_min[self.model.t] = min(probabilities) if probabilities else np.nan
         self.P_std[self.model.t] = np.std(probabilities) if probabilities else np.nan
         self.num_banks[self.model.t] = num_banks
+
+    def get_cross_correlation_result(self, t):
+        if t in [0,1] and len(self.correlation)>t:
+            status = '  '
+            if self.correlation[t][0]>0:
+                if self.correlation[t][1]<0.05:
+                    status = '**'
+                elif self.correlation[t][1]<0.10:
+                    status = '* '
+            return (f'correl t={t} int_rate/bankrupt {self.correlation[t][0]:4.2} '
+                    f'p_value={self.correlation[t][1]:4.2} {status}')
+        else:
+            return " "
+
+    def determine_cross_correlation(self):
+        if not (self.bankruptcy == 0).all():
+            self.correlation = [
+                # correlation_coefficient = [-1..1] and p_value < 0.10
+                scipy.stats.pearsonr(self.interest_rate,self.bankruptcy),
+                # time delay 1:
+                scipy.stats.pearsonr(self.interest_rate[1:],self.bankruptcy[:-1])
+                ]
+        else:
+            self.correlation = []
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
         if export_datafile:
@@ -529,15 +553,20 @@ class Statistics:
         header_text = ''
         for item in header:
             header_text += item + ' '
-        first = True
+        # header_text will be present as label in the first variable
+        # correlation_result will be present as label in the second variable
+        i = 1
         for variable_name, _ in enumerate_results():
             if variable_name == 'leverage':
                 variable_name += '_'
-            if first:
+            if i==1:
                 variables.append(VARIABLE(name='{}'.format(variable_name), label='{}'.format(header_text)))
+            elif i in [2,3]:
+                variables.append(VARIABLE(name='{}'.format(variable_name),
+                        label=self.get_cross_correlation_result(i-2)))
             else:
                 variables.append(VARIABLE(name='{}'.format(variable_name)))
-            first = False
+            i = i+1
         observations = OBSERVATIONS(count='{}'.format(self.model.config.T), labels='false')
         for i in range(self.model.config.T):
             string_obs = ''
@@ -926,6 +955,7 @@ class Model:
         if self.backward_enabled:
             self.banks_backward_copy = copy.deepcopy(self.banks)
         self.do_shock('shock1')
+        self.setup_links()
         self.statistics.compute_potential_lenders()
         self.do_loans()
         self.log.debug_banks()
@@ -942,7 +972,6 @@ class Model:
         self.statistics.compute_policy()
         self.statistics.compute_deposits_and_reserves()
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
-        self.setup_links()
         self.statistics.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
         self.log.debug_banks()
         if self.save_graphs is not None and (self.save_graphs == '*' or self.t in self.save_graphs):
@@ -974,8 +1003,10 @@ class Model:
                 self.log.debug('*****', 'Finish because there are only two banks surviving'.format())
                 break
 
+
     def finish(self):
         if not self.test:
+            self.statistics.determine_cross_correlation()
             self.statistics.export_data(export_datafile=self.export_datafile, export_description=self.export_description, generate_plots=self.generate_plots)
         summary = 'Finish: model T={}  N={}'.format(self.config.T, self.config.N)
         if not self.__policy_recommendation_changed__():
@@ -1287,44 +1318,44 @@ class Model:
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE
         min_r = sys.maxsize
+        max_r = 0
         for bank_i in self.banks:
             bank_i.asset_i = 0
             bank_i.asset_j = 0
             for j in range(self.config.N):
-                try:
-                    if j == bank_i.id:
-                        bank_i.rij[j] = 0
+                if j == bank_i.id:
+                    bank_i.rij[j] = 0
+                else:
+                    if self.banks[j].p == 0 or bank_i.c[j] == 0:
+                        bank_i.rij[j] = self.config.r_i0
                     else:
-                        if self.banks[j].p == 0 or bank_i.c[j] == 0:
-                            bank_i.rij[j] = self.config.r_i0
-                        else:
-                            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-                            if psi==1:
-                                psi=0.99999999999999
-                            bank_i.rij[j] = ((self.config.ji * bank_i.A - self.config.phi * self.banks[j].A
-                                             - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
-                                             /
-                                             (self.banks[j].p * bank_i.c[j] * (1 - psi)))
-
-
-                            bank_i.asset_i += bank_i.A
-                            bank_i.asset_j += self.banks[j].A
-                            # bank_i.asset_j += 1 - self.banks[j].p
-                        if bank_i.rij[j] < 0:
-                            bank_i.rij[j] = self.config.r_i0
-                except ZeroDivisionError:
-                    bank_i.rij[j] = self.config.r_i0
-            bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
+                        psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+                        if psi == 1:
+                            psi = 0.99999999999999
+                        bank_i.rij[j] = ((self.config.ji * bank_i.A - self.config.phi * self.banks[j].A
+                                          - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
+                                         /
+                                         (self.banks[j].p * bank_i.c[j] * (1 - psi)))
+                        bank_i.asset_i += bank_i.A
+                        bank_i.asset_j += self.banks[j].A
+                        # bank_i.asset_j += 1 - self.banks[j].p
+                    if bank_i.rij[j] < 0:
+                        bank_i.rij[j] = self.config.r_i0
             bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
             bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
-            if bank_i.r < min_r:
-                min_r = bank_i.r
+            if bank_i.get_loan_interest() < min_r:
+                min_r = bank_i.get_loan_interest()
+            if bank_i.get_loan_interest() > max_r:
+                max_r = bank_i.get_loan_interest()
+
         for bank in self.banks:
-            bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (min_r / bank.r)
+            if not bank.lender is None:
+                self.banks[bank.lender].rij[bank.id] = self.banks[bank.lender].rij[bank.id] / max_r ####
+            bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (min_r / bank.get_loan_interest())
         self.config.lender_change.step_setup_links(self)
         for bank in self.banks:
             log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
-            # self.log.debug('links', log_change_lender)
+            self.log.debug('links', log_change_lender)
 
     def estimate_average_values_for_replacement_of_banks(self):
         self.value_for_reintroduced_banks_L = self.config.L_i0
@@ -1357,11 +1388,9 @@ class Bank:
 
     def get_loan_interest(self):
         if self.lender is None or self.lender >= len(self.model.banks):
-            return None
+            return self.model.config.r_i0
         else:
             return self.model.banks[self.lender].rij[self.id]
-            #import math
-            #return math.sqrt(math.sqrt(self.model.banks[self.lender].rij[self.id]))/20
 
 
     def get_id(self, short: bool=False):
@@ -1381,7 +1410,6 @@ class Bank:
         self.D = self.model.value_for_reintroduced_banks_D
         self.E = self.model.value_for_reintroduced_banks_E
         self.A = 0
-        self.r = 0
         self.rij: list[Any] = [0] * self.model.config.N
         self.c: list[Any] = []
         self.h = 0
@@ -1577,7 +1605,11 @@ class Utils:
             save_graph_instants = Config.GRAPHS_MOMENTS
         model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants, output_directory=output_directory, seed=seed)
         model.simulate_full(interactive=interactive)
-        return model.finish()
+        result = model.finish()
+        if interactive and model.statistics.get_cross_correlation_result(0):
+            print('\n'+model.statistics.get_cross_correlation_result(0))
+            print(model.statistics.get_cross_correlation_result(1))
+        return result
 
     @staticmethod
     def is_notebook():

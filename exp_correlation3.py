@@ -10,30 +10,32 @@ import exp_runner
 import pandas as pd
 from progress.bar import Bar
 import warnings
+import scipy.stats
 
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 2
+    MC = 3
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "c:\\experiments\\correlation2"
+    OUTPUT_DIRECTORY = "c:\\experiments\\correlation3"
 
     parameters = {
-        "p": np.linspace(0.4, 1, num=1)
+        "p": [0.4]
     }
 
     config = {
-        "phi": np.linspace(0.020, 0.030 ,num=3),
-        "ji": np.linspace(0.010, 0.020, num=3),
-        "beta": np.linspace( 4,6, num=3),
-        "alfa": np.linspace( 0.05,0.15, num=3)
+        "psi": [0.4],
+        "xi": np.linspace(0.3, 0.6, num=3),
+        "ro": np.linspace(0.2, 0.5, num=3),
+        "mi": np.linspace(0.5, 0.7, num=3),
+        "omega": np.linspace(0.45, 0.65, num=3)
     }
 
     EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':True }
     
     LENGTH_FILENAME_PARAMETER = 5
-    LENGTH_FILENAME_CONFIG = 22
+    LENGTH_FILENAME_CONFIG = 25
 
     SEED_FOR_EXECUTION = 2025
 
@@ -73,6 +75,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
                     # values comparing to the other (self.MC-1):
                     result_iteration = pd.DataFrame()
                     position_inside_seeds_for_random -= self.MC
+                    vamos_bien = True
                     for i in range(self.MC):
                         result_mc = self.load_or_execute_model(model_configuration, model_parameters,
                                                                filename_for_iteration, i, clear_previous_results,
@@ -86,9 +89,25 @@ class MarketPowerRun(exp_runner.ExperimentRun):
                                                                    (seeds_for_random[position_inside_seeds_for_random]
                                                                     + offset))
                             offset += 1
+
+                        # correlation of interest_rate -> bankruptcies
+                        correlation_coefficient, p_value = scipy.stats.pearsonr(result_mc['interest_rate'],
+                                                                                result_mc['bankruptcies'])
+                        correlation_coefficient1, p_value1 = scipy.stats.pearsonr(
+                            result_mc['interest_rate'][1:],
+                            result_mc['bankruptcies'][:-1])
+
+                        correlation_file.write(
+                            f"{filename_for_iteration}_{i} = {model_configuration} {model_parameters}\n")
+                        correlation_file.write(self.format_correlation_values(0, correlation_coefficient, p_value))
+                        correlation_file.write(
+                            self.format_correlation_values(1, correlation_coefficient1, p_value1))
+                        vamos_bien = vamos_bien and ((correlation_coefficient1>0 and p_value1<=0.10) or
+                            (correlation_coefficient>0 and p_value<=0.10))
                         position_inside_seeds_for_random += 1
                         result_iteration = pd.concat([result_iteration, result_mc])
-
+                    if vamos_bien:
+                        correlation_file.write("@@@@@@@@@@@@@@@@@@@@@\n")
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
                     # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
                     # file and execution using a different seed.
@@ -105,21 +124,6 @@ class MarketPowerRun(exp_runner.ExperimentRun):
                             results_to_plot[k].append([mean_estimated, std_estimated])
                         else:
                             results_to_plot[k] = [[mean_estimated, std_estimated]]
-
-                    # correlation of interest_rate -> bankruptcies
-                    import scipy.stats
-                    correlation_coefficient, p_value = scipy.stats.pearsonr(result_iteration['interest_rate'],
-                                                                            result_iteration['bankruptcies'])
-                    correlation_coefficient1, p_value1 = scipy.stats.pearsonr(result_iteration['interest_rate'][1:],
-                                                                              result_iteration['bankruptcies'][:-1])
-
-                    if 'correlation' in results_to_plot:
-                        results_to_plot['correlation'].append([correlation_coefficient, p_value])
-                    else:
-                        results_to_plot['correlation'] = [[correlation_coefficient, p_value]]
-                    correlation_file.write(f"{filename_for_iteration} = {model_configuration} {model_parameters}\n")
-                    correlation_file.write(self.format_correlation_values(0, correlation_coefficient, p_value))
-                    correlation_file.write(self.format_correlation_values(1, correlation_coefficient1, p_value1))
                     if self.ALGORITHM.GRAPH_NAME:
                         self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))

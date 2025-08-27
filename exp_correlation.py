@@ -20,7 +20,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     OUTPUT_DIRECTORY = "c:\\experiments\\correlation"
 
     parameters = {
-        "p": np.linspace(0.0001, 1, num=10)
+        "p": np.linspace(0.4, 1, num=1 )
     }
 
     config = {
