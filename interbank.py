@@ -80,6 +80,10 @@ class Config:
     psi_endogenous = False
     psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
+    # If it's a value greater than 0, instead of allowing interest rates for borrowers of any value, we normalize
+    # them to range [r_i0..normalize_interest_rate_max]:
+    normalize_interest_rate_max = 1
+
     # banks initial parameters
     # L + C + R = D + E
     # but R = 0.02*D and C_i0= 30-2.7=27.3 and R=2.7
@@ -135,7 +139,7 @@ class Config:
                     name_config, value_config = item.split('=')
                 except ValueError:
                     name_config, value_config = ('-', '-')
-                    logging.error('A Config value should be passed as parameter=value')
+                    logging.error('A Config value should be passed as parameter=value: {}'.format(item))
                     sys.exit(-1)
                 current_value = None
                 try:
@@ -144,15 +148,19 @@ class Config:
                     logging.error("Config has no '{}' parameter".format(name_config))
                     sys.exit(-1)
                 try:
-                    if isinstance(current_value, int):
+                    if isinstance(current_value, bool):
+                        if value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'):
+                            setattr(self, name_config, True)
+                        elif value_config.lower() in ('n','no','false','f','off','0'):
+                            setattr(self, name_config, False)
+                    elif isinstance(current_value, int):
                         setattr(self, name_config, int(value_config))
                     elif isinstance(current_value, float):
                         setattr(self, name_config, float(value_config))
-                    elif isinstance(current_value, bool):
-                        setattr(self, name_config, value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'))
                     else:
                         setattr(self, name_config, float(value_config))
                 except ValueError:
+                    print(current_value,type(current_value),isinstance(current_value,bool),isinstance(current_value,int))
                     logging.error('Value given for {} is not valid: {}'.format(name_config, value_config))
                     sys.exit(-1)
 
@@ -305,7 +313,6 @@ class Statistics:
                 num_of_banks_that_are_borrowers += 1
                 interests_rates_of_borrowers.append(bank.get_loan_interest())
             bank.has_a_loan = bank.get_loan_interest() is not None and bank.l > 0
-
 
         self.interest_rate[self.model.t] = np.mean(interests_rates_of_borrowers) \
             if interests_rates_of_borrowers else 0.0
@@ -1139,17 +1146,20 @@ class Model:
             self.statistics.incrementD[self.t] += bank.incrD
 
     def do_loans(self):
-        # first we normalize the banks ir to avoid values greater than 1:
-        max_r = 0
-        for bank in self.banks:
-            if not bank.get_loan_interest() is None and bank.get_loan_interest() >max_r:
-                max_r = bank.get_loan_interest()
-        for bank in self.banks:
-            if not bank.lender is None:
-                self.banks[bank.lender].rij[bank.id] = self.banks[bank.lender].rij[bank.id] / max_r
-
-
         self.config.lender_change.extra_relationships_change(self)
+
+        # first we normalize the banks interest rate if it is necessary:
+        if self.config.normalize_interest_rate_max and self.config.normalize_interest_rate_max>0:
+            max_r = 0
+            for bank in self.banks:
+                if not bank.get_loan_interest() is None and bank.get_loan_interest() > max_r:
+                    max_r = bank.get_loan_interest()
+            if max_r > self.config.r_i0:
+                for bank in self.banks:
+                    if not bank.lender is None:
+                        self.banks[bank.lender].rij[bank.id] = (
+                                self.banks[bank.lender].rij[bank.id] / max_r * self.config.normalize_interest_rate_max)
+
         num_of_rationed = 0
         total_rationed = 0
         total_demanded = 0
@@ -1196,6 +1206,8 @@ class Model:
             bank.rationing = rationing_of_bank
         self.statistics.num_of_rationed[self.t] = num_of_rationed
         self.statistics.rationing[self.t] = total_rationed
+
+
     def do_repayments(self):
         for bank in self.banks:
             if bank.l > 0 and bank.d > 0 and (not bank.failed):
@@ -1566,26 +1578,45 @@ class Utils:
         parser = argparse.ArgumentParser()
         parser.description = "<config=value> to set up Config options. use '?' to see values"
         parser.add_argument('--log', default='ERROR', help='Log level messages (ERROR,DEBUG,INFO...)')
-        parser.add_argument('--modules', default=None, help='Log only this modules (separated by ,)'.format())
+        parser.add_argument('--modules', default=None,
+                            help='Log only this modules (separated by ,)'.format())
         parser.add_argument('--logfile', default=None, help='File to send logs to')
         parser.add_argument('--save', default=None, help='Saves the output of this execution'.format())
-        parser.add_argument('--graph', default=None, help='List of t in which save the network config (* for all)'.format())
-        parser.add_argument('--gif_graph', default=False, type=bool, help='If --graph, then also an animated gif with all graphs '.format())
-        parser.add_argument('--graph_stats', default=False, type=str, help='Load a json of a graph and give us statistics of it'.format())
+        parser.add_argument('--graph', default=None,
+                            help='List of t in which save the network config (* for all)'.format())
+        parser.add_argument('--gif_graph', default=False, type=bool,
+                            help='If --graph, then also an animated gif with all graphs '.format())
+        parser.add_argument('--graph_stats', default=False, type=str,
+                            help='Load a json of a graph and give us statistics of it'.format())
         parser.add_argument('--n', type=int, default=Config.N, help='Number of banks'.format())
         parser.add_argument('--eta', type=float, default=Model.eta, help='Policy recommendation'.format())
         parser.add_argument('--t', type=int, default=Config.T, help='Time repetitions'.format())
-        parser.add_argument('--lc_p', '--p', type=float, default=LENDER_CHANGE_DEFAULT_P, help="For Erdos-Renyi bank lender's change value of p".format())
-        parser.add_argument('--lc_m', '--m', type=int, default=None, help="For Preferential bank lender's change value of graph grade m".format())
-        parser.add_argument('--lc', type=str, default=LENDER_CHANGE_DEFAULT, help="Bank lender's change method (?=list)")
-        parser.add_argument('--lc_ini_graph_file', type=str, default=None, help='Load a graph in json networkx.node_link_data() format')
-        parser.add_argument('--detailed_equity', action='store_true', default=model.config.detailed_equity, help='Store in a gdt the individual E evolution of each individual bank')
-        parser.add_argument('--psi_endogenous', action='store_true', default=model.config.psi_endogenous, help='Market power variable psi will be endogenous')
-        parser.add_argument('--plot_format', type=str, default='none', help='Generate plots with the specified format (svg,png,pdf,gif,agr)')
-        parser.add_argument('--output_format', type=str, default='gdt', help='File extension for data (gdt,txt,csv,both)')
-        parser.add_argument('--output', type=str, default=None, help='Directory where to store the results')
-        parser.add_argument('--no_replace', action='store_true', default=not model.config.allow_replacement_of_bankrupted, help='No replace banks when they go bankrupted')
-        parser.add_argument('--reintr_with_median', action='store_true', default=model.config.reintroduce_with_median, help='Reintroduce banks with the median of current banks')
+        parser.add_argument('--lc_p', '--p', type=float, default=LENDER_CHANGE_DEFAULT_P,
+                            help="For Erdos-Renyi bank lender's change value of p".format())
+        parser.add_argument('--lc_m', '--m', type=int, default=None,
+                            help="For Preferential bank lender's change value of graph grade m".format())
+        parser.add_argument('--lc', type=str, default=LENDER_CHANGE_DEFAULT,
+                            help="Bank lender's change method (?=list)")
+        parser.add_argument('--lc_ini_graph_file', type=str, default=None,
+                            help='Load a graph in json networkx.node_link_data() format')
+        parser.add_argument('--detailed_equity', action='store_true',
+                            default=model.config.detailed_equity,
+                            help='Store in a gdt the individual E evolution of each individual bank')
+        parser.add_argument('--psi_endogenous', action='store_true',
+                            default=model.config.psi_endogenous, help='Market power variable psi will be endogenous')
+        parser.add_argument('--plot_format', type=str, default='none',
+                            help='Generate plots with the specified format (svg,png,pdf,gif,agr)')
+        parser.add_argument('--output_format', type=str, default='gdt',
+                            help='File extension for data (gdt,txt,csv,both)')
+        parser.add_argument('--output', type=str, default=None,
+
+                            help='Directory where to store the results')
+        parser.add_argument('--no_replace', action='store_true',
+                            default=not model.config.allow_replacement_of_bankrupted,
+                            help='No replace banks when they go bankrupted')
+        parser.add_argument('--reintr_with_median', action='store_true',
+                            default=model.config.reintroduce_with_median,
+                            help='Reintroduce banks with the median of current banks')
         parser.add_argument('--seed', type=int, default=None, help='seed used for random generator')
         args, other_possible_config_args = parser.parse_known_args()
         if args.graph_stats:
@@ -1601,22 +1632,32 @@ class Utils:
         model.config.psi_endogenous = args.psi_endogenous
         model.config.define_values_from_args(other_possible_config_args)
         model.config.lender_change = lc.determine_algorithm(args.lc)
-        model.config.lender_change.set_parameter('p', args.lc_p)
-        model.config.lender_change.set_parameter('m', args.lc_m)
+        if isinstance(model.config.lender_change,lc.Preferential):
+            if args.lc_m:
+                model.config.lender_change.set_parameter('m', args.lc_m)
+            else:
+                print("argument --m is necessary with Preferential")
+                sys.exit(0)
+        else:
+            model.config.lender_change.set_parameter('p', args.lc_p)
+
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
         model.log.define_log(args.log, args.logfile, args.modules)
         model.statistics.define_output_format(args.output_format)
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         model.statistics.define_detailed_equity(args.detailed_equity, args.save)
-        Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph), output_directory=args.output, seed=args.seed, interactive=args.log == 'ERROR' or args.logfile is not None)
+        Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
+                  output_directory=args.output, seed=args.seed,
+                  interactive=args.log == 'ERROR' or args.logfile is not None)
 
     @staticmethod
     def run(save=None, save_graph_instants=None, interactive=False, output_directory=None, seed=None):
         global model
         if not save_graph_instants and Config.GRAPHS_MOMENTS:
             save_graph_instants = Config.GRAPHS_MOMENTS
-        model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants, output_directory=output_directory, seed=seed)
+        model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants,
+                         output_directory=output_directory, seed=seed)
         model.simulate_full(interactive=interactive)
         result = model.finish()
         if interactive and model.statistics.get_cross_correlation_result(0):

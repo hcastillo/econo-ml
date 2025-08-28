@@ -103,12 +103,19 @@ class Config:
                            'num_banks': True, 'bankruptcy_rationed': True}
 
     def __str__(self, separator=""):
-        description = sys.argv[0] if __name__ == '__main__' else ''
+        description = sys.argv[0]+'*' if __name__ == '__main__' else '*'
         for attr in dir(self):
             value = getattr(self, attr)
             if isinstance(value, int) or isinstance(value, float):
                 description += f" {attr}={value}{separator}"
         return description + " "
+
+
+    def __iter__(self):
+        for attr in dir(self):
+            value = getattr(self, attr)
+            if isinstance(value, int) or isinstance(value, float) or isinstance(value, bool):
+                yield (attr, value)
 
     def define_values_from_args(self, config_list):
         if config_list:
@@ -1368,7 +1375,10 @@ class Model:
             # bank.μ mu
             bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (min_r / bank.r)
             log_info_1 += f"{bank.get_id(short=True)}:{bank.mu:.3f},"
-            log_info_2 += f"{bank.get_id(short=True)}:{bank.r:.3f},"
+            if bank.get_loan_interest():
+                log_info_2 += f"{bank.get_id(short=True)}:{bank.get_loan_interest():.3f},"
+            else:
+                log_info_2 += f"{bank.get_id(short=True)}:-,"
         if self.config.N <= 10:
             self.log.debug("links", f"μ=[{log_info_1[:-1]}] r=[{log_info_2[:-1]}]")
 
