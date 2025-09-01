@@ -19,6 +19,8 @@ LenderChange is a class used from interbank.py to control the change of lender i
 """
 import random
 import math
+from sys import maxsize
+
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -31,7 +33,7 @@ import warnings
 def determine_algorithm(given_name: str = "default"):
     default_method = "Boltzmann"
     if given_name.find('.')>0:
-        given_name, given_parameter = given_name.split('.')
+        given_name, given_parameter = given_name.split('.', maxsplit=1)
     else:
         given_parameter = None
 
@@ -660,8 +662,10 @@ class RestrictedMarket(LenderChange):
 
     def check_parameter(self, name, value):
         if name == 'p':
-            if isinstance(value, int):
+            try:
                 value = float(value)
+            except:
+                pass
             if isinstance(value, float) and 0 <= value <= 1:
                 return True
             else:
