@@ -32,7 +32,7 @@ import lxml.builder
 import gzip
 import scipy.stats
 
-LENDER_CHANGE_DEFAULT = 'ShockedMarket'
+LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
 LENDER_CHANGE_DEFAULT_P = 0.333
 
 class Config:
@@ -45,7 +45,7 @@ class Config:
     reserves: float = 0.02
 
     # seed applied for random values (set during initialize)
-    seed = None
+    seed : int = None
 
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
@@ -128,6 +128,28 @@ class Config:
             if isinstance(value, int) or isinstance(value, float) or isinstance(value, bool):
                 yield (attr, value)
 
+    def get_current_value(self, name_config):
+        current_value = None
+        try:
+            current_value = getattr(self, name_config)
+        except AttributeError:
+            logging.error("Config has no '{}' parameter".format(name_config))
+            sys.exit(-1)
+        # if current_value is None, then we cannot guess which type is the previous value:
+        if current_value is None:
+            try:
+                current_value = self.__annotations__[name_config]
+            except:
+                return False
+            if current_value is int:
+                return 0
+            elif current_value is bool:
+                return False
+            else:
+                return 0.0
+        return current_value
+
+
     def define_values_from_args(self, config_list):
         if config_list:
             config_list.sort()
@@ -135,34 +157,34 @@ class Config:
                 if item == '?':
                     print(self.__str__(separator='\n'))
                     sys.exit(0)
-                try:
-                    name_config, value_config = item.split('=')
-                except ValueError:
-                    name_config, value_config = ('-', '-')
-                    logging.error('A Config value should be passed as parameter=value: {}'.format(item))
-                    sys.exit(-1)
-                current_value = None
-                try:
-                    current_value = getattr(self, name_config)
-                except AttributeError:
-                    logging.error("Config has no '{}' parameter".format(name_config))
-                    sys.exit(-1)
-                try:
-                    if isinstance(current_value, bool):
-                        if value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'):
-                            setattr(self, name_config, True)
-                        elif value_config.lower() in ('n','no','false','f','off','0'):
-                            setattr(self, name_config, False)
-                    elif isinstance(current_value, int):
-                        setattr(self, name_config, int(value_config))
-                    elif isinstance(current_value, float):
-                        setattr(self, name_config, float(value_config))
-                    else:
-                        setattr(self, name_config, float(value_config))
-                except ValueError:
-                    print(current_value,type(current_value),isinstance(current_value,bool),isinstance(current_value,int))
-                    logging.error('Value given for {} is not valid: {}'.format(name_config, value_config))
-                    sys.exit(-1)
+                elif item.startswith('lc='):
+                    # to define the lenderchange algorithm by command line:
+                    self.lender_change = lc.determine_algorithm(item.replace("lc=",''))
+                else:
+                    try:
+                        name_config, value_config = item.split('=')
+                    except ValueError:
+                        name_config, value_config = ('-', '-')
+                        logging.error('A Config value should be passed as parameter=value: {}'.format(item))
+                        sys.exit(-1)
+                    current_value = self.get_current_value(name_config)
+                    try:
+                        if isinstance(current_value, bool):
+                            if value_config.lower() in ('y', 'yes', 't', 'true', 'on', '1'):
+                                setattr(self, name_config, True)
+                            elif value_config.lower() in ('n', 'no', 'false', 'f', 'off', '0'):
+                                setattr(self, name_config, False)
+                        elif isinstance(current_value, int):
+                            setattr(self, name_config, int(value_config))
+                        elif isinstance(current_value, float):
+                            setattr(self, name_config, float(value_config))
+                        else:
+                            setattr(self, name_config, float(value_config))
+                    except ValueError:
+                        print(current_value, type(current_value), isinstance(current_value, bool),
+                              isinstance(current_value, int))
+                        logging.error('Value given for {} is not valid: {}'.format(name_config, value_config))
+                        sys.exit(-1)
 
 class Statistics:
     lender_no_d = []
@@ -932,9 +954,10 @@ class Model:
             else:
                 raise LookupError('attribute in config not found: %s ' % attribute)
 
-    def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None, export_datafile=None, export_description=None, generate_plots=True, output_directory=None):
+    def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None, export_datafile=None,
+                   export_description=None, generate_plots=True, output_directory=None):
         self.statistics.reset(output_directory=output_directory)
-        if not dont_seed and self.config.seed is None:
+        if not seed is None and not dont_seed:
             applied_seed = seed if seed else self.default_seed
             random.seed(applied_seed)
             self.config.seed = applied_seed
@@ -1014,7 +1037,9 @@ class Model:
     def finish(self):
         if not self.test:
             self.statistics.determine_cross_correlation()
-            self.statistics.export_data(export_datafile=self.export_datafile, export_description=self.export_description, generate_plots=self.generate_plots)
+            self.statistics.export_data(export_datafile=self.export_datafile,
+                                        export_description=self.export_description,
+                                        generate_plots=self.generate_plots)
         summary = 'Finish: model T={}  N={}'.format(self.config.T, self.config.N)
         if not self.__policy_recommendation_changed__():
             summary += ' ŋ={}'.format(self.eta)
@@ -1110,7 +1135,8 @@ class Model:
         return self.statistics.bankruptcy[self.t - 1 if self.t > 0 else 0]
 
     def determine_shock_value(self, bank, _shock):
-        return bank.D * (self.config.mi + self.config.omega * random.random())
+        rand_value = random.random()
+        return bank.D * (self.config.mi + self.config.omega * rand_value)
 
     def do_shock(self, which_shock):
         for bank in self.banks:
@@ -1630,17 +1656,13 @@ class Utils:
         model.config.allow_replacement_of_bankrupted = not args.no_replace
         model.config.reintroduce_with_median = args.reintr_with_median
         model.config.psi_endogenous = args.psi_endogenous
-        model.config.define_values_from_args(other_possible_config_args)
         model.config.lender_change = lc.determine_algorithm(args.lc)
-        if isinstance(model.config.lender_change,lc.Preferential):
-            if args.lc_m:
-                model.config.lender_change.set_parameter('m', args.lc_m)
-            else:
-                print("argument --m is necessary with Preferential")
-                sys.exit(0)
-        else:
+        model.config.lender_change.set_parameter('m', args.lc_m)
+        if not isinstance(model.config.lender_change,lc.Preferential):
             model.config.lender_change.set_parameter('p', args.lc_p)
-
+        model.config.define_values_from_args(other_possible_config_args)
+        if model.config.seed and model.config.seed != model.default_seed and args.seed is None:
+            args.seed = model.config.seed
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
         model.log.define_log(args.log, args.logfile, args.modules)
         model.statistics.define_output_format(args.output_format)

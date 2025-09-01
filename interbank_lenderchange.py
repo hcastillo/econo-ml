@@ -30,6 +30,10 @@ import warnings
 
 def determine_algorithm(given_name: str = "default"):
     default_method = "Boltzmann"
+    if given_name.find('.')>0:
+        given_name, given_parameter = given_name.split('.')
+    else:
+        given_parameter = None
 
     if given_name == "default":
         print(f"selected default method {default_method}")
@@ -43,9 +47,14 @@ def determine_algorithm(given_name: str = "default"):
         for name, obj in inspect.getmembers(sys.modules[__name__]):
             if name.lower() == given_name.lower():
                 if inspect.isclass(obj) and obj.__doc__:
-                    return obj()
+                    lender_change_resultant =  obj()
+                    if not given_parameter is None:
+                        parameter,value = given_parameter.split('=')
+                        lender_change_resultant.set_parameter(parameter, value)
+                    return lender_change_resultant
         print(f"not found LenderChange algorithm with name '{given_name}'")
         sys.exit(-1)
+
 
 
 node_positions = None
@@ -196,7 +205,8 @@ class WattsStrogatzGraph:
 
     def rewire(self, G, p):
         for v, w in G.copy().edges():
-            if random.random() < p:
+            rewire= random.random()
+            if rewire < p:
                 G.remove_edge(v, w)
                 choices = set(G) - {v} - set(G[v])
                 new_w = random.choice(list(choices))
@@ -330,7 +340,7 @@ class LenderChange:
         self.initial_graph_file = None
 
     def __str__(self):
-        return "LenderChangePrototype"
+        return "lc=LenderChangePrototype"
 
     def initialize_bank_relationships(self, this_model):
         """ Call once at initialize() model """
@@ -392,7 +402,7 @@ class Boltzmann(LenderChange):
     CHANGE_LENDER_IF_HIGHER = 0.5
 
     def __str__(self):
-        return "BoltzMann"
+        return "lc=BoltzMann"
 
     def initialize_bank_relationships(self, this_model):
         if self.initial_graph_file:
@@ -480,7 +490,7 @@ class InitialStability(Boltzmann):
     GRAPH_NAME = 'barabasi_albert'
 
     def __str__(self):
-        return "InitialStability"
+        return "lc=InitialStability"
 
     def __create_directed_graph_from_barabasi_albert(self, barabasi_albert, result, current_node, previous_node):
         if len(barabasi_albert.edges(current_node)) > 1:
@@ -523,12 +533,16 @@ class Preferential(Boltzmann):
 
     def __str__(self):
         if 'm' in self.parameter:
-            return f"Preferential.m={self.parameter['m']}"
+            return f"lc=Preferential.m={self.parameter['m']}"
         else:
-            return f"Preferential"
+            return f"lc=Preferential"
 
     def check_parameter(self, name, value):
         if name == 'm':
+            try:
+                value = int(value)
+            except:
+                pass
             if isinstance(value, int) and 1 <= value:
                 return True
             else:
@@ -629,9 +643,9 @@ class RestrictedMarket(LenderChange):
 
     def __str__(self):
         if 'p' in self.parameter:
-            return f"Restricted.p={self.parameter['p']}"
+            return f"lc=RestrictedMarket.p={self.parameter['p']}"
         else:
-            return f"Restricted"
+            return f"lc=RestrictedMarket"
 
     def generate_banks_graph(self, this_model):
         result = nx.DiGraph()
@@ -707,9 +721,9 @@ class ShockedMarket(RestrictedMarket):
 
     def __str__(self):
         if 'p' in self.parameter:
-            return f"ShockedMarket.p={self.parameter['p']}"
+            return f"lc=ShockedMarket.p={self.parameter['p']}"
         else:
-            return f"ShockedMarket"
+            return f"lc=ShockedMarket"
 
 
     def step_setup_links(self, this_model):
@@ -724,9 +738,9 @@ class ShockedMarket2(ShockedMarket):
 
     def __str__(self):
         if 'p' in self.parameter:
-            return f"ShockedMarket2.p={self.parameter['p']}"
+            return f"lc=ShockedMarket2.p={self.parameter['p']}"
         else:
-            return f"ShockedMarket2"
+            return f"lc=ShockedMarket2"
 
     def extra_relationships_change(self, this_model):
         for bank in this_model.banks:
@@ -750,9 +764,9 @@ class ShockedMarket3(ShockedMarket2):
 
     def __str__(self):
         if 'p' in self.parameter:
-            return f"ShockedMarket3.p={self.parameter['p']}"
+            return f"lc=ShockedMarket3.p={self.parameter['p']}"
         else:
-            return f"ShockedMarket3"
+            return f"lc=ShockedMarket3"
 
     def generate_banks_graph(self, this_model):
         result = nx.erdos_renyi_graph(n=this_model.config.N, p=self.parameter['p'])
@@ -779,9 +793,9 @@ class SmallWorld(ShockedMarket):
 
     def __str__(self):
         if 'p' in self.parameter:
-            return f"SmallWorld.p={self.parameter['p']}"
+            return f"lc=SmallWorld.p={self.parameter['p']}"
         else:
-            return f"SmallWorld"
+            return f"lc=SmallWorld"
 
 
     def generate_banks_graph(self, this_model):
