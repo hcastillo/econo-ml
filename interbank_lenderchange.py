@@ -11,7 +11,8 @@ LenderChange is a class used from interbank.py to control the change of lender i
     - ShockedMarket      using an Erdos Renyi graph with p=parameter['p']. In each step a new random Erdos Renyi is
                             used
     - ShockedMarket2     Erdos Renyi graph not directed and in each step, we randomly choose a direction
-
+    - ShockedMarket3     Erdos Renyi graph with no limitation of links between nodes, and we randomly choose one of
+                            it in each step.
     - SmallWorld         using a Watts and Strogatz algorithm with parameter['p'] and k=5
                             (Each node is joined with its k nearest neighbors in a ring topology)
 @author: hector@bith.net

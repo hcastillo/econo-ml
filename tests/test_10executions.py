@@ -5,7 +5,7 @@ import interbank_lenderchange
 
 class ValuesAfterExecutionTestCase(unittest.TestCase):
 
-    CONFIG = 'C_i0=30 D_i0=135 E_i0=15 L_i0=120 N=50 T=50 alfa=0.1 allow_replacement_of_bankrupted=True beta=5 ji=0.0015 mi=0.7 omega=0.55 phi=0.25 psi=0.0 r_i0=0.02 reintroduce_with_median=False reserves=0.02 ro=0.3 xi=0.9'
+    CONFIG = 'C_i0=30 D_i0=135 E_i0=15 L_i0=120 N=50 T=50 alfa=0.1 allow_replacement_of_bankrupted=True beta=5 chi=0.0015 mu=0.7 omega=0.55 phi=0.25 psi=0.0 r_i0=0.02 reintroduce_with_median=False reserves=0.02 rho=0.3 xi=0.9'
 
     def setUp(self):
         self.model = interbank.Model()
@@ -21,7 +21,7 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         self.model.log.debug_banks()
 
     def test_values_after_execution(self):
-        self.assertEqual(self.model.banks[1].C, 8.392209275094018)
+        self.assertEqual(self.model.banks[1].C,  0.90986389240916)
         self.assertEqual(self.model.banks[3].D, 146.68244545478308)
         self.assertEqual(self.model.banks[4].E, 2.463826448774782)
         self.assertEqual(self.model.banks[0].A, 159.22071365241473)

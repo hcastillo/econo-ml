@@ -59,7 +59,7 @@ class Config:
     detailed_equity = False
 
     # shocks parameters: mi=0.7 omega=0.55 for perfect balance
-    mi: float = 0.7  # mi µ
+    mu: float = 0.7  # mi µ
     omega: float = 0.55  # omega ω
 
     # Lender's change mechanism
@@ -67,11 +67,10 @@ class Config:
 
     # screening costs
     phi: float = 0.025  # phi Φ
-    ji: float = 0.015  # ji Χ
+    chi: float = 0.015  # ji Χ
 
-    # liquidation cost of collateral
-    xi: float = 0.3  # xi ξ, previous 0.6
-    ro: float = 0.3  # ro ρ fire sale cost
+    xi: float = 0.3  # xi ξ liquidation cost of collateral
+    rho: float = 0.3  # ro ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
@@ -1136,7 +1135,7 @@ class Model:
 
     def determine_shock_value(self, bank, _shock):
         rand_value = random.random()
-        return bank.D * (self.config.mi + self.config.omega * rand_value)
+        return bank.D * (self.config.mu + self.config.omega * rand_value)
 
     def do_shock(self, which_shock):
         for bank in self.banks:
@@ -1380,8 +1379,8 @@ class Model:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
                             if psi==1:
                                 psi=0.99999999999999
-                            bank_i.rij[j] = ((self.config.ji * bank_i.A - self.config.phi * self.banks[j].A
-                                             - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
+                            bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
+                                              - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
                                              /
                                              (self.banks[j].p * bank_i.c[j] * (1 - psi)))
 
@@ -1492,7 +1491,7 @@ class Bank:
     def do_bankruptcy(self, phase):
         self.failed = True
         self.model.statistics.bankruptcy[self.model.t] += 1
-        recovered_in_fire_sales = self.L * self.model.config.ro
+        recovered_in_fire_sales = self.L * self.model.config.rho
         recovered = recovered_in_fire_sales - self.D
         if recovered < 0:
             recovered = 0
@@ -1518,8 +1517,8 @@ class Bank:
         return recovered
 
     def do_fire_sales(self, amount_to_sell, reason, phase):
-        cost_of_sell = ( amount_to_sell / self.model.config.ro ) if self.model.config.ro else np.inf
-        extra_cost_of_selling = cost_of_sell * (1 - self.model.config.ro)
+        cost_of_sell = (amount_to_sell / self.model.config.rho) if self.model.config.rho else np.inf
+        extra_cost_of_selling = cost_of_sell * (1 - self.model.config.rho)
         if cost_of_sell > self.L:
             self.model.log.debug(phase, '{} impossible fire sale to recover {}: cost_sell_L={} > L={}: {}'.format(self.get_id(), amount_to_sell, cost_of_sell, self.L, reason))
             return self.do_bankruptcy(phase)
@@ -1685,6 +1684,8 @@ class Utils:
         if interactive and model.statistics.get_cross_correlation_result(0):
             print('\n'+model.statistics.get_cross_correlation_result(0))
             print(model.statistics.get_cross_correlation_result(1))
+            print('bankruptcy.mean: %s' % model.statistics.bankruptcy.mean())
+            print('interest_rate.mean: %s' % model.statistics.interest_rate.mean())
         return result
 
     @staticmethod

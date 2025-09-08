@@ -25,21 +25,21 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     #                                  that costs 11.56 in L -> new E = -6.092 fails
     #                              --> #1 new
     def initialValues(self):
-        interbank.Config.ro = 0.4 # fire sale cost
+        interbank.Config.rho = 0.4 # fire sale cost
         self.setBank(bank=self.model.banks[0], C=0.0, L=8, D=3.0, E=5.0)
         self.setBank(bank=self.model.banks[1], C=10.0, L=20.0, D=20.0, E=10.0)
 
     @patch.object(interbank.Model, "do_shock", tests.interbank_testclass.mockedShock)
     def setUp(self):
-        previous = interbank.Config.ro
-        interbank.Config.ro = 0.3
+        previous = interbank.Config.rho
+        interbank.Config.rho = 0.3
         self.configureTest(N=2,T=1,
                            shocks=[
                                {"shock1": [0, 1], "shock2": [-3, 0], },
                            ], lc="Boltzmann")
         self.initialValues()
         self.doTest()
-        interbank.Config.ro = previous
+        interbank.Config.rho = previous
 
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], C=0, L=0.5900000000000007, D=0, E=0.5900000000000007,
