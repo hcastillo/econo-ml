@@ -110,46 +110,14 @@ def draw(original_graph, new_guru_look_for=False, title=None, show=False):
         plt.show()
     return guru
 
-
-# def plot_degree_histogram(g, normalized=True):
-#     aux_y = nx.degree_histogram(g)
-#     aux_x = np.arange(0, len(aux_y)).tolist()
-#     n_nodes = g.number_of_nodes()
-#     if normalized:
-#         for i in range(len(aux_y)):
-#             aux_y[i] = aux_y[i] / n_nodes
-#     return aux_x, aux_y
-
 def save_graph_png(graph, description, filename, add_info=False):
     if add_info:
         if not description:
             description = ""
         description += " " + GraphStatistics.describe(graph)
 
-    #fig = plt.figure(layout="constrained")
-    #gs = gridspec.GridSpec(4, 4, figure=fig)
-    #fig.add_subplot(gs[:, :])
     guru = draw(graph, new_guru_look_for=True, title=description)
     plt.rcParams.update({'font.size': 6})
-
-    # ax4 = fig.add_subplot(gs[-1, 0])
-    # aux_x, aux_y = plot_degree_histogram(graph, False)
-    # ax4.plot(aux_x, aux_y, 'o')
-    # warnings.simplefilter("ignore")
-    # ax4.set_xscale("log")
-    # ax4.set_yscale("log")
-    # warnings.resetwarnings()
-    # ax4.set_xlabel('')
-    # ax4.set_ylabel('')
-
-    # ax5 = fig.add_subplot(gs[-1, 0])
-    # aux_y = nx.degree_histogram(graph)
-    # aux_y.sort(reverse=True)
-    # aux_x = np.arange(0, len(aux_y)).tolist()
-    # ax5.loglog(aux_x, aux_y, 'o')
-    # ax5.set_xlabel('')
-    # ax5.set_ylabel('')
-
     plt.rcParams.update(plt.rcParamsDefault)
     warnings.filterwarnings("ignore", category=UserWarning)
     plt.savefig(filename)
@@ -227,10 +195,7 @@ class GraphStatistics:
         """weakly connected componentes of the directed graph using Tarjan's algorithm:
            https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm"""
         if graph.is_directed():
-            #return len(max(nx.weakly_connected_components(graph), key=len))
-            # return len(max(nx.strongly_connected_components(graph), key=len))
-            #TODO
-            return nx.average_clustering(graph) #len(max(nx.strongly_connected_components(graph), key=len))
+            return nx.average_clustering(graph)
         else:
             return len(max(nx.connected_components(graph), key=len))
 
@@ -251,7 +216,7 @@ class GraphStatistics:
     def communities(graph):
         """Communities using greedy modularity maximization"""
         return list(nx.weakly_connected_components(graph if graph.is_directed() else graph.to_directed()))
-        #return list(nx.strongly_connected_components(graph if graph.is_directed() else graph.to_directed()))
+
     @staticmethod
     def grade_avg(graph):
         communities = GraphStatistics.communities(graph)
@@ -455,7 +420,6 @@ class Boltzmann(LenderChange):
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
-            #bank.r = this_model.config.r_i0
             bank.mu = 0
             bank.asset_i = 0
             bank.asset_j = 0
@@ -626,7 +590,6 @@ class Preferential(Boltzmann):
         if bank.lender is None:
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
-            #bank.r = this_model.config.r_i0
             bank.mu = 0
         if self.banks_graph and self.banks_graph.out_edges() and self.banks_graph.out_edges(bank.id):
             return list(self.banks_graph.out_edges(bank.id))[0][1]

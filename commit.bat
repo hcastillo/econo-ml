@@ -10,7 +10,7 @@ if %errorlevel%==0 (
  powershell -command "(Get-Content interbank.py) -replace 'lc\.','' -replace 'import interbank_lenderchange as lc','' | Out-File -encoding Default inter.py"
  jupytext inter.py -o inter.ipynb
  jupytext interbank_lenderchange.py -o lc.ipynb
- nbmerge lc.ipynb inter.ipynb -o colab_interbank.ipynb
+ nbmerge lc.ipynb inter.ipynb --out colab_interbank.ipynb
  del inter.ipynb lc.ipynb inter.py
  git add .
  git commit -a
