@@ -102,8 +102,7 @@ def run_interactive():
     parser.add_argument("--logs", default="logs", help=f"Log dir for Tensorboard")
     args = parser.parse_args()
     env = InterbankAgent(T=args.t, N=args.n)
-    env.interbank_model.log.define_log(log=args.log, logfile=args.logfile,
-                                       modules=args.modules, script_name=sys.argv[0])
+    env.interbank_model.log.define_log(log=args.log, logfile=args.logfile, modules=args.modules)
     if not os.path.isdir(args.logs):
         os.mkdir(args.logs)
     description = f"{type(env).__name__} T={env.interbank_model.config.T}" + \

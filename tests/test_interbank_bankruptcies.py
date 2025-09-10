@@ -18,7 +18,7 @@ class BankruptedTestCase(unittest.TestCase):
         self.model = interbank.Model()
         self.model.test = True
         self.model.configure(N=self.BANKS, T=self.T)
-        self.model.log.define_log(log='DEBUG', script_name=self.id().split('.')[0])
+        self.model.log.define_log(log='DEBUG')
         self.model.config.lender_change = interbank_lenderchange.determine_algorithm("Boltzmann")
         self.model.initialize()
 

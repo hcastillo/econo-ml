@@ -53,8 +53,8 @@ class InterbankAgent(gymnasium.Env):
         self.export_description = export_description
         self.export_datafile = export_datafile
 
-    def define_log(self, log: str, logfile: str = '', modules: str = '', script_name: str = ''):
-        self.interbank_model.log.define_log(log, logfile, modules, script_name)
+    def define_log(self, log: str, logfile: str = '', modules: str = ''):
+        self.interbank_model.log.define_log(log, logfile, modules)
 
     def __get_observations(self):
         self.current_fitness = self.interbank_model.get_current_fitness()

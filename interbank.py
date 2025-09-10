@@ -24,6 +24,8 @@ import networkx as nx
 import sys
 import os
 import matplotlib.pyplot as plt
+import numpy
+
 import interbank_lenderchange as lc
 import pandas as pd
 import numpy as np
@@ -80,7 +82,7 @@ class Config:
     psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # If it's a value greater than 0, instead of allowing interest rates for borrowers of any value, we normalize
-    # them to range [r_i0..normalize_interest_rate_max]:
+    # them to range [r_i0 .. normalize_interest_rate_max]:
     normalize_interest_rate_max = 1
 
     # banks initial parameters
@@ -125,7 +127,7 @@ class Config:
         for attr in dir(self):
             value = getattr(self, attr)
             if isinstance(value, int) or isinstance(value, float) or isinstance(value, bool):
-                yield (attr, value)
+                yield attr, value
 
     def get_current_value(self, name_config):
         current_value = None
@@ -138,7 +140,7 @@ class Config:
         if current_value is None:
             try:
                 current_value = self.__annotations__[name_config]
-            except:
+            except KeyError:
                 return False
             if current_value is int:
                 return 0
@@ -157,7 +159,7 @@ class Config:
                     print(self.__str__(separator='\n'))
                     sys.exit(0)
                 elif item.startswith('lc='):
-                    # to define the lenderchange algorithm by command line:
+                    # to define the lender change algorithm by command line:
                     self.lender_change = lc.determine_algorithm(item.replace("lc=",''))
                 else:
                     try:
@@ -556,28 +558,29 @@ class Statistics:
             return path + self.output_format.lower()
 
     def __generate_csv_or_txt(self, export_datafile, header, delimiter):
-        with open(export_datafile, 'w', encoding='utf-8') as savefile:
+        with open(export_datafile, 'w', encoding='utf-8') as save_file:
             for line_header in header:
-                savefile.write('# {}\n'.format(line_header))
-            savefile.write("# pd.read_csv('file{}',header={}', delimiter='{}')\nt".format(self.output_format, len(header) + 1, delimiter))
+                save_file.write('# {}\n'.format(line_header))
+            save_file.write("# pd.read_csv('file{}',header={}', delimiter='{}')\nt".format(self.output_format,
+                                                                                           len(header) + 1, delimiter))
             for element_name, _ in self.enumerate_statistics_results():
-                savefile.write('{}{}'.format(delimiter, element_name))
-            savefile.write('\n')
+                save_file.write('{}{}'.format(delimiter, element_name))
+            save_file.write('\n')
             for i in range(self.model.config.T):
-                savefile.write('{}'.format(i))
+                save_file.write('{}'.format(i))
                 for _, element in self.enumerate_statistics_results():
-                    savefile.write('{}{}'.format(delimiter, element[i]))
-                savefile.write('\n'.format())
+                    save_file.write('{}{}'.format(delimiter, element[i]))
+                save_file.write('\n'.format())
 
     def __generate_gdt_file(self, filename, enumerate_results, header):
-        E = lxml.builder.ElementMaker()
-        gretl_data = E.gretldata
-        DESCRIPTION = E.description
-        VARIABLES = E.variables
-        VARIABLE = E.variable
-        OBSERVATIONS = E.observations
-        OBS = E.obs
-        variables = VARIABLES(count='{}'.format(sum((1 for _ in enumerate_results()))))
+        element = lxml.builder.ElementMaker()
+        gretl_data = element.gretldata
+        xml_description = element.description
+        xml_variables = element.variables
+        variable = element.variable
+        xml_observations = element.observations
+        observation = element.obs
+        variables = xml_variables(count='{}'.format(sum((1 for _ in enumerate_results()))))
         header_text = ''
         for item in header:
             header_text += item + ' '
@@ -588,20 +591,20 @@ class Statistics:
             if variable_name == 'leverage':
                 variable_name += '_'
             if i==1:
-                variables.append(VARIABLE(name='{}'.format(variable_name), label='{}'.format(header_text)))
+                variables.append(variable(name='{}'.format(variable_name), label='{}'.format(header_text)))
             elif i in [2,3]:
-                variables.append(VARIABLE(name='{}'.format(variable_name),
+                variables.append(variable(name='{}'.format(variable_name),
                         label=self.get_cross_correlation_result(i-2)))
             else:
-                variables.append(VARIABLE(name='{}'.format(variable_name)))
+                variables.append(variable(name='{}'.format(variable_name)))
             i = i+1
-        observations = OBSERVATIONS(count='{}'.format(self.model.config.T), labels='false')
+        xml_observations = xml_observations(count='{}'.format(self.model.config.T), labels='false')
         for i in range(self.model.config.T):
             string_obs = ''
             for _, variable in enumerate_results():
                 string_obs += '{}  '.format(variable[i])
-            observations.append(OBS(string_obs))
-        gdt_result = gretl_data(DESCRIPTION(header_text), variables, observations, version='1.4', name='interbank', frequency='special:1', startobs='1', endobs='{}'.format(self.model.config.T), type='time-series')
+            xml_observations.append(observation(string_obs))
+        gdt_result = gretl_data(xml_description(header_text), variables, xml_observations, version='1.4', name='interbank', frequency='special:1', startobs='1', endobs='{}'.format(self.model.config.T), type='time-series')
         with gzip.open(filename, 'w') as output_file:
             output_file.write(b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
@@ -659,7 +662,7 @@ class Statistics:
 
     def enumerate_statistics_results(self):
         for element in Config.ELEMENTS_STATISTICS:
-            yield (self.get_name(element), getattr(self, element))
+            yield self.get_name(element), getattr(self, element)
 
     def get_name(self, variable):
         match variable:
@@ -740,7 +743,7 @@ class Statistics:
                 else:
                     self.plot_result(variable, self.get_name(variable), export_datafile)
 
-    def plot_P(self, export_datafile=None):
+    def plot_p(self, export_datafile=None):
         xx = []
         yy = []
         yy_min = []
@@ -863,7 +866,7 @@ class Log:
         if text:
             self.logger.error('t={}/{} {}'.format(self.model.t, module, text))
 
-    def define_log(self, log: str, logfile: str='', modules: str='', script_name: str='%(module)s'):
+    def define_log(self, log: str, logfile: str='', modules: str=''):
         self.modules = modules.split(',') if modules else []
         formatter = logging.Formatter('%(levelname)s-' + '- %(message)s')
         self.logLevel = Log.get_level(log.upper())
@@ -933,7 +936,9 @@ class Model:
 
     def configure_json(self, json_string: str):
         import re, json
-        json_string = json_string.strip().replace('=', ':').replace(' ', ', ').replace('True', 'true').replace('False', 'false')
+        json_string = (json_string.strip().
+                       replace('=', ':').replace(' ', ', ').
+                       replace('True', 'true').replace('False', 'false'))
         if not json_string.startswith('{'):
             json_string = '{' + json_string
         if not json_string.endswith('}'):
@@ -1107,7 +1112,7 @@ class Model:
                     max_ir = bank_ir
                 if min_ir > bank_ir:
                     min_ir = bank_ir
-        return (max_ir, min_ir, self.get_current_interest_rate())
+        return max_ir, min_ir, self.get_current_interest_rate()
 
     def get_current_liquidity_info(self):
         """
@@ -1123,7 +1128,7 @@ class Model:
                 max_c = bank_c
             if min_c > bank_c:
                 min_c = bank_c
-        return (max_c, min_c, self.get_current_liquidity())
+        return max_c, min_c, self.get_current_liquidity()
 
     def get_current_bankruptcies(self):
         """
@@ -1176,14 +1181,22 @@ class Model:
         # first we normalize the banks interest rate if it is necessary:
         if self.config.normalize_interest_rate_max and self.config.normalize_interest_rate_max>0:
             max_r = 0
+            min_r = numpy.inf
             for bank in self.banks:
-                if not bank.get_loan_interest() is None and bank.get_loan_interest() > max_r:
-                    max_r = bank.get_loan_interest()
+                if not bank.get_loan_interest() is None:
+                    if bank.get_loan_interest() > max_r:
+                        max_r = bank.get_loan_interest()
+                    if min_r > bank.get_loan_interest():
+                        min_r = bank.get_loan_interest()
             if max_r > self.config.r_i0:
                 for bank in self.banks:
                     if not bank.lender is None:
-                        self.banks[bank.lender].rij[bank.id] = (
-                                self.banks[bank.lender].rij[bank.id] / max_r * self.config.normalize_interest_rate_max)
+                        # normalize in range [a,b], where a = self.config.r_i0
+                        #                                 b =  self.config.normalize_interest_rate_max
+                        # x = a + \frac{(x - x_{\min})}{x_{\max} - x_{\min}} (b - a)
+                        self.banks[bank.lender].rij[bank.id] = \
+                            self.config.r_i0 +( self.banks[bank.lender].rij[bank.id]  - min_r) / (max_r - min_r) * \
+                            ( self.config.normalize_interest_rate_max - self.config.r_i0 )
 
         num_of_rationed = 0
         total_rationed = 0
@@ -1256,7 +1269,8 @@ class Model:
                 if loan_to_return > bank.C:
                     lack_of_capital_to_return_loan = loan_to_return - bank.C
                     bank.C = 0
-                    obtained_in_fire_sales = bank.do_fire_sales(lack_of_capital_to_return_loan, 'to return loan and interest {} > C={}'.format(loan_to_return, bank.C), 'repay')
+                    obtained_in_fire_sales = bank.do_fire_sales(lack_of_capital_to_return_loan,
+                            'to return loan and interest {} > C={}'.format(loan_to_return, bank.C), 'repay')
                     gap_of_money_not_covered_of_loan = lack_of_capital_to_return_loan - obtained_in_fire_sales
                     if gap_of_money_not_covered_of_loan > loan_profits:
                         bank.paid_profits = 0
@@ -1279,7 +1293,8 @@ class Model:
                 bank.E -= loan_profits
                 if bank.E < 0:
                     bank.failed = True
-                    self.log.debug('repay', '{} fails because the profits of the loan generates E<0'.format(bank.get_id()))
+                    self.log.debug('repay',
+                                   '{} fails because the profits of the loan generates E<0'.format(bank.get_id()))
         for bank in self.banks:
             if bank.l == 0 and (not bank.failed):
                 if bank.C < bank.incrD:
@@ -1344,7 +1359,7 @@ class Model:
         if len(self.banks) <= 1:
             return
         self.maxE = max(self.banks, key=lambda k: k.E).E
-        maxC = max(self.banks, key=lambda k: k.C).C
+        max_c = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
             bank.p = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
@@ -1398,7 +1413,7 @@ class Model:
             if bank_i.r < min_r:
                 min_r = bank_i.r
         for bank in self.banks:
-            bank.mu = self.eta * (bank.C / maxC) + (1 - self.eta) * (min_r / bank.r)
+            bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
         self.config.lender_change.step_setup_links(self)
         for bank in self.banks:
             log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
@@ -1409,18 +1424,18 @@ class Model:
         self.value_for_reintroduced_banks_E = self.config.E_i0
         self.value_for_reintroduced_banks_D = self.config.D_i0
         if self.config.reintroduce_with_median:
-            banks_L = []
-            banks_E = []
-            banks_D = []
+            banks_l = []
+            banks_e = []
+            banks_d = []
             for bank in self.banks:
                 if not bank.failed and bank.E > 0:
-                    banks_L.append(bank.L)
-                    banks_D.append(bank.D)
-                    banks_E.append(bank.E)
-            if banks_L:
-                self.value_for_reintroduced_banks_L = np.median(banks_L)
-                self.value_for_reintroduced_banks_D = np.median(banks_D)
-                self.value_for_reintroduced_banks_E = np.median(banks_E)
+                    banks_l.append(bank.L)
+                    banks_d.append(bank.D)
+                    banks_e.append(bank.E)
+            if banks_l:
+                self.value_for_reintroduced_banks_L = np.median(banks_l)
+                self.value_for_reintroduced_banks_D = np.median(banks_d)
+                self.value_for_reintroduced_banks_E = np.median(banks_e)
 
 class Bank:
     """

@@ -110,7 +110,7 @@ def run_interactive():
     args = parser.parse_args()
 
     environment = interbank.Model(T=args.t, N=args.n)
-    environment.log.define_log(log=args.log, logfile=args.logfile, modules=args.modules, script_name=sys.argv[0])
+    environment.log.define_log(log=args.log, logfile=args.logfile, modules=args.modules)
     simulation = Montecarlo(environment=environment, simulations=args.simulations, fixed_eta=args.fixed_eta)
     simulation.run()
     simulation.save(args.save)

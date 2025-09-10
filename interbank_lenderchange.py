@@ -638,13 +638,17 @@ class RestrictedMarket(LenderChange):
         else:
             return False
 
+    def step_setup_links(self, this_model):
+        # if not declared, at each step it will generate a new graph:
+        pass
+
     def initialize_bank_relationships(self, this_model, save_graph=True):
         """ It creates a Erdos Renyi graph with p defined in parameter['p']. No changes in relationships before end"""
         if self.initial_graph_file:
             self.banks_graph = load_graph_json(self.initial_graph_file)
             description = f"from file {self.initial_graph_file}"
         else:
-            self.banks_graph, description = self.generate_banks_graph(this_model)
+            self.banks_graph, description = self.generate_banks_graph(this_model=this_model)
         self.banks_graph.type = self.GRAPH_NAME
         if this_model.export_datafile and save_graph:
             filename_for_file = f"_{self.GRAPH_NAME}"
@@ -657,10 +661,6 @@ class RestrictedMarket(LenderChange):
         for (borrower, lender_for_borrower) in self.banks_graph.edges():
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
-
-    def step_setup_links(self, this_model):
-        # if not declared, at each step it will generate a new graph:
-        pass
 
     def new_lender(self, this_model, bank):
         """ We return the same lender we have created in self.banks_graph """
@@ -723,6 +723,17 @@ class ShockedMarket2(ShockedMarket):
                 else:
                     bank.lender = None
 
+    def generate_banks_graph(self, this_model):
+        result = nx.Graph()
+        result.add_nodes_from(list(range(this_model.config.N)))
+        for i in range(this_model.config.N):
+            if random.random() < self.parameter['p']:
+                j = random.randrange(this_model.config.N)
+                while j == i:
+                    j = random.randrange(this_model.config.N)
+                result.add_edge(i, j)
+        return result, f"erdos_renyi p={self.parameter['p']:5.3} {GraphStatistics.describe(result)}"
+
 
 class ShockedMarket3(ShockedMarket2):
     """ Erdos Renyi graph not directed and in each step with no limits in number of edges,
@@ -753,6 +764,9 @@ class ShockedMarket3(ShockedMarket2):
                 else:
                     bank.lender = None
 
+    def step_setup_links(self, this_model):
+        """ At the end of each step, a new graph is generated """
+        self.initialize_bank_relationships(this_model, save_graph=self.SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP)
 
 class SmallWorld(ShockedMarket):
     """ SmallWorld implementation using Watts Strogatz

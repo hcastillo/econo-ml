@@ -12,7 +12,7 @@ class BankTestCase(unittest.TestCase):
         self.model.initialize()
         self.model.enable_backward()
         self.model.forward()
-        self.model.log.define_log(log='DEBUG', script_name=self.id().split('.')[0])
+        self.model.log.define_log(log='DEBUG')
 
     def test_backwards(self):
         before_C = []

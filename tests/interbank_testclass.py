@@ -19,7 +19,7 @@ class InterbankTest(unittest.TestCase):
             self.model.configure(N=N)
         if T:
             self.model.configure(T=T)
-        self.model.log.define_log(log='DEBUG', script_name=self.id().split('.')[0])
+        self.model.log.define_log(log='DEBUG')
         self.model.initialize()
 
     def doTest(self):
