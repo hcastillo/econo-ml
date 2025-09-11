@@ -10,6 +10,7 @@
     - It accepts command line options. For instance, you can execute this:
     
           interbank.py --log DEBUG --n 150 --t 2000
+          interbank.py --save results.gdt --p 0.5 eta=0.35 param=X     
     - When it is used as a package, the sequence should be:
 
           import interbank
@@ -20,15 +21,22 @@
           model.set_policy_recommendation( ŋ=0.5 )
 
 
-  - *interbank.ipynb*: Notebook version of the standalone *interbank.py* with the same results but plotted using Bokeh.
-  - *interbank.lml*: LabPlot2 file to plot the results of the *interbank.py*.
+  - *colab_interbank.ipynb*: Notebook version of the standalone *interbank.py* with the same results but plotted using Bokeh.
+  - *labplot2_interbank.lml*: [LabPlot2](https://labplot.org/) file to plot the results of the *interbank.py*. By the way the best way is to use [Gretl](https://gretl.sourceforge.net/) as an export format.
+  - *interbank_lenderchange.py*: It contains the different algorithms that control the change of lender in the model.
+  - *exp_runner.py*: A prototype for executing experiments with different parameters and using MonteCarlo.
+  - *exp_runner_comparer.py*: A derivation of the former prototype though to compare the evolution with *p* (probability of attachment in an Erdos-Renyi graph) in the *x* axis and other parameters accross the *y* axis.
+  - *experiments/**: directory with all the experiments conducted. The results of that executions are stored in a folder determined inside each experiment.
+  - *algorithm.drawio* and *algorithm.drawio.pf*: the [draw.io](https://www.drawio.com/) and PDF schema of the algorithm used in the model to propagate shocks and to balance sheets.
+  - 
 
 
 ## - RL with Stable Baselines3
-  - *interbank_agent_ppo.py*: agent to test using PPO
+  - *interbank_agent.py*: agent to test using PPO
   - *run_ppo.py*: run and simulate with PPO agent
-  - *interbank_agent_XXX.py* and *run_XXX*: other agents and algorithms to simulate
+  - *run_td3.py*: run and simulate with TD3 algorithm 
   - *models/XXXX.zip*: instances of Gymnasium.env trained to use with *run_XXXX.py*
+  - *plot_ppo.py*: auxiliary creator of plots to interprete the results of PPO
   - Usage:
 
           # train first and save the model env:
