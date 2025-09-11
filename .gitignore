@@ -7,7 +7,6 @@ logs/
 output/*
 models/td3.zip
 lenders/*
-experiments/*
 ppo/*
 tommaso/*
 .idea/*

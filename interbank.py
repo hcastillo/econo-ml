@@ -459,12 +459,15 @@ class Statistics:
 
     def determine_cross_correlation(self):
         if not (self.bankruptcy == 0).all():
-            self.correlation = [
-                # correlation_coefficient = [-1..1] and p_value < 0.10
-                scipy.stats.pearsonr(self.interest_rate,self.bankruptcy),
-                # time delay 1:
-                scipy.stats.pearsonr(self.interest_rate[1:],self.bankruptcy[:-1])
-                ]
+            try:
+                self.correlation = [
+                    # correlation_coefficient = [-1..1] and p_value < 0.10
+                    scipy.stats.pearsonr(self.interest_rate,self.bankruptcy),
+                    # time delay 1:
+                    scipy.stats.pearsonr(self.interest_rate[1:],self.bankruptcy[:-1])
+                    ]
+            except ValueError:
+                self.correlation = []
         else:
             self.correlation = []
 
@@ -1188,7 +1191,7 @@ class Model:
                         max_r = bank.get_loan_interest()
                     if min_r > bank.get_loan_interest():
                         min_r = bank.get_loan_interest()
-            if max_r > self.config.r_i0:
+            if max_r > self.config.r_i0 and max_r != min_r:
                 for bank in self.banks:
                     if not bank.lender is None:
                         # normalize in range [a,b], where a = self.config.r_i0
