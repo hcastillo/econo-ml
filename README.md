@@ -40,7 +40,7 @@
   - Usage:
 
           # train first and save the model env:
-          run_ppo.py --train ppo_10000 --times 10000 --verbose
+          run_ppo.py --train ppo_10000 --t 10000 --verbose
 
           # use the trained env and generate a simulation of T=1000 with Interbank model
           run_ppo.py --load ppo_10000 --save results_ppo.txt

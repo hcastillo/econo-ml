@@ -14,10 +14,10 @@ from interbank_agent import InterbankAgent
 import numpy as np
 import interbank
 import time
-import sys
 import run_mc
 import os
 import argparse
+import interbank_lenderchange as lc
 
 # we run STEPS_BEFORE_TRAINING times the Interbank.model() before train
 STEPS_BEFORE_TRAINING: int = 5
@@ -92,6 +92,12 @@ def run_interactive():
                         help=f"Number of banks in Interbank model")
     parser.add_argument("--t", type=int, default=interbank.Config.T,
                         help=f"Time repetitions of Interbank model")
+    parser.add_argument('--lc', type=str, default=interbank.LENDER_CHANGE_DEFAULT,
+                        help="Bank lender's change method (?=list)")
+    parser.add_argument('--lc_p', '--p', type=float, default=interbank.LENDER_CHANGE_DEFAULT_P,
+                        help="For Erdos-Renyi bank lender's change value of p".format())
+    parser.add_argument('--lc_m', '--m', type=int, default=None,
+                        help="For Preferential bank lender's change value of graph grade m".format())
     parser.add_argument("--simulations", type=int, default=NUM_SIMULATIONS,
                         help=f"Number of MC simulations")
     parser.add_argument("--save", default=None, help=f"Saves the output of this execution")
@@ -102,12 +108,13 @@ def run_interactive():
     parser.add_argument("--logs", default="logs", help=f"Log dir for Tensorboard")
     args = parser.parse_args()
     env = InterbankAgent(T=args.t, N=args.n)
+    env.interbank_model.config.lender_change = lc.determine_algorithm(args.lc, args.lc_p, args.lc_m)
     env.interbank_model.log.define_log(log=args.log, logfile=args.logfile, modules=args.modules)
     if not os.path.isdir(args.logs):
         os.mkdir(args.logs)
     description = f"{type(env).__name__} T={env.interbank_model.config.T}" + \
                   f"N={env.interbank_model.config.N} env={args.load if args.load else '-'}"
-
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
     # train ------------------------
     if args.train:
         t1 = time.time()

@@ -35,7 +35,7 @@ import gzip
 import scipy.stats
 
 LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
-LENDER_CHANGE_DEFAULT_P = 0.333
+LENDER_CHANGE_DEFAULT_P = 0.2
 
 class Config:
     """
@@ -1191,15 +1191,20 @@ class Model:
                         max_r = bank.get_loan_interest()
                     if min_r > bank.get_loan_interest():
                         min_r = bank.get_loan_interest()
-            if max_r > self.config.r_i0 and max_r != min_r:
-                for bank in self.banks:
-                    if not bank.lender is None:
+            for bank in self.banks:
+                if not bank.lender is None:
+                    if max_r > self.config.r_i0 and max_r != min_r:
                         # normalize in range [a,b], where a = self.config.r_i0
                         #                                 b =  self.config.normalize_interest_rate_max
                         # x = a + \frac{(x - x_{\min})}{x_{\max} - x_{\min}} (b - a)
                         self.banks[bank.lender].rij[bank.id] = \
                             self.config.r_i0 +( self.banks[bank.lender].rij[bank.id]  - min_r) / (max_r - min_r) * \
                             ( self.config.normalize_interest_rate_max - self.config.r_i0 )
+                    else:
+                        # if max_r = min_r or max_r< self.config.r_i0 we have maybe only one bank lending, so
+                        # max interest rate:
+                        self.banks[bank.lender].rij[bank.id] = self.config.normalize_interest_rate_max
+
 
         num_of_rationed = 0
         total_rationed = 0
@@ -1634,12 +1639,12 @@ class Utils:
         parser.add_argument('--n', type=int, default=Config.N, help='Number of banks'.format())
         parser.add_argument('--eta', type=float, default=Model.eta, help='Policy recommendation'.format())
         parser.add_argument('--t', type=int, default=Config.T, help='Time repetitions'.format())
+        parser.add_argument('--lc', type=str, default=LENDER_CHANGE_DEFAULT,
+                            help="Bank lender's change method (?=list)")
         parser.add_argument('--lc_p', '--p', type=float, default=LENDER_CHANGE_DEFAULT_P,
                             help="For Erdos-Renyi bank lender's change value of p".format())
         parser.add_argument('--lc_m', '--m', type=int, default=None,
                             help="For Preferential bank lender's change value of graph grade m".format())
-        parser.add_argument('--lc', type=str, default=LENDER_CHANGE_DEFAULT,
-                            help="Bank lender's change method (?=list)")
         parser.add_argument('--lc_ini_graph_file', type=str, default=None,
                             help='Load a graph in json networkx.node_link_data() format')
         parser.add_argument('--detailed_equity', action='store_true',
@@ -1673,10 +1678,7 @@ class Utils:
         model.config.allow_replacement_of_bankrupted = not args.no_replace
         model.config.reintroduce_with_median = args.reintr_with_median
         model.config.psi_endogenous = args.psi_endogenous
-        model.config.lender_change = lc.determine_algorithm(args.lc)
-        model.config.lender_change.set_parameter('m', args.lc_m)
-        if not isinstance(model.config.lender_change,lc.Preferential):
-            model.config.lender_change.set_parameter('p', args.lc_p)
+        model.config.lender_change = lc.determine_algorithm(args.lc, args.lc_p, args.lc_m)
         model.config.define_values_from_args(other_possible_config_args)
         if model.config.seed and model.config.seed != model.default_seed and args.seed is None:
             args.seed = model.config.seed

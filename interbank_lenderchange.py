@@ -31,7 +31,7 @@ import json
 import warnings
 
 
-def determine_algorithm(given_name: str = "default"):
+def determine_algorithm(given_name: str = "default", p:float = None, m:int = None):
     default_method = "Boltzmann"
     if given_name.find('.')>0:
         given_name, given_parameter = given_name.split('.', maxsplit=1)
@@ -51,9 +51,18 @@ def determine_algorithm(given_name: str = "default"):
             if name.lower() == given_name.lower():
                 if inspect.isclass(obj) and obj.__doc__:
                     lender_change_resultant =  obj()
-                    if not given_parameter is None:
+                    if given_parameter is None:
+                        if not p is None and isinstance(lender_change_resultant, ShockedMarket) or \
+                            isinstance(lender_change_resultant, ShockedMarket2) or \
+                            isinstance(lender_change_resultant, RestrictedMarket) or \
+                            isinstance(lender_change_resultant, ShockedMarket3):
+                            lender_change_resultant.set_parameter('p', p)
+                        if not m is None and isinstance(lender_change_resultant, Preferential):
+                            lender_change_resultant.set_parameter('m', m)
+                    else:
                         parameter,value = given_parameter.split('=')
                         lender_change_resultant.set_parameter(parameter, value)
+
                     return lender_change_resultant
         print(f"not found LenderChange algorithm with name '{given_name}'")
         sys.exit(-1)
