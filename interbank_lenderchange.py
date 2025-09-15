@@ -52,12 +52,13 @@ def determine_algorithm(given_name: str = "default", p:float = None, m:int = Non
                 if inspect.isclass(obj) and obj.__doc__:
                     lender_change_resultant =  obj()
                     if given_parameter is None:
-                        if not p is None and isinstance(lender_change_resultant, ShockedMarket) or \
+                        if not p is None and (isinstance(lender_change_resultant, ShockedMarket) or \
                             isinstance(lender_change_resultant, ShockedMarket2) or \
                             isinstance(lender_change_resultant, RestrictedMarket) or \
-                            isinstance(lender_change_resultant, ShockedMarket3):
+                            isinstance(lender_change_resultant, ShockedMarket3)):
                             lender_change_resultant.set_parameter('p', p)
-                        if not m is None and isinstance(lender_change_resultant, Preferential):
+                        if not m is None and (isinstance(lender_change_resultant, Preferential) or \
+                                isinstance(lender_change_resultant, InitialStability)):
                             lender_change_resultant.set_parameter('m', m)
                     else:
                         parameter,value = given_parameter.split('=')
@@ -540,6 +541,9 @@ class Preferential(Boltzmann):
             self.banks_graph_full = load_graph_json(self.initial_graph_file)
             description = f"{self.GRAPH_NAME} from file {self.initial_graph_file}"
         else:
+            if not 'm' in self.parameter or not self.parameter['m']:
+                print("parameter 'm' is needed and not present or not an integer")
+                sys.exit(-1)
             self.banks_graph_full = nx.barabasi_albert_graph(this_model.config.N, self.parameter['m'])
             description = (f"{self.GRAPH_NAME} m={self.parameter['m']:5.3f} "
                            f"{GraphStatistics.describe(self.banks_graph_full)}")
