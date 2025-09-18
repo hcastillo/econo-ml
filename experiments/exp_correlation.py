@@ -18,10 +18,10 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 10
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "c:\\experiments\\correlation_phase"
+    OUTPUT_DIRECTORY = "c:\\experiments\\correlation_test"
 
     parameters = {
-        "p": np.linspace(0.0001, 1, num=10),
+        "p": np.linspace(0.0001, 0.2, num=10),
     }
 
     config = { }
@@ -29,7 +29,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':True }
     
     LENGTH_FILENAME_PARAMETER = 5
-    LENGTH_FILENAME_CONFIG = 25
+    LENGTH_FILENAME_CONFIG = 0
 
     SEED_FOR_EXECUTION = 2025
 

@@ -1404,85 +1404,39 @@ class Model:
                 bank.c.append(c)
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE
-        # optimized 2:
-        N = self.config.N
-        r_i0 = self.config.r_i0
-        chi = self.config.chi
-        phi = self.config.phi
-        xi = self.config.xi
-        psi_global = self.config.psi
-        psi_endogenous = self.config.psi_endogenous
+        min_r = sys.maxsize
+        for bank_i in self.banks:
+            bank_i.asset_i = 0
+            bank_i.asset_j = 0
+            for j in range(self.config.N):
+                try:
+                    if j == bank_i.id:
+                        bank_i.rij[j] = 0
+                    else:
+                        if self.banks[j].p == 0 or bank_i.c[j] == 0:
+                            bank_i.rij[j] = self.config.r_i0
+                        else:
+                            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+                            if psi==1:
+                                psi=0.99999999999999
+                            bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
+                                              - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
+                                             /
+                                             (self.banks[j].p * bank_i.c[j] * (1 - psi)))
 
-        A = np.array([bank.A for bank in self.banks])
-        p = np.array([bank.p for bank in self.banks])
-        psi_array = np.array([bank.psi for bank in self.banks]) if psi_endogenous else np.full(N, psi_global)
-        c = np.array([bank.c for bank in self.banks])  # Matriz NxN
 
-        # Ajustar psi cercano a 1 para evitar división por cero
-        psi_array = np.where(psi_array == 1, 0.99999999999999, psi_array)
-
-        # Máscaras para condiciones
-        mask_diag = np.eye(N, dtype=bool)
-        mask_invalid = (p == 0)
-
-        # Broadcasting para cálculo matricial
-        psi_matrix = np.repeat(psi_array[:, np.newaxis], N, axis=1)
-        denom = p * c * (1 - psi_matrix)
-        num = (chi * A[:, np.newaxis] - phi * A[np.newaxis, :] - (1 - p[np.newaxis, :]) * (xi * A[np.newaxis, :] - c))
-
-        # Inicializar rij con r_i0 excepto diagonal cero
-        rij = np.where(mask_diag, 0, r_i0)
-        valid_mask = (~mask_diag) & (~mask_invalid[np.newaxis, :]) & (c != 0) & (denom != 0)
-        rij[valid_mask] = num[valid_mask] / denom[valid_mask]
-        rij[rij < 0] = r_i0
-
-        # Asignar rij a cada banco
-        for i, bank in enumerate(self.banks):
-            bank.rij = rij[i]
-
-        # Calcular r, asset_i y asset_j
-        asset_i = A.copy()  # asumido igual que en el código original
-        asset_j = np.sum(A) - A
-        for i, bank in enumerate(self.banks):
-            bank.r = np.sum(bank.rij) / (N - 1)
-            bank.asset_i = asset_i[i]
-            bank.asset_j = asset_j[i] / (N - 1)
-
-        min_r = np.min([bank.r for bank in self.banks])
-
-        # min_r = sys.maxsize
-        # for bank_i in self.banks:
-        #     bank_i.asset_i = 0
-        #     bank_i.asset_j = 0
-        #     for j in range(self.config.N):
-        #         try:
-        #             if j == bank_i.id:
-        #                 bank_i.rij[j] = 0
-        #             else:
-        #                 if self.banks[j].p == 0 or bank_i.c[j] == 0:
-        #                     bank_i.rij[j] = self.config.r_i0
-        #                 else:
-        #                     psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-        #                     if psi==1:
-        #                         psi=0.99999999999999
-        #                     bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
-        #                                       - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
-        #                                      /
-        #                                      (self.banks[j].p * bank_i.c[j] * (1 - psi)))
-        #
-        #
-        #                     bank_i.asset_i += bank_i.A
-        #                     bank_i.asset_j += self.banks[j].A
-        #                     # bank_i.asset_j += 1 - self.banks[j].p
-        #                 if bank_i.rij[j] < 0:
-        #                     bank_i.rij[j] = self.config.r_i0
-        #         except ZeroDivisionError:
-        #             bank_i.rij[j] = self.config.r_i0
-        #     bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
-        #     bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
-        #     bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
-        #     if bank_i.r < min_r:
-        #         min_r = bank_i.r
+                            bank_i.asset_i += bank_i.A
+                            bank_i.asset_j += self.banks[j].A
+                            # bank_i.asset_j += 1 - self.banks[j].p
+                        if bank_i.rij[j] < 0:
+                            bank_i.rij[j] = self.config.r_i0
+                except ZeroDivisionError:
+                    bank_i.rij[j] = self.config.r_i0
+            bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
+            bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
+            bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
+            if bank_i.r < min_r:
+                min_r = bank_i.r
         for bank in self.banks:
             bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
         self.config.lender_change.step_setup_links(self)

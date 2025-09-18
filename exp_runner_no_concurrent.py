@@ -19,9 +19,7 @@ from itertools import product
 import lxml.etree
 import lxml.builder
 import argparse
-import concurrent.futures
 import time
-
 
 class ExperimentRun:
     N = 1
@@ -29,8 +27,6 @@ class ExperimentRun:
     MC = 1
 
     LIMIT_OUTLIER = 6
-
-    MAX_EXECUTIONS_OF_MODELS_OUTLIERS = 10
 
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
@@ -203,12 +199,14 @@ class ExperimentRun:
     def set_lender_change(self, execution_parameters):
         p = execution_parameters['p'] if 'p' in execution_parameters else interbank.LENDER_CHANGE_DEFAULT_P
         m = execution_parameters['m'] if 'm' in execution_parameters else None
-        return interbank_lenderchange.determine_algorithm(self.ALGORITHM, p, m)
+        return interbank_lenderchange.determine_algorithm(self.ALGORITHM(), p, m)
 
     def run_model(self, filename, execution_config, execution_parameters, seed_random):
         model = Model()
         model.export_datafile = filename
+        print("pasa")
         model.config.lender_change = self.set_lender_change(execution_parameters)
+
         model.configure(T=self.T, N=self.N,
                         allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
         model.configure(**self.EXTRA_MODEL_CONFIGURATION)
@@ -372,7 +370,7 @@ class ExperimentRun:
             if (not np.isnan(mean_individual_execution) and not np.isnan(iqr) and
                 not (lower_bound <= mean_individual_execution <= upper_bound) and
                 not (lower_bound==upper_bound)):
-                ##print(f"{k} {filename_for_iteration}:{i} {lower_bound:.3f} <= {mean_individual_execution:.3f} <= {upper_bound:.3f}")
+                print(f"{k} {filename_for_iteration}:{i} {lower_bound:.3f} <= {mean_individual_execution:.3f} <= {upper_bound:.3f}")
                 return False
         return True
 
@@ -391,30 +389,6 @@ class ExperimentRun:
                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
                 model_configuration, model_parameters, seed_for_this_model)
         return result_mc
-
-
-    def load_model_and_rerun_till_ok(self, model_configuration, model_parameters, filename_for_iteration,
-                                     i, clear_previous_results, seeds_for_random,
-                                     position_inside_seeds_for_random, result_iteration_to_check):
-        """
-        Internal function in which we have result_iteration_to_check with the averages of the MC iterations, and
-        we check individually if any of those individual executions is an outlier, we replace it using a different
-        seed and incorporate to the results:
-        """
-        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
-                                               filename_for_iteration, i, clear_previous_results,
-                                               seeds_for_random[i+position_inside_seeds_for_random])
-        offset = 1
-        while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check) \
-                and offset <= self.MAX_EXECUTIONS_OF_MODELS_OUTLIERS:
-            self.discard_execution_of_iteration(filename_for_iteration, i)
-            result_mc = self.load_or_execute_model(model_configuration, model_parameters,
-                                                   filename_for_iteration, i, clear_previous_results,
-                                                   (seeds_for_random[i+position_inside_seeds_for_random]
-                                                    + offset))
-            offset += 1
-        return result_mc
-
 
     def do(self, clear_previous_results=False):
         self.log_replaced_data = ""
@@ -437,32 +411,33 @@ class ExperimentRun:
                     result_iteration_to_check = pd.DataFrame()
                     graphs_iteration = []
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
-                    # first round to load all the self.MC and estimate mean and standard deviation of the series
-                    # inside result_iteration:
-                    with concurrent.futures.ProcessPoolExecutor() as executor:
-                        results_mc = {executor.submit(self.load_or_execute_model,
-                                                      model_configuration, model_parameters,
-                                                      filename_for_iteration, i,
-                                                      clear_previous_results,
-                                                      seeds_for_random[i+position_inside_seeds_for_random]) :
-                                          i for i in range(self.MC)}
-                        for future in concurrent.futures.as_completed(results_mc):
-                            i = results_mc[future]
-                            graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
-                            result_iteration_to_check = pd.concat([result_iteration_to_check, future.result()])
+                    # first round to load all the self.MC and estimate mean and standard deviation of the series inside
+                    # result_iteration:
+                    for i in range(self.MC):
+                        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                               filename_for_iteration, i, clear_previous_results,
+                                                               seeds_for_random[i+position_inside_seeds_for_random])
+                        graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+                        result_iteration_to_check = pd.concat([result_iteration_to_check, result_mc])
+
 
                     # second round to verify if one of the models should be replaced because it presents abnormal
-                    # values comparing to the other (self.MC-1) stored in result_iteration_to_check:
+                    # values comparing to the other (self.MC-1):
                     result_iteration = pd.DataFrame()
-                    position_inside_seeds_for_random -= self.MC
-                    with concurrent.futures.ProcessPoolExecutor() as executor:
-                        results_mc = {executor.submit(self.load_model_and_rerun_till_ok,
-                                                      model_configuration, model_parameters, filename_for_iteration,
-                                                      i, clear_previous_results, seeds_for_random,
-                                                      position_inside_seeds_for_random, result_iteration_to_check) :
-                                          i for i in range(self.MC)}
-                        for future in concurrent.futures.as_completed(results_mc):
-                            result_iteration = pd.concat([result_iteration, future.result()])
+                    for i in range(self.MC):
+                        result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                               filename_for_iteration, i, clear_previous_results,
+                                                               seeds_for_random[i+position_inside_seeds_for_random])
+                        offset = 1
+                        while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check)\
+                                and offset <= 10:
+                            self.discard_execution_of_iteration(filename_for_iteration, i)
+                            result_mc = self.load_or_execute_model(model_configuration, model_parameters,
+                                                                   filename_for_iteration, i, clear_previous_results,
+                                                                   (seeds_for_random[i+position_inside_seeds_for_random]
+                                                                    + offset))
+                            offset += 1
+                        result_iteration = pd.concat([result_iteration, result_mc])
 
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
                     # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
