@@ -459,7 +459,10 @@ class Statistics:
             return " "
 
     def determine_cross_correlation(self):
-        if not (self.bankruptcy == 0).all():
+        if np.all(self.bankruptcy == 0) or np.all(self.bankruptcy == self.bankruptcy[0]) or \
+            np.all(self.interest_rate == 0) or np.all(self.interest_rate == self.interest_rate[0]):
+            self.correlation = []
+        else:
             try:
                 self.correlation = [
                     # correlation_coefficient = [-1..1] and p_value < 0.10
@@ -469,8 +472,6 @@ class Statistics:
                     ]
             except ValueError:
                 self.correlation = []
-        else:
-            self.correlation = []
 
     def export_data(self, export_datafile=None, export_description=None, generate_plots=True):
         if export_datafile:
@@ -1318,7 +1319,7 @@ class Model:
                 if bank.E < 0:
                     bank.failed = True
                     self.log.debug('repay',
-                                   '{} fails because the profits of the loan generates E<0'.format(bank.get_id()))
+                                   '{} fails as paying interest of the loan generates E<0'.format(bank.get_id()))
         for bank in self.banks:
             if bank.l == 0 and (not bank.failed):
                 if bank.C < bank.incrD:

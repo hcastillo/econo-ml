@@ -21,7 +21,8 @@ import lxml.builder
 import argparse
 import concurrent.futures
 import time
-
+import dask.distributed
+import sys
 
 class ExperimentRun:
     N = 1
@@ -63,6 +64,7 @@ class ExperimentRun:
     LENGTH_FILENAME_CONFIG = 1
 
     log_replaced_data = ""
+    dask_client = None
 
     def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
         # we plot only x labels 1 of each 10:
@@ -187,7 +189,8 @@ class ExperimentRun:
             for j in array_with_data:
                 string_obs += f"{array_with_data[j][i][0]}  {array_with_data[j][i][1]}  "
             observations.append(OBS(string_obs))
-        header_text = f"MC={self.MC} N={self.N} T={self.T} {self.ALGORITHM.__name__ if not self.NAME_OF_X_SERIES else self.NAME_OF_X_SERIES}"
+        header_text = (f"MC={self.MC} N={self.N} T={self.T} "
+                       f"{self.ALGORITHM.__name__ if not self.NAME_OF_X_SERIES else self.NAME_OF_X_SERIES}")
         gdt_result = GRETLDATA(
             DESCRIPTION(header_text),
             variables,
@@ -269,6 +272,15 @@ class ExperimentRun:
                 print(model_name)
                 num += 1
         print("total: ", num)
+
+    def dask_cluster(self, scheduler_ip:str):
+        if not scheduler_ip.lower().startswith("tcp://"):
+            scheduler_ip = "tcp://"+scheduler_ip
+        try:
+            self.dask_client = dask.distributed.Client(scheduler_ip)
+        except:
+            print("unreacheable or bad scheduler ip. excepted 'tcp://ip:8786'")
+            sys.exit(-1)
 
     def __get_value_for(self, param):
         result = ''
@@ -416,6 +428,62 @@ class ExperimentRun:
             offset += 1
         return result_mc
 
+    def model_combination_execution(self,
+                                    # input parameters:
+                                    model_parameters, model_configuration,
+                                    clear_previous_results, seeds_for_random, position_inside_seeds_for_random,
+                                    # output parameters:
+                                    results_to_plot, results_x_axis):
+        result_iteration_to_check = pd.DataFrame()
+        graphs_iteration = []
+        filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
+        # first round to load all the self.MC and estimate mean and standard deviation of the series
+        # inside result_iteration:
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results_mc = {executor.submit(self.load_or_execute_model,
+                                          model_configuration, model_parameters,
+                                          filename_for_iteration, i,
+                                          clear_previous_results,
+                                          seeds_for_random[i + position_inside_seeds_for_random]):
+                              i for i in range(self.MC)}
+            for future in concurrent.futures.as_completed(results_mc):
+                i = results_mc[future]
+                graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+                result_iteration_to_check = pd.concat([result_iteration_to_check, future.result()])
+
+        # second round to verify if one of the models should be replaced because it presents abnormal
+        # values comparing to the other (self.MC-1) stored in result_iteration_to_check:
+        result_iteration = pd.DataFrame()
+        position_inside_seeds_for_random -= self.MC
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results_mc = {executor.submit(self.load_model_and_rerun_till_ok,
+                                          model_configuration, model_parameters, filename_for_iteration,
+                                          i, clear_previous_results, seeds_for_random,
+                                          position_inside_seeds_for_random, result_iteration_to_check):
+                              i for i in range(self.MC)}
+            for future in concurrent.futures.as_completed(results_mc):
+                result_iteration = pd.concat([result_iteration, future.result()])
+
+        # When it arrives here, all the results are correct and inside the self.MC executions, if one
+        # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
+        # file and execution using a different seed.
+        # We save now mean and std inside results_to_plot to create later the results:
+        for k in result_iteration.keys():
+            if k.strip() == "t":
+                continue
+            mean_estimated = result_iteration[k].mean()
+            warnings.filterwarnings(
+                "ignore"
+            )  # it generates RuntimeWarning: overflow encountered in multiply
+            std_estimated = result_iteration[k].std()
+            if k in results_to_plot:
+                results_to_plot[k].append([mean_estimated, std_estimated])
+            else:
+                results_to_plot[k] = [[mean_estimated, std_estimated]]
+        if self.ALGORITHM.GRAPH_NAME:
+            self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
+        results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+
 
     def do(self, clear_previous_results=False):
         self.log_replaced_data = ""
@@ -435,55 +503,9 @@ class ExperimentRun:
             position_inside_seeds_for_random = 0
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
-                    result_iteration_to_check = pd.DataFrame()
-                    graphs_iteration = []
-                    filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
-                    # first round to load all the self.MC and estimate mean and standard deviation of the series
-                    # inside result_iteration:
-                    with concurrent.futures.ProcessPoolExecutor() as executor:
-                        results_mc = {executor.submit(self.load_or_execute_model,
-                                                      model_configuration, model_parameters,
-                                                      filename_for_iteration, i,
-                                                      clear_previous_results,
-                                                      seeds_for_random[i+position_inside_seeds_for_random]) :
-                                          i for i in range(self.MC)}
-                        for future in concurrent.futures.as_completed(results_mc):
-                            i = results_mc[future]
-                            graphs_iteration.append(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
-                            result_iteration_to_check = pd.concat([result_iteration_to_check, future.result()])
-
-                    # second round to verify if one of the models should be replaced because it presents abnormal
-                    # values comparing to the other (self.MC-1) stored in result_iteration_to_check:
-                    result_iteration = pd.DataFrame()
-                    position_inside_seeds_for_random -= self.MC
-                    with concurrent.futures.ProcessPoolExecutor() as executor:
-                        results_mc = {executor.submit(self.load_model_and_rerun_till_ok,
-                                                      model_configuration, model_parameters, filename_for_iteration,
-                                                      i, clear_previous_results, seeds_for_random,
-                                                      position_inside_seeds_for_random, result_iteration_to_check) :
-                                          i for i in range(self.MC)}
-                        for future in concurrent.futures.as_completed(results_mc):
-                            result_iteration = pd.concat([result_iteration, future.result()])
-
-                    # When it arrives here, all the results are correct and inside the self.MC executions, if one
-                    # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
-                    # file and execution using a different seed.
-                    # We save now mean and std inside results_to_plot to create later the results:
-                    for k in result_iteration.keys():
-                        if k.strip() == "t":
-                            continue
-                        mean_estimated = result_iteration[k].mean()
-                        warnings.filterwarnings(
-                            "ignore"
-                        )  # it generates RuntimeWarning: overflow encountered in multiply
-                        std_estimated = result_iteration[k].std()
-                        if k in results_to_plot:
-                            results_to_plot[k].append([mean_estimated, std_estimated])
-                        else:
-                            results_to_plot[k] = [[mean_estimated, std_estimated]]
-                    if self.ALGORITHM.GRAPH_NAME:
-                        self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
-                    results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+                    self.model_combination_execution(model_parameters, model_configuration,
+                                    clear_previous_results, seeds_for_random, position_inside_seeds_for_random,
+                                    results_to_plot, results_x_axis)
                     progress_bar.next()
 
             progress_bar.finish()
@@ -565,10 +587,18 @@ class Runner:
             action=argparse.BooleanOptionalAction,
             help="Ignore generated models and create them again",
         )
+        parser.add_argument(
+            "--dask",
+            default=None,
+            type=str,
+            help="Distribute the load between nodes of a Dask cluster (tcp://ip:8786)",
+        )
         args = parser.parse_args()
         experiment = experiment_runner()
         if args.clear_results:
             experiment.clear_results()
+        if args.dask:
+            experiment.dask_cluster(args.dask)
         if args.listnames:
             experiment.listnames()
         elif args.do:

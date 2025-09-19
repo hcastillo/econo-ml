@@ -13,3 +13,4 @@ statsmodels~=0.14
 networkx~=3.5
 progress~=1.6
 lxml~=5.3
+dask~=2025.7.0

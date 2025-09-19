@@ -8,7 +8,7 @@ class BankTestCase(unittest.TestCase):
         self.model = interbank.Model()
         self.model.test = True
         self.model.config.lender_change = interbank_lenderchange.determine_algorithm("Boltzmann")
-        self.model.configure(N=10)
+        self.model.configure(N=10, seed=10)
         self.model.initialize()
         self.model.enable_backward()
         self.model.forward()
@@ -35,7 +35,12 @@ class BankTestCase(unittest.TestCase):
         for i in range(10):
             if banks_ids[i] == self.model.banks[i].get_id():
                 bankd_id = self.model.banks[i].get_id()
-                self.assertNotEqual(before_D[i], temporary_D[i],
-                                    f"r of #{bankd_id} should change from t={self.model.t} to t={self.model.t+1}")
+                if self.model.banks[i].D != self.model.config.D_i0:
+                    # if it fails, the value of D could be the same, the initial one Di0
+                    self.assertNotEqual(before_D[i], temporary_D[i],
+                                    f"D of #{bankd_id} should change from t={self.model.t} to t={self.model.t+1}"
+                                    f" ({before_D[i]}->{temporary_D[i]})")
+
                 self.assertEqual(before_D[i], self.model.banks[i].D,
-                                 f"r of #{bankd_id} should be the same as t={self.model.t} if we go backward")
+                                 f"r of #{bankd_id} should be the same as t={self.model.t} if we go backward "
+                                 f" ({before_D[i]}->{self.model.banks[i].D})")

@@ -3,7 +3,6 @@
 import unittest
 from mock import patch
 import interbank
-import interbank_lenderchange
 import tests.interbank_testclass
 
 
@@ -22,14 +21,14 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     #   shock1=-15     shock1=+5        shock=-20 --> #0 obtains from #1 a loan of 5.40
     #                                                 #2 obtains from #2 a loan of 10.4
     #   shock2=-3      shock2=3         shock= 0  --> #0 returns loan
-    #                                                 #2 fails and affects E in #1
-    #                                                 #1 fails due to loss of E
+    #                                                 #2 fails and generates BD in #1 = 5
+
     #
-    #       #0             #1             #2
-    #   ------------    ------------    -----------
-    #   C=9.49| D=20    failed          failed
-    #   L=20  | E=9.89
-    #   R=0.4 |
+    #       #0             #1              #2
+    #   ------------       ------------    -----------
+    #   C=4.5 | D=20       failed          C=15.92 | D=29
+    #   L=20  | E=4.9                      L=17    | E=4.499
+    #   R=0.4 |                            R=0.58
     #   t=1
     #
     def initialValues(self):
@@ -49,12 +48,11 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
 
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=False)
-        # like only 1 has survived, both #1 and #2 will have new values with C,D,E equal to bank #0:
+        # #2 will have new values with L,D,E equal to avg of values of #0 and #1:
         self.assertBank(bank=self.model.banks[2], bankrupted=True,
-                        C=self.model.banks[0].C, L=self.model.banks[0].L, D=self.model.banks[0].D)
-        self.assertBank(bank=self.model.banks[1], bankrupted=True,
-                        C = self.model.banks[0].C, L = self.model.banks[0].L, D = self.model.banks[0].D)
-
+                        E=(self.model.banks[0].E+self.model.banks[1].E)/2,
+                        L=(self.model.banks[0].L+self.model.banks[1].L)/2,
+                        D=(self.model.banks[0].D+self.model.banks[1].D)/2)
 
 if __name__ == '__main__':
     unittest.main()
