@@ -304,6 +304,36 @@ class ExperimentRun:
         communities.append(len(graph_communities))
         lengths += [len(i) for i in graph_communities]
 
+
+    def get_statistics_of_graphs1(self, graph_files):
+        communities_not_alone = []
+        communities = []
+        lengths = []
+        gcs = []
+        results = {}
+        for graph_file in graph_files:
+            filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}.json"
+            # we need to obtain the stats of all graph_files, but maybe we have not only a graph for each model
+            # analyzed, also a graph for each step t, so a "_0.json" will be present:
+            if not os.path.exists(filename) and os.path.exists(filename.replace(".json", "_0.json")):
+                for i in range(0, self.T):
+                    filename = f"{graph_file}_{self.ALGORITHM.GRAPH_NAME}_{i}.json"
+                    try:
+                        self._get_statistics_of_individual_graph(filename,
+                                                                 communities_not_alone, gcs, communities, lengths)
+                    except FileNotFoundError:
+                        break
+            else:
+                self._get_statistics_of_individual_graph(filename, communities_not_alone, gcs, communities, lengths)
+
+        results['grade_avg']=[0 if len(lengths) == 0 else (float(sum(lengths)) / len(lengths)), 0]
+        results['communities']=[0 if len(communities) == 0 else (sum(communities)) / len(communities), 0]
+        results['communities_not_alone']=[0 if len(communities_not_alone) == 0 else
+                                                 (sum(communities_not_alone)) / len(communities_not_alone), 0]
+        results['gcs']=[0 if len(gcs) == 0 else sum(gcs) / len(gcs), 0]
+        return results
+
+
     def get_statistics_of_graphs(self, graph_files, results, model_parameters):
         communities_not_alone = []
         communities = []
@@ -431,9 +461,7 @@ class ExperimentRun:
     def model_combination_execution(self,
                                     # input parameters:
                                     model_parameters, model_configuration,
-                                    clear_previous_results, seeds_for_random, position_inside_seeds_for_random,
-                                    # output parameters:
-                                    results_to_plot, results_x_axis):
+                                    clear_previous_results, seeds_for_random, position_inside_seeds_for_random):
         result_iteration_to_check = pd.DataFrame()
         graphs_iteration = []
         filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
@@ -464,10 +492,7 @@ class ExperimentRun:
             for future in concurrent.futures.as_completed(results_mc):
                 result_iteration = pd.concat([result_iteration, future.result()])
 
-        # When it arrives here, all the results are correct and inside the self.MC executions, if one
-        # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
-        # file and execution using a different seed.
-        # We save now mean and std inside results_to_plot to create later the results:
+        results = {}
         for k in result_iteration.keys():
             if k.strip() == "t":
                 continue
@@ -476,13 +501,13 @@ class ExperimentRun:
                 "ignore"
             )  # it generates RuntimeWarning: overflow encountered in multiply
             std_estimated = result_iteration[k].std()
-            if k in results_to_plot:
-                results_to_plot[k].append([mean_estimated, std_estimated])
-            else:
-                results_to_plot[k] = [[mean_estimated, std_estimated]]
+
+            results[k] = [mean_estimated, std_estimated]
+
         if self.ALGORITHM.GRAPH_NAME:
-            self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
-        results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+            results = results | self.get_statistics_of_graphs1(graphs_iteration, model_parameters)
+        return results
+
 
 
     def do(self, clear_previous_results=False):
@@ -501,12 +526,53 @@ class ExperimentRun:
             )
             progress_bar.update()
             position_inside_seeds_for_random = 0
-            for model_configuration in self.get_models(self.config):
-                for model_parameters in self.get_models(self.parameters):
-                    self.model_combination_execution(model_parameters, model_configuration,
-                                    clear_previous_results, seeds_for_random, position_inside_seeds_for_random,
-                                    results_to_plot, results_x_axis)
+
+            if self.dask_client:
+
+                futures = []
+                for model_configuration in self.get_models(self.config):
+                    for model_parameters in self.get_models(self.parameters):
+                        future = self.dask_client.submit(self.model_combination_execution,
+                                                         model_parameters, model_configuration, clear_previous_results,
+                                                         seeds_for_random, position_inside_seeds_for_random)
+                        futures.append(future)
+                        results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+
+                for future in self.dask_client.futures.as_completed(futures):
+                    results = future.result()
+                    for k in results.keys():
+                        if k in results_to_plot:
+                            results_to_plot[k].append(results[k])
+                        else:
+                            results_to_plot[k] = [results[k]]
                     progress_bar.next()
+
+            else:
+                for model_configuration in self.get_models(self.config):
+                    for model_parameters in self.get_models(self.parameters):
+
+
+                        result_iteration,graphs_iteration =\
+                            self.model_combination_execution(model_parameters, model_configuration, clear_previous_results,
+                                                             seeds_for_random, position_inside_seeds_for_random)
+
+                        # We save now mean and std inside results_to_plot to create later the results:
+                        for k in result_iteration.keys():
+                            if k.strip() == "t":
+                                continue
+                            mean_estimated = result_iteration[k].mean()
+                            warnings.filterwarnings(
+                                "ignore"
+                            )  # it generates RuntimeWarning: overflow encountered in multiply
+                            std_estimated = result_iteration[k].std()
+                            if k in results_to_plot:
+                                results_to_plot[k].append([mean_estimated, std_estimated])
+                            else:
+                                results_to_plot[k] = [[mean_estimated, std_estimated]]
+                        if self.ALGORITHM.GRAPH_NAME:
+                            self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
+                        results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+                        progress_bar.next()
 
             progress_bar.finish()
             print(f"Saving results in {self.OUTPUT_DIRECTORY}...")

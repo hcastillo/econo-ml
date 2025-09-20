@@ -27,7 +27,7 @@ import sys
 import inspect
 import json
 import warnings
-
+import os.path
 
 def determine_algorithm(given_name = "default", p:float = None, m:int = None):
     default_method = "Boltzmann"
@@ -51,8 +51,10 @@ def determine_algorithm(given_name = "default", p:float = None, m:int = None):
                         lender_change_resultant = obj()
 
     else:
-        # if it is not an string, we guess it  has indicated directly an instance of lender_change:
-        if isinstance(given_name, LenderChange):
+        # if it is not a string, we guess it  has indicated directly an instance of lender_change:
+        if issubclass(given_name, LenderChange):
+            lender_change_resultant = given_name()
+        elif isinstance(given_name, LenderChange):
             lender_change_resultant = given_name
         else:
             print(f"not found LenderChange algorithm with name '{given_name}'")
@@ -67,7 +69,6 @@ def determine_algorithm(given_name = "default", p:float = None, m:int = None):
         if not m is None and (isinstance(lender_change_resultant, Preferential) or
                               isinstance(lender_change_resultant, InitialStability)):
             lender_change_resultant.set_parameter('m', m)
-
     else:
         parameter, value = given_parameter.split('=')
         lender_change_resultant.set_parameter(parameter, value)
@@ -674,14 +675,17 @@ class RestrictedMarket(LenderChange):
         else:
             self.banks_graph, description = self.generate_banks_graph(this_model=this_model)
         self.banks_graph.type = self.GRAPH_NAME
-        # if this_model.export_datafile and save_graph:
-        #     filename_for_file = f"_{self.GRAPH_NAME}"
-        #     if self.SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP:
-        #         filename_for_file += f"_{this_model.t}"
-        #     save_graph_png(self.banks_graph, description,
-        #                  this_model.statistics.get_export_path(this_model.export_datafile, f"{filename_for_file}.png"))
-        #     save_graph_json(self.banks_graph,
-        #                  this_model.statistics.get_export_path(this_model.export_datafile, f"{filename_for_file}.json"))
+        #TODO begin
+        if this_model.export_datafile and save_graph:
+             filename_for_file = f"_{self.GRAPH_NAME}"
+             if self.SAVE_THE_DIFFERENT_GRAPH_OF_EACH_STEP:
+                 filename_for_file += f"_{this_model.t}"
+             destination_file_json = this_model.statistics.get_export_path(this_model.export_datafile,
+                                                                           f"{filename_for_file}.json")
+             if not os.path.isfile(destination_file_json):
+                 save_graph_json(self.banks_graph, destination_file_json)
+                 save_graph_png(self.banks_graph, description, destination_file_json.replace('.json','.png'))
+        #TODO end
         for (borrower, lender_for_borrower) in self.banks_graph.edges():
             this_model.banks[borrower].lender = lender_for_borrower
         return self.banks_graph
