@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Runs the Interbank model using montecarlo to determine the precision of RL model
@@ -12,6 +13,7 @@ import argparse
 import sys
 from progress.bar import Bar
 from scipy.stats import bernoulli
+
 
 NUM_SIMULATIONS = 50
 

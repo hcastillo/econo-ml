@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Runs the RL PPO to estimate the policy recommendation training (--training)

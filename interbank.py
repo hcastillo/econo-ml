@@ -1,20 +1,13 @@
-"""
-Generates a simulation of an interbank network following the rules described in paper
-  Reinforcement Learning Policy Recommendation for Interbank Network Stability
-  from Gabrielle and Alessio
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Generates a simulation of an interbank network
+# Usage: interbank.py --help
+#
+#
+# author: hector@bith.net
+# date:   04/2023, 09/2025
 
-  You can use it interactively, but if you import it, the process will be:
-    # model = Model()
-    #   # step by step:
-    #   model.enable_backward()
-    #   model.forward() # t=0 -> t=1
-    #   model.backward() : reverts the last step (when executed)
-    #   # all in a loop:
-    #   model.simulate_full()
-
-@author: hector@bith.net
-@date:   04/2023
-"""
 import copy
 import random
 import logging
@@ -38,17 +31,18 @@ import scipy.stats
 LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
 LENDER_CHANGE_DEFAULT_P = 0.2
 
+
 class Config:
     """
         Configuration parameters for the interbank network
     """
     T: int = 1000  # time (1000)
-    N: int = 50    # number of banks (50)
+    N: int = 50  # number of banks (50)
 
     reserves: float = 0.02
 
     # seed applied for random values (set during initialize)
-    seed : int = None
+    seed: int = None
 
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
@@ -113,10 +107,9 @@ class Config:
                            'loans': False, 'c': True,
                            'reserves': True, 'deposits': True,
                            'psi': True, 'psi_lenders': True,
-                           'potential_lenders':False,
+                           'potential_lenders': False,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
                            'num_banks': True, 'bankruptcy_rationed': True}
-
 
     def __str__(self, separator=''):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -151,7 +144,6 @@ class Config:
                 return 0.0
         return current_value
 
-
     def define_values_from_args(self, config_list):
         if config_list:
             config_list.sort()
@@ -161,7 +153,7 @@ class Config:
                     sys.exit(0)
                 elif item.startswith('lc='):
                     # to define the lender change algorithm by command line:
-                    self.lender_change = lc.determine_algorithm(item.replace("lc=",''))
+                    self.lender_change = lc.determine_algorithm(item.replace("lc=", ''))
                 else:
                     try:
                         name_config, value_config = item.split('=')
@@ -188,57 +180,56 @@ class Config:
                         logging.error('Value given for {} is not valid: {}'.format(name_config, value_config))
                         sys.exit(-1)
 
-class Statistics:
-    lender_no_d = []
-    no_lender = []
-    enough_money = []
-    bankruptcy = []
-    best_lender = []
-    best_lender_clients = []
-    potential_credit_channels = []
-    liquidity = []
-    policy = []
-    deposits = []
-    reserves = []
-    interest_rate = []
-    incrementD = []
-    fitness = []
-    rationing = []
-    leverage = []
-    systemic_leverage = []
-    loans = []
-    asset_i = []
-    asset_j = []
-    equity = []
-    equity_borrowers = []
-    P = []
-    B = []
-    c = []
-    P_max = []
-    P_min = []
-    P_std = []
-    active_borrowers = []
-    active_lenders = []
-    potential_lenders = []
-    prob_bankruptcy = []
-    num_of_rationed = []
-    psi = []
-    psi_lenders = []
-    num_banks = []
-    bankruptcy_rationed = []
-    model = None
-    graphs = {}
-    graphs_pos = None
-    plot_format = None
-    graph_format = '.svg'
-    output_format = '.gdt'
-    create_gif = False
-    OUTPUT_DIRECTORY = 'output'
-    NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
-    # cross correlation of interest rate against bankruptcies
-    correlation = []
 
+class Statistics:
     def __init__(self, in_model):
+        self.lender_no_d = []
+        self.no_lender = []
+        self.enough_money = []
+        self.bankruptcy = []
+        self.best_lender = []
+        self.best_lender_clients = []
+        self.potential_credit_channels = []
+        self.liquidity = []
+        self.policy = []
+        self.deposits = []
+        self.reserves = []
+        self.interest_rate = []
+        self.incrementD = []
+        self.fitness = []
+        self.rationing = []
+        self.leverage = []
+        self.systemic_leverage = []
+        self.loans = []
+        self.asset_i = []
+        self.asset_j = []
+        self.equity = []
+        self.equity_borrowers = []
+        self.P = []
+        self.B = []
+        self.c = []
+        self.P_max = []
+        self.P_min = []
+        self.P_std = []
+        self.active_borrowers = []
+        self.active_lenders = []
+        self.potential_lenders = []
+        self.prob_bankruptcy = []
+        self.num_of_rationed = []
+        self.psi = []
+        self.psi_lenders = []
+        self.num_banks = []
+        self.bankruptcy_rationed = []
+        self.model = in_model
+        self.graphs = {}
+        self.graphs_pos = None
+        self.plot_format = None
+        self.graph_format = '.svg'
+        self.output_format = '.gdt'
+        self.create_gif = False
+        self.OUTPUT_DIRECTORY = 'output'
+        self.NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
+        self.correlation = []         # cross correlation of interest rate against bankruptcies
         self.detailed_equity = None
         self.model = in_model
 
@@ -310,9 +301,8 @@ class Statistics:
 
     def compute_potential_lenders(self):
         for bank in self.model.banks:
-            if bank.incrD>0:
+            if bank.incrD > 0:
                 self.potential_lenders[self.model.t] += 1
-
 
     def compute_interest_rates_and_loans(self):
         interests_rates_of_borrowers = []
@@ -322,7 +312,7 @@ class Statistics:
         sum_of_loans = 0
         num_of_banks_that_are_lenders = 0
         num_of_banks_that_are_borrowers = 0
-        for bank in self.model.banks:            
+        for bank in self.model.banks:
             if bank.incrD >= 0:
                 if bank.active_borrowers:
                     asset_i.append(bank.asset_i)
@@ -365,7 +355,7 @@ class Statistics:
                     amount_of_loan = 0
                     if bank.get_lender() is not None and bank.get_lender().l > 0:
                         amount_of_loan = bank.get_lender().l
-                    leverage_of_lenders.append(amount_of_loan/ bank.E)
+                    leverage_of_lenders.append(amount_of_loan / bank.E)
                 if bank.active_borrowers:
                     for borrower in bank.active_borrowers:
                         sum_of_equity_borrowers += self.model.banks[borrower].E
@@ -419,26 +409,19 @@ class Statistics:
         self.reserves[self.model.t] = total_reserves
 
     def compute_probability_of_lender_change_num_banks_prob_bankruptcy(self):
-        self.model.maxE = 0
-        for bank in self.model.banks:
-            if bank.E > self.model.maxE:
-                self.model.maxE = bank.E
-        avg_prob_bankruptcy = []
-        if self.model.maxE > 0:
-            for bank in self.model.banks:
-                if bank.has_a_loan:
-                    avg_prob_bankruptcy.append(1 - bank.E / self.model.maxE)
+        self.model.maxE = max((bank.E for bank in self.model.banks), default=0)
+        avg_prob_bankruptcy = [
+            1 - bank.E / self.model.maxE
+            for bank in self.model.banks
+            if bank.has_a_loan and self.model.maxE > 0
+        ]
         self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy) if avg_prob_bankruptcy else np.nan
 
-        probabilities = []
-        lender_capacities = []
-        num_banks = 0
-        for bank in self.model.banks:
-            if not bank.failed:
-                probabilities.append(bank.P)
-                lender_capacities.append(np.mean(bank.c))
-                num_banks += 1
-        self.P[self.model.t] = sum(probabilities) / len(probabilities) if len(probabilities) > 0 else np.nan
+        probabilities = [bank.P for bank in self.model.banks if not bank.failed]
+        lender_capacities = [np.mean(bank.c) for bank in self.model.banks if not bank.failed]
+        num_banks = len(probabilities)
+
+        self.P[self.model.t] = np.mean(probabilities) if probabilities else np.nan
         self.P_max[self.model.t] = max(probabilities) if probabilities else np.nan
         self.c[self.model.t] = np.mean(lender_capacities) if lender_capacities else np.nan
         self.P_min[self.model.t] = min(probabilities) if probabilities else np.nan
@@ -446,12 +429,12 @@ class Statistics:
         self.num_banks[self.model.t] = num_banks
 
     def get_cross_correlation_result(self, t):
-        if t in [0,1] and len(self.correlation)>t:
+        if t in [0, 1] and len(self.correlation) > t:
             status = '  '
-            if self.correlation[t][0]>0:
-                if self.correlation[t][1]<0.05:
+            if self.correlation[t][0] > 0:
+                if self.correlation[t][1] < 0.05:
                     status = '**'
-                elif self.correlation[t][1]<0.10:
+                elif self.correlation[t][1] < 0.10:
                     status = '* '
             return (f'correl t={t} int_rate/bankrupt {self.correlation[t][0]:4.2} '
                     f'p_value={self.correlation[t][1]:4.2} {status}')
@@ -460,16 +443,16 @@ class Statistics:
 
     def determine_cross_correlation(self):
         if np.all(self.bankruptcy == 0) or np.all(self.bankruptcy == self.bankruptcy[0]) or \
-            np.all(self.interest_rate == 0) or np.all(self.interest_rate == self.interest_rate[0]):
+                np.all(self.interest_rate == 0) or np.all(self.interest_rate == self.interest_rate[0]):
             self.correlation = []
         else:
             try:
                 self.correlation = [
                     # correlation_coefficient = [-1..1] and p_value < 0.10
-                    scipy.stats.pearsonr(self.interest_rate,self.bankruptcy),
+                    scipy.stats.pearsonr(self.interest_rate, self.bankruptcy),
                     # time delay 1:
-                    scipy.stats.pearsonr(self.interest_rate[1:],self.bankruptcy[:-1])
-                    ]
+                    scipy.stats.pearsonr(self.interest_rate[1:], self.bankruptcy[:-1])
+                ]
             except ValueError:
                 self.correlation = []
 
@@ -596,14 +579,14 @@ class Statistics:
         for variable_name, _ in enumerate_results():
             if variable_name == 'leverage':
                 variable_name += '_'
-            if i==1:
+            if i == 1:
                 variables.append(variable(name='{}'.format(variable_name), label='{}'.format(header_text)))
-            elif i in [2,3]:
+            elif i in [2, 3]:
                 variables.append(variable(name='{}'.format(variable_name),
-                        label=self.get_cross_correlation_result(i-2)))
+                                          label=self.get_cross_correlation_result(i - 2)))
             else:
                 variables.append(variable(name='{}'.format(variable_name)))
-            i = i+1
+            i = i + 1
         xml_observations = xml_observations(count='{}'.format(self.model.config.T), labels='false')
         for i in range(self.model.config.T):
             string_obs = ''
@@ -830,6 +813,7 @@ class Statistics:
                 value = '{};'.format(value)
             self.detailed_equity.write(value)
 
+
 class Log:
     """
     The class acts as a logger and helpers to represent the data and evol from the Model.
@@ -856,7 +840,7 @@ class Log:
             result = result[:-1]
         return result
 
-    def debug_banks(self, details: bool=True, info: str=''):
+    def debug_banks(self, details: bool = True, info: str = ''):
         for bank in self.model.banks:
             if not info:
                 info = '-----'
@@ -884,7 +868,7 @@ class Log:
         if text:
             self.logger.error('t={}/{} {}'.format(self.model.t, module, text))
 
-    def define_log(self, log: str, logfile: str='', modules: str=''):
+    def define_log(self, log: str, logfile: str = '', modules: str = ''):
         self.modules = modules.split(',') if modules else []
         formatter = logging.Formatter('%(levelname)s-' + '- %(message)s')
         self.logLevel = Log.get_level(log.upper())
@@ -901,6 +885,7 @@ class Log:
             ch.setLevel(self.logLevel)
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
+
 
 class Model:
     """
@@ -988,7 +973,6 @@ class Model:
         self.t = 0
         if not self.config.lender_change:
             self.config.lender_change = lc.determine_algorithm()
-            self.config.lender_change.set_parameter('p', 0.5)
         self.policy_changes = 0
         if export_datafile:
             self.export_datafile = export_datafile
@@ -1055,7 +1039,6 @@ class Model:
                 self.log.debug('*****', 'Finish because there are only two banks surviving'.format())
                 break
 
-
     def finish(self):
         if not self.test:
             self.statistics.determine_cross_correlation()
@@ -1072,7 +1055,7 @@ class Model:
         plt.close()
         return self.statistics.get_data()
 
-    def set_policy_recommendation(self, n: int=None, eta: float=None, eta_1: float=None):
+    def set_policy_recommendation(self, n: int = None, eta: float = None, eta_1: float = None):
         if eta_1 is not None:
             n = round(eta_1)
         if n is not None and eta is None:
@@ -1199,7 +1182,7 @@ class Model:
         self.config.lender_change.extra_relationships_change(self)
 
         # first we normalize the banks interest rate if it is necessary:
-        if self.config.normalize_interest_rate_max and self.config.normalize_interest_rate_max>0:
+        if self.config.normalize_interest_rate_max and self.config.normalize_interest_rate_max > 0:
             max_r = 0
             min_r = numpy.inf
             for bank in self.banks:
@@ -1215,13 +1198,12 @@ class Model:
                         #                                 b =  self.config.normalize_interest_rate_max
                         # x = a + \frac{(x - x_{\min})}{x_{\max} - x_{\min}} (b - a)
                         self.banks[bank.lender].rij[bank.id] = \
-                            self.config.r_i0 +( self.banks[bank.lender].rij[bank.id]  - min_r) / (max_r - min_r) * \
-                            ( self.config.normalize_interest_rate_max - self.config.r_i0 )
+                            self.config.r_i0 + (self.banks[bank.lender].rij[bank.id] - min_r) / (max_r - min_r) * \
+                            (self.config.normalize_interest_rate_max - self.config.r_i0)
                     else:
                         # if max_r = min_r or max_r< self.config.r_i0 we have maybe only one bank lending, so
                         # max interest rate:
                         self.banks[bank.lender].rij[bank.id] = self.config.normalize_interest_rate_max
-
 
         num_of_rationed = 0
         total_rationed = 0
@@ -1238,17 +1220,17 @@ class Model:
                     rationing_of_bank = demand
                     total_rationed += rationing_of_bank
                     num_of_rationed += 1
-                    bank.do_fire_sales(rationing_of_bank, 
-                        f'rationing={{rationing_of_bank}} as no lender for this bank' if lender is None 
-                        else f'rationing={{rationing_of_bank}} as lender {{lender.get_id(short=True)}} has no money', 
-                        'loans')
+                    bank.do_fire_sales(rationing_of_bank,
+                                       f'rationing={{rationing_of_bank}} as no lender for this bank' if lender is None
+                                       else f'rationing={{rationing_of_bank}} as lender {{lender.get_id(short=True)}} has no money',
+                                       'loans')
                 elif demand > lender.s:
                     rationing_of_bank = demand - lender.s
                     total_rationed += rationing_of_bank
                     num_of_rationed += 1
                     bank.do_fire_sales(rationing_of_bank,
-                        f'lender.s={{lender.s}} but need d={{demand}}, rationing={{rationing_of_bank}}', 
-                        'loans')
+                                       f'lender.s={{lender.s}} but need d={{demand}}, rationing={{rationing_of_bank}}',
+                                       'loans')
                     loan = lender.s if lender.s > 0 else 0
                     bank.l = loan
                     if loan > 0:
@@ -1269,7 +1251,6 @@ class Model:
             bank.rationing = rationing_of_bank
         self.statistics.num_of_rationed[self.t] = num_of_rationed
         self.statistics.rationing[self.t] = total_rationed
-
 
     def do_repayments(self):
         for bank in self.banks:
@@ -1295,7 +1276,8 @@ class Model:
                     lack_of_capital_to_return_loan = loan_to_return - bank.C
                     bank.C = 0
                     obtained_in_fire_sales = bank.do_fire_sales(lack_of_capital_to_return_loan,
-                            'to return loan and interest {} > C={}'.format(loan_to_return, bank.C), 'repay')
+                                                                'to return loan and interest {} > C={}'.format(
+                                                                    loan_to_return, bank.C), 'repay')
                     gap_of_money_not_covered_of_loan = lack_of_capital_to_return_loan - obtained_in_fire_sales
                     if gap_of_money_not_covered_of_loan > loan_profits:
                         bank.paid_profits = 0
@@ -1319,7 +1301,7 @@ class Model:
                 if bank.E < 0:
                     bank.failed = True
                     self.log.debug('repay',
-                                   '{} fails as paying interest of the loan generates E<0'.format(bank.get_id()))
+                                   '{} fails because the profits of the loan generates E<0'.format(bank.get_id()))
         for bank in self.banks:
             if bank.l == 0 and (not bank.failed):
                 if bank.C < bank.incrD:
@@ -1380,7 +1362,6 @@ class Model:
         if self.t == 0:
             self.log.debug_banks()
 
-
     def setup_links(self):
         if len(self.banks) <= 1:
             return
@@ -1405,85 +1386,39 @@ class Model:
                 bank.c.append(c)
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE
-        # optimized 2:
-        N = self.config.N
-        r_i0 = self.config.r_i0
-        chi = self.config.chi
-        phi = self.config.phi
-        xi = self.config.xi
-        psi_global = self.config.psi
-        psi_endogenous = self.config.psi_endogenous
+        min_r = sys.maxsize
+        for bank_i in self.banks:
+            bank_i.asset_i = 0
+            bank_i.asset_j = 0
+            for j in range(self.config.N):
+                try:
+                    if j == bank_i.id:
+                        bank_i.rij[j] = 0
+                    else:
+                        if self.banks[j].p == 0 or bank_i.c[j] == 0:
+                            bank_i.rij[j] = self.config.r_i0
+                        else:
+                            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+                            if psi == 1:
+                                psi = 0.99999999999999
+                            bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
+                                              - (1 - self.banks[j].p) * (
+                                                          self.config.xi * self.banks[j].A - bank_i.c[j]))
+                                             /
+                                             (self.banks[j].p * bank_i.c[j] * (1 - psi)))
 
-        A = np.array([bank.A for bank in self.banks])
-        p = np.array([bank.p for bank in self.banks])
-        psi_array = np.array([bank.psi for bank in self.banks]) if psi_endogenous else np.full(N, psi_global)
-        c = np.array([bank.c for bank in self.banks])  # Matriz NxN
-
-        # Ajustar psi cercano a 1 para evitar división por cero
-        psi_array = np.where(psi_array == 1, 0.99999999999999, psi_array)
-
-        # Máscaras para condiciones
-        mask_diag = np.eye(N, dtype=bool)
-        mask_invalid = (p == 0)
-
-        # Broadcasting para cálculo matricial
-        psi_matrix = np.repeat(psi_array[:, np.newaxis], N, axis=1)
-        denom = p * c * (1 - psi_matrix)
-        num = (chi * A[:, np.newaxis] - phi * A[np.newaxis, :] - (1 - p[np.newaxis, :]) * (xi * A[np.newaxis, :] - c))
-
-        # Inicializar rij con r_i0 excepto diagonal cero
-        rij = np.where(mask_diag, 0, r_i0)
-        valid_mask = (~mask_diag) & (~mask_invalid[np.newaxis, :]) & (c != 0) & (denom != 0)
-        rij[valid_mask] = num[valid_mask] / denom[valid_mask]
-        rij[rij < 0] = r_i0
-
-        # Asignar rij a cada banco
-        for i, bank in enumerate(self.banks):
-            bank.rij = rij[i]
-
-        # Calcular r, asset_i y asset_j
-        asset_i = A.copy()  # asumido igual que en el código original
-        asset_j = np.sum(A) - A
-        for i, bank in enumerate(self.banks):
-            bank.r = np.sum(bank.rij) / (N - 1)
-            bank.asset_i = asset_i[i]
-            bank.asset_j = asset_j[i] / (N - 1)
-
-        min_r = np.min([bank.r for bank in self.banks])
-
-        # min_r = sys.maxsize
-        # for bank_i in self.banks:
-        #     bank_i.asset_i = 0
-        #     bank_i.asset_j = 0
-        #     for j in range(self.config.N):
-        #         try:
-        #             if j == bank_i.id:
-        #                 bank_i.rij[j] = 0
-        #             else:
-        #                 if self.banks[j].p == 0 or bank_i.c[j] == 0:
-        #                     bank_i.rij[j] = self.config.r_i0
-        #                 else:
-        #                     psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-        #                     if psi==1:
-        #                         psi=0.99999999999999
-        #                     bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
-        #                                       - (1 - self.banks[j].p) * (self.config.xi * self.banks[j].A - bank_i.c[j]))
-        #                                      /
-        #                                      (self.banks[j].p * bank_i.c[j] * (1 - psi)))
-        #
-        #
-        #                     bank_i.asset_i += bank_i.A
-        #                     bank_i.asset_j += self.banks[j].A
-        #                     # bank_i.asset_j += 1 - self.banks[j].p
-        #                 if bank_i.rij[j] < 0:
-        #                     bank_i.rij[j] = self.config.r_i0
-        #         except ZeroDivisionError:
-        #             bank_i.rij[j] = self.config.r_i0
-        #     bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
-        #     bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
-        #     bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
-        #     if bank_i.r < min_r:
-        #         min_r = bank_i.r
+                            bank_i.asset_i += bank_i.A
+                            bank_i.asset_j += self.banks[j].A
+                            # bank_i.asset_j += 1 - self.banks[j].p
+                        if bank_i.rij[j] < 0:
+                            bank_i.rij[j] = self.config.r_i0
+                except ZeroDivisionError:
+                    bank_i.rij[j] = self.config.r_i0
+            bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
+            bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
+            bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
+            if bank_i.r < min_r:
+                min_r = bank_i.r
         for bank in self.banks:
             bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
         self.config.lender_change.step_setup_links(self)
@@ -1509,6 +1444,7 @@ class Model:
                 self.value_for_reintroduced_banks_D = np.median(banks_d)
                 self.value_for_reintroduced_banks_E = np.median(banks_e)
 
+
 class Bank:
     """
     It represents an individual bank of the network, with the logic of interaction between it and the interbank system
@@ -1528,8 +1464,7 @@ class Bank:
             #import math
             #return math.sqrt(math.sqrt(self.model.banks[self.lender].rij[self.id]))/20
 
-
-    def get_id(self, short: bool=False):
+    def get_id(self, short: bool = False):
         init = 'bank#' if not short else '#'
         if self.failures > 0:
             return '{}{}.{}'.format(init, self.id, self.failures)
@@ -1673,13 +1608,311 @@ class Bank:
             text += ' psi={}'.format(Log.__format_number__(self.psi))
         return text
 
+
+
+class ModelOptimized(Model):
+    """
+    Improved version optimized for many executions
+    """
+
+    def setup_links3(self):
+        if len(self.banks) <= 1:
+            return
+
+        # Paso 1: Cálculo de valores máximos
+        self.maxE = max(bank.E for bank in self.banks)
+        max_C = max(bank.C for bank in self.banks)
+
+        # Paso 2: Inicialización de parámetros bancarios
+        for bank in self.banks:
+            bank.p = bank.E / self.maxE if self.maxE != 0 else 0
+            lender = bank.get_lender()
+            bank.lambda_ = lender.l / bank.E if lender and lender.l > 0 and bank.E != 0 else 0
+            bank.incrD = 0
+            bank.A = bank.C + bank.L + bank.R  # Se puede calcular aquí directamente
+        # Paso 3: Cálculo de h (normalización de lambda)
+        max_lambda = max(bank.lambda_ for bank in self.banks)
+        for bank in self.banks:
+            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
+
+        # Paso 4: Cálculo de c y psi
+        for bank in self.banks:
+            bank.c = []
+            for i in range(self.config.N):
+                other_bank = self.banks[i]
+                c_value = 0 if i == bank.id else (1 - other_bank.h) * other_bank.A
+                bank.c.append(c_value)
+            if self.config.psi_endogenous:
+                bank.psi = bank.E / self.maxE if self.maxE != 0 else 0
+
+        # Paso 5: Cálculo de rij y activos
+        min_r = float('inf')
+        for bank_i in self.banks:
+            bank_i.asset_i = 0
+            bank_i.asset_j = 0
+            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+            psi = min(psi, 0.99999999999999)
+
+            for j in range(self.config.N):
+                if j == bank_i.id:
+                    bank_i.rij[j] = 0
+                    continue
+
+                bank_j = self.banks[j]
+                c_ij = bank_i.c[j]
+                rij = self._calculate_rij(bank_i, bank_j, c_ij, psi)
+                bank_i.rij[j] = rij
+
+                bank_i.asset_i += bank_i.A
+                bank_i.asset_j += bank_j.A
+
+            N_minus_1 = self.config.N - 1
+            bank_i.r = np.sum(bank_i.rij) / N_minus_1
+            bank_i.asset_i /= N_minus_1
+            bank_i.asset_j /= N_minus_1
+            min_r = min(min_r, bank_i.r)
+
+        # Paso 6: Cálculo de mu
+        for bank in self.banks:
+            ratio = min_r / bank.r if bank.r != 0 else 0
+            bank.mu = self.eta * (bank.C / max_C) + (1 - self.eta) * ratio
+
+        # Paso 7: Cambios de prestamista y logging
+        self.config.lender_change.step_setup_links(self)
+        for bank in self.banks:
+            log_msg = self.config.lender_change.change_lender(self, bank, self.t)
+            self.log.debug('links', log_msg)
+
+    def _calculate_rij(self, bank_i, bank_j, c_ij, psi):
+        """Calcula el valor rij entre dos bancos."""
+        if bank_j.p == 0 or c_ij == 0:
+            return self.config.r_i0
+
+        numerator = (self.config.chi * bank_i.A - self.config.phi * bank_j.A -
+                     (1 - bank_j.p) * (self.config.xi * bank_j.A - c_ij))
+        denominator = bank_j.p * c_ij * (1 - psi)
+
+        if denominator == 0:
+            return self.config.r_i0
+
+        rij = numerator / denominator
+        return rij if rij >= 0 else self.config.r_i0
+
+    def setup_links(self):
+        if len(self.banks) <= 1:
+            return
+        self.maxE = max(self.banks, key=lambda k: k.E).E
+        max_c = max(self.banks, key=lambda k: k.C).C
+        for bank in self.banks:
+            bank.p = bank.E / self.maxE
+            if bank.get_lender() is not None and bank.get_lender().l > 0:
+                bank.lambda_ = bank.get_lender().l / bank.E
+            else:
+                bank.lambda_ = 0
+            # bank.lambda_ = bank.l / bank.E
+            bank.incrD = 0
+        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
+        for bank in self.banks:
+            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
+            bank.A = bank.C + bank.L + bank.R
+        for bank in self.banks:
+            bank.c = []
+            for i in range(self.config.N):
+                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
+                bank.c.append(c)
+            if self.config.psi_endogenous:
+                bank.psi = bank.E / self.maxE
+
+        # optimized part ----------
+        min_r = float('inf')
+        for bank_i in self.banks:
+            bank_i.asset_i = 0
+            bank_i.asset_j = 0
+            A_i = bank_i.A
+            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+            psi = min(psi, 0.99999999999999)
+
+            for j in range(self.config.N):
+                if j == bank_i.id:
+                    bank_i.rij[j] = 0
+                    continue
+
+                bank_j = self.banks[j]
+                p_j = bank_j.p
+                c_ij = bank_i.c[j]
+                A_j = bank_j.A
+                bank_i.rij[j] = self._calculate_rij(bank_i, bank_j, c_ij, psi)
+
+                if p_j != 0 and c_ij != 0:
+                    bank_i.asset_i += A_i
+                    bank_i.asset_j += A_j
+
+            N_minus_1 = self.config.N - 1
+            bank_i.r = np.sum(bank_i.rij) / N_minus_1
+            bank_i.asset_i /= N_minus_1
+            bank_i.asset_j /= N_minus_1
+            min_r = min(min_r, bank_i.r)
+        # ----------
+        for bank in self.banks:
+            bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
+        self.config.lender_change.step_setup_links(self)
+        for bank in self.banks:
+            log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
+            self.log.debug('links', log_change_lender)
+
+
+    def setup_links5(self):
+        if len(self.banks) <= 1:
+            return
+        self.maxE = max(self.banks, key=lambda k: k.E).E
+        max_c = max(self.banks, key=lambda k: k.C).C
+        for bank in self.banks:
+            bank.p = bank.E / self.maxE
+            if bank.get_lender() is not None and bank.get_lender().l > 0:
+                bank.lambda_ = bank.get_lender().l / bank.E
+            else:
+                bank.lambda_ = 0
+            # bank.lambda_ = bank.l / bank.E
+            bank.incrD = 0
+        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
+        for bank in self.banks:
+            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
+            bank.A = bank.C + bank.L + bank.R
+        for bank in self.banks:
+            bank.c = []
+            for i in range(self.config.N):
+                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
+                bank.c.append(c)
+            if self.config.psi_endogenous:
+                bank.psi = bank.E / self.maxE
+
+        # optimized part ----------
+        min_r = float('inf')
+        for bank_i in self.banks:
+            bank_i.asset_i = 0
+            bank_i.asset_j = 0
+            A_i = bank_i.A
+            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
+            psi = min(psi, 0.99999999999999)
+
+            for j in range(self.config.N):
+                if j == bank_i.id:
+                    bank_i.rij[j] = 0
+                    continue
+
+                bank_j = self.banks[j]
+                p_j = bank_j.p
+                c_ij = bank_i.c[j]
+                A_j = bank_j.A
+
+                if p_j == 0 or c_ij == 0:
+                    bank_i.rij[j] = self.config.r_i0
+                else:
+                    numerator = (self.config.chi * A_i - self.config.phi * A_j -
+                                 (1 - p_j) * (self.config.xi * A_j - c_ij))
+                    denominator = p_j * c_ij * (1 - psi)
+
+                    if denominator != 0:
+                        rij_value = numerator / denominator
+                        bank_i.rij[j] = rij_value if rij_value >= 0 else self.config.r_i0
+                    else:
+                        bank_i.rij[j] = self.config.r_i0
+
+                    bank_i.asset_i += A_i
+                    bank_i.asset_j += A_j
+
+            N_minus_1 = self.config.N - 1
+            bank_i.r = np.sum(bank_i.rij) / N_minus_1
+            bank_i.asset_i /= N_minus_1
+            bank_i.asset_j /= N_minus_1
+            min_r = min(min_r, bank_i.r)
+        # ----------
+        for bank in self.banks:
+            bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
+        self.config.lender_change.step_setup_links(self)
+        for bank in self.banks:
+            log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
+            self.log.debug('links', log_change_lender)
+
+
+    def setup_links1(self):
+        if len(self.banks) <= 1:
+            return
+        self.maxE = max(self.banks, key=lambda k: k.E).E
+        max_c = max(self.banks, key=lambda k: k.C).C
+        for bank in self.banks:
+            bank.p = bank.E / self.maxE
+            if bank.get_lender() is not None and bank.get_lender().l > 0:
+                bank.lambda_ = bank.get_lender().l / bank.E
+            else:
+                bank.lambda_ = 0
+            # bank.lambda_ = bank.l / bank.E
+            bank.incrD = 0
+        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
+        for bank in self.banks:
+            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
+            bank.A = bank.C + bank.L + bank.R
+        for bank in self.banks:
+            bank.c = []
+            for i in range(self.config.N):
+                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
+                bank.c.append(c)
+            if self.config.psi_endogenous:
+                bank.psi = bank.E / self.maxE
+
+        # optimized part ----------
+        N = self.config.N
+        chi = self.config.chi
+        phi = self.config.phi
+        xi = self.config.xi
+        psi_global = self.config.psi
+        psi_endogenous = self.config.psi_endogenous
+
+        A = np.array([bank.A for bank in self.banks])
+        p = np.array([bank.p for bank in self.banks])
+        psi_array = np.array([bank.psi for bank in self.banks]) if psi_endogenous else np.full(N, psi_global)
+        c = np.array([bank.c for bank in self.banks])  # NxN
+
+        # Adjust ps1 to avoid 1 and division by zero errors:
+        psi_array = np.where(psi_array == 1, 0.99999999999999, psi_array)
+
+        mask_diag = np.eye(N, dtype=bool)
+        mask_invalid = (p == 0)
+
+        psi_matrix = np.repeat(psi_array[:, np.newaxis], N, axis=1)
+        denom = p * c * (1 - psi_matrix)
+        num = (chi * A[:, np.newaxis] - phi * A[np.newaxis, :] - (1 - p[np.newaxis, :]) * (xi * A[np.newaxis, :] - c))
+
+        rij = np.where(mask_diag, 0, self.config.r_i0)
+        valid_mask = (~mask_diag) & (~mask_invalid[np.newaxis, :]) & (c != 0) & (denom != 0)
+        rij[valid_mask] = num[valid_mask] / denom[valid_mask]
+        rij[rij < 0] = self.config.r_i0
+
+        # Determine r, asset_i y asset_j
+        asset_i = A.copy()
+        asset_j = np.sum(A) - A
+        for i, bank in enumerate(self.banks):
+            bank.rij = rij[i]
+            bank.r = np.sum(bank.rij) / (N - 1)
+            bank.asset_i = asset_i[i]
+            bank.asset_j = asset_j[i] / (N - 1)
+        min_r = np.min([bank.r for bank in self.banks])
+        # ----------
+        for bank in self.banks:
+            bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
+        self.config.lender_change.step_setup_links(self)
+        for bank in self.banks:
+            log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
+            self.log.debug('links', log_change_lender)
+
+
+
 class Utils:
     """
     Auxiliary class to encapsulate the use of the model
     """
 
-    @staticmethod
-    def __extract_t_values_from_arg__(param):
+    def __extract_t_values_from_arg__(self, param):
         if param is None:
             return None
         else:
@@ -1693,12 +1926,10 @@ class Utils:
                         raise ValueError('{} greater than Config.T or below 0'.format(t[-1]))
                 return t
 
-    @staticmethod
-    def run_interactive():
+    def run_interactive(self, model: Model):
         """
             Run interactively the model
         """
-        global model
         parser = argparse.ArgumentParser()
         parser.description = "<config=value> to set up Config options. use '?' to see values"
         parser.add_argument('--log', default='ERROR', help='Log level messages (ERROR,DEBUG,INFO...)')
@@ -1733,8 +1964,9 @@ class Utils:
         parser.add_argument('--output_format', type=str, default='gdt',
                             help='File extension for data (gdt,txt,csv,both)')
         parser.add_argument('--output', type=str, default=None,
-
                             help='Directory where to store the results')
+        parser.add_argument('--fast',  action='store_true', default=False,
+                            help='Uses the improved version (fastest), same results')
         parser.add_argument('--no_replace', action='store_true',
                             default=not model.config.allow_replacement_of_bankrupted,
                             help='No replace banks when they go bankrupted')
@@ -1743,6 +1975,8 @@ class Utils:
                             help='Reintroduce banks with the median of current banks')
         parser.add_argument('--seed', type=int, default=None, help='seed used for random generator')
         args, other_possible_config_args = parser.parse_known_args()
+        if args.fast:
+            model = ModelOptimized()
         if args.graph_stats:
             lc.GraphStatistics.describe(args.graph_stats, interact=True)
         if args.t != model.config.T:
@@ -1764,13 +1998,12 @@ class Utils:
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         model.statistics.define_detailed_equity(args.detailed_equity, args.save)
-        Utils.run(args.save, Utils.__extract_t_values_from_arg__(args.graph),
-                  output_directory=args.output, seed=args.seed,
-                  interactive=args.log == 'ERROR' or args.logfile is not None)
+        self.run(model, save=args.save, save_graph_instants=self.__extract_t_values_from_arg__(args.graph),
+                 output_directory=args.output, seed=args.seed,
+                 interactive=args.log == 'ERROR' or args.logfile is not None)
 
-    @staticmethod
-    def run(save=None, save_graph_instants=None, interactive=False, output_directory=None, seed=None):
-        global model
+    def run(self, model: Model, save=None, save_graph_instants=None, interactive=False,
+            output_directory=None, seed=None):
         if not save_graph_instants and Config.GRAPHS_MOMENTS:
             save_graph_instants = Config.GRAPHS_MOMENTS
         initial_time = time.perf_counter()
@@ -1779,7 +2012,7 @@ class Utils:
         model.simulate_full(interactive=interactive)
         result = model.finish()
         if interactive and model.statistics.get_cross_correlation_result(0):
-            print('\n'+model.statistics.get_cross_correlation_result(0))
+            print('\n' + model.statistics.get_cross_correlation_result(0))
             print(model.statistics.get_cross_correlation_result(1))
             print('bankruptcy.mean: %s' % model.statistics.bankruptcy.mean())
             print('interest_rate.mean: %s' % model.statistics.interest_rate.mean())
@@ -1801,10 +2034,13 @@ class Utils:
             return get_ipython().__class__.__name__ == 'SpyderShell'
         except NameError:
             return False
+
+
+utils = Utils()
 model = Model()
 if Utils.is_notebook():
     model.statistics.OUTPUT_DIRECTORY = '/content'
     model.statistics.output_format = 'csv'
-    Utils.run(save='results')
+    utils.run(model, save='results')
 elif __name__ == '__main__':
-    Utils.run_interactive()
+    utils.run_interactive(model)

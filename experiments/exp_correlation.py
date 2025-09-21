@@ -14,8 +14,8 @@ import scipy.stats
 
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
-    T = 1000
-    MC = 10
+    T = 100
+    MC = 3
 
     ALGORITHM = ShockedMarket3
     OUTPUT_DIRECTORY = "c:\\experiments\\correlation_test"

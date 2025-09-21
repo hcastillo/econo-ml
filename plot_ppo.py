@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Plots:
@@ -15,6 +16,7 @@ import numpy as np
 import pandas as pd
 import math
 
+
 class PlotFrequency:
     data = []
     legend = []
@@ -27,7 +29,7 @@ class PlotFrequency:
     def load_data(self, datafiles):
         for datafile in datafiles.split(","):
             self.data.append([])
-            self.legend.append(datafile.replace("_policy","").upper())
+            self.legend.append(datafile.replace("_policy", "").upper())
             lines = 0
             ignored = 0
             with open(self.default_interbank.statistics.get_export_path(datafile, '.txt'),
@@ -55,7 +57,7 @@ class PlotFrequency:
                 for values in data:
                     # colum#0 is the time
                     for value in values[1:]:
-                        value=value.strip()
+                        value = value.strip()
                         if value == "0.0":
                             yy[-1][0] += 1
                         else:
@@ -69,10 +71,11 @@ class PlotFrequency:
             plt.ylabel("Frequency")
             # plt.figure(figsize=(12, 8))
             for i in range(len(yy)):
-                plt.bar(x+(0.1*i), yy[i], color=self.get_color(i), width=0.1, label=self.legend[i])
+                plt.bar(x + (0.1 * i), yy[i], color=self.get_color(i), width=0.1, label=self.legend[i])
             plt.legend()
             plt.savefig(destination)
             print("plot saved in ", destination)
+
 
 class PlotCumulativeFitness:
     t = []
@@ -80,7 +83,7 @@ class PlotCumulativeFitness:
     stdev = []
     num_of_simulations = 0
     confidence_interval = []
-    z_confidence_interval= 1.96
+    z_confidence_interval = 1.96
     mean = []
     colors = ['black', 'red', 'green', 'blue', 'purple']
     fills = ['gray', 'mistyrose', 'honeydew', 'lavender', 'plum']
@@ -97,7 +100,7 @@ class PlotCumulativeFitness:
         result = []
         i = 0
         for item in strings:
-            result += [float(item)*n]
+            result += [float(item) * n]
             i += 1
         if i > PlotCumulativeFitness.num_of_simulations:
             PlotCumulativeFitness.num_of_simulations = i
@@ -123,7 +126,7 @@ class PlotCumulativeFitness:
                             mean.append(elements.mean())
                             stdev.append(elements.std())
                             confidence_interval.append(
-                               self.z_confidence_interval*stdev[-1] / math.sqrt(elements.size))
+                                self.z_confidence_interval * stdev[-1] / math.sqrt(elements.size))
                             lines += 1
                         else:
                             ignored += 1
@@ -134,7 +137,6 @@ class PlotCumulativeFitness:
             self.stdev.append(np.array(stdev))
             self.t.append(np.array(t))
             print(f"{ignored} lines in {datafile}, {lines} incorporated")
-
 
     def plot(self, save, file_format, type):
         destination = self.default_interbank.statistics.get_export_path(save, file_format)
@@ -160,8 +162,8 @@ class PlotCumulativeFitness:
                     mean = mean_aux[0].to_numpy()
                     confidence_interval = confidence_interval_aux[0].to_numpy()
 
-                min_fill = mean-confidence_interval
-                max_fill = mean+confidence_interval
+                min_fill = mean - confidence_interval
+                max_fill = mean + confidence_interval
                 ax.fill_between(self.t[i], min_fill, max_fill,
                                 where=(min_fill < max_fill),
                                 color=self.get_fill(i), alpha=0.80)
@@ -182,12 +184,13 @@ def run_interactive():
     parser.add_argument("--extension", default='svg', help="Saves as svg/pdf/jpg/png")
     parser.add_argument("--load", default='ppo_policy,mc_policy',
                         help="Loads the file(s) with the data (sep by comma)")
-    parser.add_argument("--plot", default="fitness", help="Two options: fitness or frequency. If fitness, remember to put also --n and --type")
+    parser.add_argument("--plot", default="fitness",
+                        help="Two options: fitness or frequency. If fitness, remember to put also --n and --type")
     parser.add_argument("--n", type=int, default=50, help=f"Number of banks")
     parser.add_argument("--type", default='sma', help=f"sma or ewma (moving average) or none (raw data)")
 
     args = parser.parse_args()
-    if not args.plot in ("fitness","frequency"):
+    if not args.plot in ("fitness", "frequency"):
         print("bad usage: fitness or frequency are the only two options for --plot")
     elif not args.load or not args.save:
         print("bad usage: check --load mc,ppo --save result")
@@ -199,9 +202,8 @@ def run_interactive():
         else:
             plot = PlotFrequency()
             plot.load_data(args.load)
-            plot.plot(args.save, "."+args.extension)
+            plot.plot(args.save, "." + args.extension)
 
 
 if __name__ == "__main__":
     run_interactive()
-
