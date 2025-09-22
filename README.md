@@ -23,10 +23,23 @@
 
     - Basic options:
     
-          interbank.py --help   (to list all options)
+          # To list all options:
+          interbank.py --help
     
-          interbank.py 
+          # Using lender's change mechanishm ShockedMarket3 with probability of attachment 0.3:
+          interbank.py --lc ShockedMarket3 --p 0.3 
     
+          # Same for Preferential with m nodes:
+          interbank.py --lc Preferential --m 0.3 
+    
+          # To use a fastest algorithm to run in big simulations:
+          interbank.py --fast
+  
+          # To run a simulation based on exp_runner, in which we run an amount of MonteCarlos for 
+          # each value of probability of attachment or any other value used in model.Config (the 
+          # sketch of this experiments is in experiments\_exp_template.py):
+          python -m experiments.exp_shockedmarket --do 
+ 
 
   - *colab_interbank.ipynb*: Notebook version of the standalone *interbank.py* with the same results but plotted using Bokeh.
   - *labplot2_interbank.lml*: [LabPlot2](https://labplot.org/) file to plot the results of the *interbank.py*. By the way the best way is to use [Gretl](https://gretl.sourceforge.net/) as an export format.
@@ -37,7 +50,6 @@
   - *exp_runner_comparer.py*: A derivation of the former prototype though to compare the evolution with *p* (probability of attachment in an Erdos-Renyi graph) in the *x* axis and other parameters accross the *y* axis.
   - *experiments/**: directory with all the experiments conducted. The results of that executions are stored in a folder determined inside each experiment.
   - *algorithm.drawio* and *algorithm.drawio.pf*: the [draw.io](https://www.drawio.com/) and PDF schema of the algorithm used in the model to propagate shocks and to balance sheets.
-  - 
 
 
 ## RL with Stable Baselines3

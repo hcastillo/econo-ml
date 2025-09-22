@@ -20,6 +20,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy
 
+import interbank_lenderchange
 import interbank_lenderchange as lc
 import pandas as pd
 import numpy as np
@@ -1761,152 +1762,6 @@ class ModelOptimized(Model):
             self.log.debug('links', log_change_lender)
 
 
-    def setup_links5(self):
-        if len(self.banks) <= 1:
-            return
-        self.maxE = max(self.banks, key=lambda k: k.E).E
-        max_c = max(self.banks, key=lambda k: k.C).C
-        for bank in self.banks:
-            bank.p = bank.E / self.maxE
-            if bank.get_lender() is not None and bank.get_lender().l > 0:
-                bank.lambda_ = bank.get_lender().l / bank.E
-            else:
-                bank.lambda_ = 0
-            # bank.lambda_ = bank.l / bank.E
-            bank.incrD = 0
-        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
-        for bank in self.banks:
-            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
-            bank.A = bank.C + bank.L + bank.R
-        for bank in self.banks:
-            bank.c = []
-            for i in range(self.config.N):
-                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
-                bank.c.append(c)
-            if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE
-
-        # optimized part ----------
-        min_r = float('inf')
-        for bank_i in self.banks:
-            bank_i.asset_i = 0
-            bank_i.asset_j = 0
-            A_i = bank_i.A
-            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-            psi = min(psi, 0.99999999999999)
-
-            for j in range(self.config.N):
-                if j == bank_i.id:
-                    bank_i.rij[j] = 0
-                    continue
-
-                bank_j = self.banks[j]
-                p_j = bank_j.p
-                c_ij = bank_i.c[j]
-                A_j = bank_j.A
-
-                if p_j == 0 or c_ij == 0:
-                    bank_i.rij[j] = self.config.r_i0
-                else:
-                    numerator = (self.config.chi * A_i - self.config.phi * A_j -
-                                 (1 - p_j) * (self.config.xi * A_j - c_ij))
-                    denominator = p_j * c_ij * (1 - psi)
-
-                    if denominator != 0:
-                        rij_value = numerator / denominator
-                        bank_i.rij[j] = rij_value if rij_value >= 0 else self.config.r_i0
-                    else:
-                        bank_i.rij[j] = self.config.r_i0
-
-                    bank_i.asset_i += A_i
-                    bank_i.asset_j += A_j
-
-            N_minus_1 = self.config.N - 1
-            bank_i.r = np.sum(bank_i.rij) / N_minus_1
-            bank_i.asset_i /= N_minus_1
-            bank_i.asset_j /= N_minus_1
-            min_r = min(min_r, bank_i.r)
-        # ----------
-        for bank in self.banks:
-            bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
-        self.config.lender_change.step_setup_links(self)
-        for bank in self.banks:
-            log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
-            self.log.debug('links', log_change_lender)
-
-
-    def setup_links1(self):
-        if len(self.banks) <= 1:
-            return
-        self.maxE = max(self.banks, key=lambda k: k.E).E
-        max_c = max(self.banks, key=lambda k: k.C).C
-        for bank in self.banks:
-            bank.p = bank.E / self.maxE
-            if bank.get_lender() is not None and bank.get_lender().l > 0:
-                bank.lambda_ = bank.get_lender().l / bank.E
-            else:
-                bank.lambda_ = 0
-            # bank.lambda_ = bank.l / bank.E
-            bank.incrD = 0
-        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
-        for bank in self.banks:
-            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
-            bank.A = bank.C + bank.L + bank.R
-        for bank in self.banks:
-            bank.c = []
-            for i in range(self.config.N):
-                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
-                bank.c.append(c)
-            if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE
-
-        # optimized part ----------
-        N = self.config.N
-        chi = self.config.chi
-        phi = self.config.phi
-        xi = self.config.xi
-        psi_global = self.config.psi
-        psi_endogenous = self.config.psi_endogenous
-
-        A = np.array([bank.A for bank in self.banks])
-        p = np.array([bank.p for bank in self.banks])
-        psi_array = np.array([bank.psi for bank in self.banks]) if psi_endogenous else np.full(N, psi_global)
-        c = np.array([bank.c for bank in self.banks])  # NxN
-
-        # Adjust ps1 to avoid 1 and division by zero errors:
-        psi_array = np.where(psi_array == 1, 0.99999999999999, psi_array)
-
-        mask_diag = np.eye(N, dtype=bool)
-        mask_invalid = (p == 0)
-
-        psi_matrix = np.repeat(psi_array[:, np.newaxis], N, axis=1)
-        denom = p * c * (1 - psi_matrix)
-        num = (chi * A[:, np.newaxis] - phi * A[np.newaxis, :] - (1 - p[np.newaxis, :]) * (xi * A[np.newaxis, :] - c))
-
-        rij = np.where(mask_diag, 0, self.config.r_i0)
-        valid_mask = (~mask_diag) & (~mask_invalid[np.newaxis, :]) & (c != 0) & (denom != 0)
-        rij[valid_mask] = num[valid_mask] / denom[valid_mask]
-        rij[rij < 0] = self.config.r_i0
-
-        # Determine r, asset_i y asset_j
-        asset_i = A.copy()
-        asset_j = np.sum(A) - A
-        for i, bank in enumerate(self.banks):
-            bank.rij = rij[i]
-            bank.r = np.sum(bank.rij) / (N - 1)
-            bank.asset_i = asset_i[i]
-            bank.asset_j = asset_j[i] / (N - 1)
-        min_r = np.min([bank.r for bank in self.banks])
-        # ----------
-        for bank in self.banks:
-            bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
-        self.config.lender_change.step_setup_links(self)
-        for bank in self.banks:
-            log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
-            self.log.debug('links', log_change_lender)
-
-
-
 class Utils:
     """
     Auxiliary class to encapsulate the use of the model
@@ -2041,6 +1896,8 @@ model = Model()
 if Utils.is_notebook():
     model.statistics.OUTPUT_DIRECTORY = '/content'
     model.statistics.output_format = 'csv'
+    model.config.lender_change = interbank_lenderchange.determine_algorithm( LENDER_CHANGE_DEFAULT,
+                                                                             p=LENDER_CHANGE_DEFAULT_P)
     utils.run(model, save='results')
 elif __name__ == '__main__':
     utils.run_interactive(model)

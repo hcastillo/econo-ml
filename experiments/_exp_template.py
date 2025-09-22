@@ -18,10 +18,10 @@ class MarketPowerRun(exp_runner_distributed.ExperimentRun):
     MC = 3
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "c:\\experiments\\parallel_2"
+    OUTPUT_DIRECTORY = "c:\\experiments\\template"
 
     parameters = {
-        "p": np.linspace(0.0001, 0.2, num=10),
+        "p": np.linspace(0.0001, 0.2, num=5),
     }
 
     config = { }
@@ -35,8 +35,6 @@ class MarketPowerRun(exp_runner_distributed.ExperimentRun):
 
 
     def do(self, clear_previous_results=False):
-
-
         self.log_replaced_data = ""
         results_to_plot = results_comparing = {}
         results_x_axis = []
@@ -49,6 +47,7 @@ class MarketPowerRun(exp_runner_distributed.ExperimentRun):
             )
             progress_bar.update()
             correlation_file = open(f"{self.OUTPUT_DIRECTORY}/results.txt", "w")
+            montecarlo_iteration_perfect_correlations = {}
             position_inside_seeds_for_random = 0
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
@@ -69,7 +68,7 @@ class MarketPowerRun(exp_runner_distributed.ExperimentRun):
                     # values comparing to the other (self.MC-1):
                     result_iteration = pd.DataFrame()
                     position_inside_seeds_for_random -= self.MC
-                    vamos_bien = True
+                    montecarlo_iteration_perfect_correlation = True
                     for i in range(self.MC):
                         result_mc = self.load_or_execute_model(model_configuration, model_parameters,
                                                                filename_for_iteration, i, clear_previous_results,
@@ -100,12 +99,16 @@ class MarketPowerRun(exp_runner_distributed.ExperimentRun):
                             correlation_file.write(self.format_correlation_values(0, correlation_coefficient, p_value))
                             correlation_file.write(
                                 self.format_correlation_values(1, correlation_coefficient1, p_value1))
-                            vamos_bien = vamos_bien and ((correlation_coefficient1>0 and p_value1<=0.10) or
-                                (correlation_coefficient>0 and p_value<=0.10))
+                            montecarlo_iteration_perfect_correlation = ( montecarlo_iteration_perfect_correlation and
+                                ((correlation_coefficient1>0 and p_value1<=0.10) or
+                                 (correlation_coefficient>0 and p_value<=0.10)))
                         position_inside_seeds_for_random += 1
                         result_iteration = pd.concat([result_iteration, result_mc])
-                    if vamos_bien:
-                        correlation_file.write("@@@@@@@@@@@@@@@@@@@@@\n")
+                    if montecarlo_iteration_perfect_correlation:
+                        montecarlo_iteration_perfect_correlations[
+                            str(model_configuration)+ ' '+str(model_parameters) ] = \
+                                self.format_correlation_values(1, correlation_coefficient, p_value)
+
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
                     # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
                     # file and execution using a different seed.
@@ -126,6 +129,11 @@ class MarketPowerRun(exp_runner_distributed.ExperimentRun):
                         self.get_statistics_of_graphs(graphs_iteration, results_to_plot, model_parameters)
                     results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
                     progress_bar.next()
+            if montecarlo_iteration_perfect_correlations:
+                correlation_file.write('\n\n\n')
+                for good_model in montecarlo_iteration_perfect_correlations:
+                    correlation_file.write('%s: %s\n' % (good_model,
+                                                         montecarlo_iteration_perfect_correlations[good_model]))
             correlation_file.close()
             progress_bar.finish()
             print(f"Saving results in {self.OUTPUT_DIRECTORY}...")
