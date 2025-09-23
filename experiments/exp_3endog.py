@@ -14,11 +14,11 @@ import scipy.stats
 
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
-    T = 100
-    MC = 3
+    T = 1000
+    MC = 10
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "c:\\experiments\\template"
+    OUTPUT_DIRECTORY = "c:\\experiments\\3_psiendog"
 
     parameters = {
         "p": np.linspace(0.0001, 0.2, num=5),

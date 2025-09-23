@@ -64,6 +64,8 @@ class ExperimentRun:
 
     log_replaced_data = ""
 
+    error_bar = False
+
     def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
         # we plot only x labels 1 of each 10:
         plot_x_values = []
@@ -74,17 +76,29 @@ class ExperimentRun:
             i = i.strip()
             if i != "t":
                 mean = []
+                deviation_error = []
                 mean_comparing = []
                 for j in range(len(array_with_data[i])):
                     # mean is 0, std is 1:
                     mean.append(array_with_data[i][j][0])
+                    deviation_error.append(array_with_data[i][j][1]/2)
                     if array_comparing and i in array_comparing and j<len(array_comparing[i]):
                         mean_comparing.append(array_comparing[i][j][0])
                 plt.clf()
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
 
-                plt.plot(array_with_x_values, mean, "b-",
+                if self.error_bar:
+                    plt.errorbar(array_with_x_values, mean,  yerr=deviation_error, fmt='-o', ecolor='blue',
+                                 label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
+                                 else self.ALGORITHM.__name__ if array_comparing else "")
+                    #plt.xlabel('X')
+                    #plt.ylabel('Valor')
+                    #plt.title('Gráfica con barras de error')
+                    #plt.legend()
+                    #plt.show()
+                else:
+                    plt.plot(array_with_x_values, mean, "b-",
                          label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                          else self.ALGORITHM.__name__ if array_comparing else "")
                 logarithm_plot = False
@@ -565,10 +579,17 @@ class Runner:
             action=argparse.BooleanOptionalAction,
             help="Ignore generated models and create them again",
         )
+        parser.add_argument(
+            "--errorbar",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="Plot also the errorbar (deviation error)",
+        )
         args = parser.parse_args()
         experiment = experiment_runner()
         if args.clear_results:
             experiment.clear_results()
+        experiment.error_bar = args.errorbar
         if args.listnames:
             experiment.listnames()
         elif args.do:
