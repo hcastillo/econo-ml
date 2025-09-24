@@ -8,10 +8,10 @@ Executor for the interbank model using different values for the lc RestrictedMar
 @author: hector@bith.net
 """
 import numpy as np
-import exp_surviving_runner
+import exp_runner_surviving
 
 
-class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
+class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     N = 50
     T = 1000
     MC = 5
@@ -26,7 +26,7 @@ class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
 
 
 if __name__ == "__main__":
-    runner = exp_surviving_runner.Runner()
+    runner = exp_runner_surviving.Runner()
     experiment = runner.do(RestrictedMarketSurvivingRun)
     if experiment:
         experiment.generate_data_surviving()

@@ -8,25 +8,25 @@ Executor for the interbank model using different values for the lc RestrictedMar
 @author: hector@bith.net
 """
 import numpy as np
-import exp_surviving_runner
+import exp_runner_surviving
 
 
-class RestrictedMarketSurvivingRun(exp_surviving_runner.SurvivingRun):
-    N = 50
+class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
+    N = 100
     T = 1000
     MC = 15
 
-    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.4"
+    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.10"
 
     parameters = {
-        "p": np.linspace(0.0001, 1, num=4),
+        "p": np.linspace(0.0001, 1, num=10),
     }
 
-    SEED_FOR_EXECUTION = 918995
+    SEED_FOR_EXECUTION = 318994
 
 
 if __name__ == "__main__":
-    runner = exp_surviving_runner.Runner()
+    runner = exp_runner_surviving.Runner()
     experiment = runner.do(RestrictedMarketSurvivingRun)
     if experiment:
         experiment.generate_data_surviving()

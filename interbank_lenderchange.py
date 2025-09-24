@@ -380,6 +380,19 @@ class LenderChange:
             return None
 
 
+    # This functions have sense when we have a graph to determine lender change:
+    def determine_current_communities(self):
+        return None
+
+    def determine_current_communities_not_alone(self):
+        return None
+
+    def determine_current_graph_gcs(self):
+        return None
+
+    def determine_current_graph_grade_avg(self):
+        return None
+
 # ---------------------------------------------------------
 
 
@@ -509,6 +522,18 @@ class InitialStability(Boltzmann):
         from_graph_to_array_banks(self.banks_graph, this_model)
         return self.banks_graph
 
+    def determine_current_communities(self):
+        return len(GraphStatistics.communities(self.banks_graph))
+
+    def determine_current_communities_not_alone(self):
+        return GraphStatistics.communities_not_alone(self.banks_graph)
+
+    def determine_current_graph_gcs(self):
+        return GraphStatistics.giant_component_size(self.banks_graph)
+
+    def determine_current_graph_grade_avg(self):
+        return GraphStatistics.grade_avg(self.banks_graph)
+
 
 class Preferential(Boltzmann):
     """ Using a Barabasi with grade m we restrict to those relations the possibilities to obtain an outgoing link
@@ -624,6 +649,18 @@ class Preferential(Boltzmann):
     def describe(self):
         return f"($\\gamma={self.gamma} and change if >{self.CHANGE_LENDER_IF_HIGHER})$"
 
+    def determine_current_communities(self):
+        return len(GraphStatistics.communities(self.banks_graph))
+
+    def determine_current_communities_not_alone(self):
+        return GraphStatistics.communities_not_alone(self.banks_graph)
+
+    def determine_current_graph_gcs(self):
+        return GraphStatistics.giant_component_size(self.banks_graph)
+
+    def determine_current_graph_grade_avg(self):
+        return GraphStatistics.grade_avg(self.banks_graph)
+
 
 class RestrictedMarket(LenderChange):
     """ Using an Erdos Renyi graph with p=parameter['p']. This method does not allow the evolution in
@@ -705,6 +742,18 @@ class RestrictedMarket(LenderChange):
         """ We return the same lender we have created in self.banks_graph """
         bank.P = 0
         return f"{bank.get_id()} maintains lender #{bank.lender} with %1"
+
+    def determine_current_communities(self):
+        return len(GraphStatistics.communities(self.banks_graph))
+
+    def determine_current_communities_not_alone(self):
+        return GraphStatistics.communities_not_alone(self.banks_graph)
+
+    def determine_current_graph_gcs(self):
+        return GraphStatistics.giant_component_size(self.banks_graph)
+
+    def determine_current_graph_grade_avg(self):
+        return GraphStatistics.grade_avg(self.banks_graph)
 
 
 class ShockedMarket(RestrictedMarket):

@@ -110,7 +110,12 @@ class Config:
                            'psi': True, 'psi_lenders': True,
                            'potential_lenders': False,
                            'active_lenders': False, 'active_borrowers': False, 'prob_bankruptcy': False,
-                           'num_banks': True, 'bankruptcy_rationed': True}
+                           'num_banks': True, 'bankruptcy_rationed': True,
+                           }
+    # only if we have a graph for lender_change:
+    ELEMENTS_STATISTICS_GRAPHS = {
+        'grade_avg': True, 'communities': True, 'communities_not_alone': True, 'gcs': True
+    }
 
     def __str__(self, separator=''):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -231,8 +236,15 @@ class Statistics:
         self.OUTPUT_DIRECTORY = 'output'
         self.NUMBER_OF_ITEMS_IN_ANIMATED_GRAPH = 40
         self.correlation = []         # cross correlation of interest rate against bankruptcies
+        # this other only used if there is a graph associated with the lender change:
+        self.grade_avg = []
+        self.communities = []
+        self.communities_not_alone = []
+        self.gcs = []
+
         self.detailed_equity = None
         self.model = in_model
+
 
     def set_gif_graph(self, gif_graph):
         if gif_graph:
@@ -277,6 +289,10 @@ class Statistics:
         self.num_of_rationed = np.zeros(self.model.config.T, dtype=int)
         self.psi = np.zeros(self.model.config.T, dtype=float)
         self.psi_lenders = np.zeros(self.model.config.T, dtype=float)
+        self.grade_avg = np.zeros(self.model.config.T, dtype=float)
+        self.communities = np.zeros(self.model.config.T, dtype=int)
+        self.communities_not_alone = np.zeros(self.model.config.T, dtype=int)
+        self.gcs = np.zeros(self.model.config.T, dtype=int)
 
     def compute_credit_channels_and_best_lender(self):
         lenders = {}
@@ -299,6 +315,13 @@ class Statistics:
             self.potential_credit_channels[self.model.t] = len(self.model.banks)
         else:
             self.potential_credit_channels[self.model.t] = credit_channels
+
+    def compute_statistics_of_graph(self):
+        if self.model.config.lender_change.GRAPH_NAME:
+            self.communities[self.model.t] = self.model.config.lender_change.determine_current_communities()
+            self.communities_not_alone[self.model.t] = self.model.config.lender_change.determine_current_communities_not_alone()
+            self.gcs[self.model.t] = self.model.config.lender_change.determine_current_graph_gcs()
+            self.grade_avg[self.model.t] = self.model.config.lender_change.determine_current_graph_grade_avg()
 
     def compute_potential_lenders(self):
         for bank in self.model.banks:
@@ -656,6 +679,9 @@ class Statistics:
     def enumerate_statistics_results(self):
         for element in Config.ELEMENTS_STATISTICS:
             yield self.get_name(element), getattr(self, element)
+        if self.model.config.lender_change.GRAPH_NAME:
+            for element in Config.ELEMENTS_STATISTICS_GRAPHS:
+                yield self.get_name(element), getattr(self, element)
 
     def get_name(self, variable):
         match variable:
@@ -736,6 +762,13 @@ class Statistics:
                     eval('self.plot_{}(export_datafile)'.format(variable))
                 else:
                     self.plot_result(variable, self.get_name(variable), export_datafile)
+        if self.model.config.lender_change.GRAPH_NAME:
+            for variable in Config.ELEMENTS_STATISTICS_GRAPHS:
+                if Config.ELEMENTS_STATISTICS_GRAPHS[variable]:
+                    if 'plot_{}'.format(variable) in dir(Statistics):
+                        eval('self.plot_{}(export_datafile)'.format(variable))
+                    else:
+                        self.plot_result(variable, self.get_name(variable), export_datafile)
 
     def plot_p(self, export_datafile=None):
         xx = []
@@ -1009,6 +1042,7 @@ class Model:
         self.statistics.compute_deposits_and_reserves()
         self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
         self.setup_links()
+        self.statistics.compute_statistics_of_graph()
         self.statistics.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
         self.log.debug_banks()
         if self.save_graphs is not None and (self.save_graphs == '*' or self.t in self.save_graphs):
@@ -1615,75 +1649,6 @@ class ModelOptimized(Model):
     """
     Improved version optimized for many executions
     """
-
-    def setup_links3(self):
-        if len(self.banks) <= 1:
-            return
-
-        # Paso 1: Cálculo de valores máximos
-        self.maxE = max(bank.E for bank in self.banks)
-        max_C = max(bank.C for bank in self.banks)
-
-        # Paso 2: Inicialización de parámetros bancarios
-        for bank in self.banks:
-            bank.p = bank.E / self.maxE if self.maxE != 0 else 0
-            lender = bank.get_lender()
-            bank.lambda_ = lender.l / bank.E if lender and lender.l > 0 and bank.E != 0 else 0
-            bank.incrD = 0
-            bank.A = bank.C + bank.L + bank.R  # Se puede calcular aquí directamente
-        # Paso 3: Cálculo de h (normalización de lambda)
-        max_lambda = max(bank.lambda_ for bank in self.banks)
-        for bank in self.banks:
-            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
-
-        # Paso 4: Cálculo de c y psi
-        for bank in self.banks:
-            bank.c = []
-            for i in range(self.config.N):
-                other_bank = self.banks[i]
-                c_value = 0 if i == bank.id else (1 - other_bank.h) * other_bank.A
-                bank.c.append(c_value)
-            if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE if self.maxE != 0 else 0
-
-        # Paso 5: Cálculo de rij y activos
-        min_r = float('inf')
-        for bank_i in self.banks:
-            bank_i.asset_i = 0
-            bank_i.asset_j = 0
-            psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-            psi = min(psi, 0.99999999999999)
-
-            for j in range(self.config.N):
-                if j == bank_i.id:
-                    bank_i.rij[j] = 0
-                    continue
-
-                bank_j = self.banks[j]
-                c_ij = bank_i.c[j]
-                rij = self._calculate_rij(bank_i, bank_j, c_ij, psi)
-                bank_i.rij[j] = rij
-
-                bank_i.asset_i += bank_i.A
-                bank_i.asset_j += bank_j.A
-
-            N_minus_1 = self.config.N - 1
-            bank_i.r = np.sum(bank_i.rij) / N_minus_1
-            bank_i.asset_i /= N_minus_1
-            bank_i.asset_j /= N_minus_1
-            min_r = min(min_r, bank_i.r)
-
-        # Paso 6: Cálculo de mu
-        for bank in self.banks:
-            ratio = min_r / bank.r if bank.r != 0 else 0
-            bank.mu = self.eta * (bank.C / max_C) + (1 - self.eta) * ratio
-
-        # Paso 7: Cambios de prestamista y logging
-        self.config.lender_change.step_setup_links(self)
-        for bank in self.banks:
-            log_msg = self.config.lender_change.change_lender(self, bank, self.t)
-            self.log.debug('links', log_msg)
-
     def _calculate_rij(self, bank_i, bank_j, c_ij, psi):
         """Calcula el valor rij entre dos bancos."""
         if bank_j.p == 0 or c_ij == 0:

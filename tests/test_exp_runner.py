@@ -6,20 +6,13 @@ import interbank
 import interbank_lenderchange
 import numpy as np
 import pandas as pd
-from mock import patch
 from pathlib import Path
 import os
-
-def get_statistics_of_graphs_mocked(_, _b, _c, _d):
-    pass
 
 
 class ExpRunnerTestCase(unittest.TestCase):
 
-    @patch.object(exp_runner.ExperimentRun, "get_statistics_of_graphs", get_statistics_of_graphs_mocked)
     def setUp(self):
-        #self.runner = exp_runner.Runner()
-        #self.runner.do(MockedRunner)
         if os.path.exists('output/results.csv'):
             os.remove("output/results.csv")
         self.runner = MockedRunner()
