@@ -6,15 +6,15 @@ Executor for the interbank model using different values for the lc ShockedMarket
 """
 import numpy as np
 from interbank_lenderchange import ShockedMarket3
-import exp_runner
+import exp_runner_distributed
 
-class MarketPowerRun(exp_runner.ExperimentRun):
+class MarketPowerRun(exp_runner_distributed.ExperimentRunDistributed):
     N = 50
     T = 100
     MC = 3
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/tmp/prueba"
+    OUTPUT_DIRECTORY = "/tmp/prueba4"
 
     parameters = {
         "p": np.linspace(0.0001, 0.2, num=5),
@@ -32,5 +32,5 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner(MarketPowerRun)
+    runner = exp_runner_distributed.Runner(MarketPowerRun)
     runner.do()

@@ -112,12 +112,13 @@ class ExperimentRunDistributed(exp_runner.ExperimentRun):
             head_ip = "ray://" + head_ip
         if not ':' in head_ip.replace('ray://', '').lower():
             head_ip = head_ip + f':{self.RAY_DEFAULT_PORT}'
-        try:
-            if not self.ray_connected:
+        #try:
+        if not self.ray_connected:
+                print(head_ip)
                 self.ray_connected = ray.init(head_ip)
-        except:
-            print(f"Unreachable or bad head ip. Try: 'ip:{self.RAY_DEFAULT_PORT}'")
-            sys.exit(-1)
+        #except:
+        #    print(f"Unreachable or bad head ip. Try: 'ip:{self.RAY_DEFAULT_PORT}'")
+        #    sys.exit(-1)
 
 
     def generate_distributed_execution(self, model_configurations, model_parameters,
@@ -126,7 +127,7 @@ class ExperimentRunDistributed(exp_runner.ExperimentRun):
                                        progress_bar):
         results_to_plot = {}
         results_x_axis = []
-        futures = [actor_combination_execution(model_i, parameter_j,
+        futures = [actor_combination_execution.remote(model_i, parameter_j,
                                 clear_previous_results, seeds_for_random,
                                 position_inside_seeds_for_random,
                                 self.get_filename_for_iteration(model_i, parameter_j),
@@ -185,7 +186,7 @@ class ExperimentRunDistributed(exp_runner.ExperimentRun):
             return results_to_plot, results_x_axis
 
 
-class RunnerDistributed(exp_runner.Runner):
+class Runner(exp_runner.Runner):
     def do(self):
         self.parser.add_argument(
             "--ray",
