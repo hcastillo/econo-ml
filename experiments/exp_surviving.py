@@ -13,8 +13,8 @@ import exp_runner_surviving
 
 class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     N = 50
-    T = 1000
-    MC = 5
+    T = 100
+    MC = 2
 
     OUTPUT_DIRECTORY = "c:\\experiments\\surviving"
 
@@ -26,8 +26,8 @@ class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
 
 
 if __name__ == "__main__":
-    runner = exp_runner_surviving.Runner()
-    experiment = runner.do(RestrictedMarketSurvivingRun)
+    runner = exp_runner_surviving.Runner(RestrictedMarketSurvivingRun)
+    experiment = runner.do()
     if experiment:
         experiment.generate_data_surviving()
         experiment.plot_surviving()

@@ -30,5 +30,5 @@ class ShockedMarketRun(exp_runner.ExperimentRun):
     SEED_FOR_EXECUTION = 98899
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner()
-    runner.do(ShockedMarketRun)
+    runner = exp_runner.Runner(ShockedMarketRun)
+    runner.do()

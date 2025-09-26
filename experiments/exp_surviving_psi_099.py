@@ -30,8 +30,8 @@ class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     LENGTH_FILENAME_CONFIG = 5
 
 if __name__ == "__main__":
-    runner = exp_runner_surviving.Runner()
-    experiment = runner.do(RestrictedMarketSurvivingRun)
+    runner = exp_runner_surviving.Runner(RestrictedMarketSurvivingRun)
+    experiment = runner.do()
     if experiment:
         experiment.generate_data_surviving()
         experiment.plot_surviving()

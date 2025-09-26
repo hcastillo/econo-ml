@@ -28,5 +28,5 @@ class RestrictedMarketRun(exp_runner.ExperimentRun):
 
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner()
-    runner.do(RestrictedMarketRun)
+    runner = exp_runner.Runner(RestrictedMarketRun)
+    runner.do()

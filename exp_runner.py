@@ -21,6 +21,7 @@ import lxml.builder
 import argparse
 import concurrent.futures
 import time
+import scipy
 
 
 class ExperimentRun:
@@ -92,11 +93,6 @@ class ExperimentRun:
                     plt.errorbar(array_with_x_values, mean,  yerr=deviation_error, fmt='-o', ecolor='blue',
                                  label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                                  else self.ALGORITHM.__name__ if array_comparing else "")
-                    #plt.xlabel('X')
-                    #plt.ylabel('Valor')
-                    #plt.title('Gráfica con barras de error')
-                    #plt.legend()
-                    #plt.show()
                 else:
                     plt.plot(array_with_x_values, mean, "b-",
                          label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
@@ -313,41 +309,22 @@ class ExperimentRun:
             if k.strip() == "t":
                 continue
             mean_individual_execution = individual_execution[k].mean()
-
-            # mean_estimated = array_all_data[k].mean()
-            # warnings.filterwarnings(
-            #     "ignore"
-            # )  # it generates RuntimeWarning: overflow encountered in multiply
-            # std_estimated = array_all_data[k].std()
-            # we discard outliers: whatever is over μ±3σ or under μ±3σ:
-            # if (not np.isnan(mean_estimated) and not np.isnan(std_estimated) and
-            #     not np.isnan(mean_individual_execution) and
-            #     not ((mean_estimated - self.LIMIT_OUTLIER * std_estimated) <=
-            #     mean_individual_execution <=
-            #     (mean_estimated + self.LIMIT_OUTLIER * std_estimated))):
-            #     return False
             means = []
             for i in range(self.MC):
                 means.append(array_all_data[k][i * self.T:(i * self.T) + (self.T-1)].mean())
-            #Z-Score Method
-            #mean = np.mean(means)
-            #std = np.std(means)
-            #if ( mean_individual_execution - mean ) > 7:
-            #    print(f"{k} {filename_for_iteration}:{i} {mean_individual_execution} mean:{mean} std:{std}")
-            q1 = np.percentile(means, 25)
-            q3 = np.percentile(means, 75)
-            iqr = q3 - q1
-            lower_bound = q1 - self.LIMIT_OUTLIER * iqr
-            upper_bound = q3 + self.LIMIT_OUTLIER * iqr
             # IQR Method (Non-parametric, more robust)
             # How it works:
             # Calculate Q1 (25th percentile) and Q3 (75th percentile)
             # Compute IQR = Q3 - Q1
             # Outliers are values outside [Q1 - 1.5IQR, Q3 + 1.5IQR]
+            q1 = np.percentile(means, 25)
+            q3 = np.percentile(means, 75)
+            iqr = q3 - q1
+            lower_bound = q1 - self.LIMIT_OUTLIER * iqr
+            upper_bound = q3 + self.LIMIT_OUTLIER * iqr
             if (not np.isnan(mean_individual_execution) and not np.isnan(iqr) and
                 not (lower_bound <= mean_individual_execution <= upper_bound) and
                 not (lower_bound==upper_bound)):
-                ##print(f"{k} {filename_for_iteration}:{i} {lower_bound:.3f} <= {mean_individual_execution:.3f} <= {upper_bound:.3f}")
                 return False
         return True
 
@@ -391,6 +368,13 @@ class ExperimentRun:
         return result_mc
 
 
+    def __format_correlation_values(self, delay, correlation_coefficient, p_value):
+        result = f"\tt={delay} "
+        result += f"pearson={correlation_coefficient} p_value={p_value}"
+        result += " !!!\n" if  p_value < 0.1 and correlation_coefficient > 0 else "\n"
+        return result
+
+
     def do(self, clear_previous_results=False):
         self.log_replaced_data = ""
         initial_time = time.perf_counter()
@@ -406,6 +390,8 @@ class ExperimentRun:
                 "Executing models", max=self.get_num_models()
             )
             progress_bar.update()
+            correlation_file = open(f"{self.OUTPUT_DIRECTORY}/results.txt", "w")
+            montecarlo_iteration_perfect_correlations = {}
             position_inside_seeds_for_random = 0
             for model_configuration in self.get_models(self.config):
                 for model_parameters in self.get_models(self.parameters):
@@ -430,14 +416,43 @@ class ExperimentRun:
                     # values comparing to the other (self.MC-1) stored in result_iteration_to_check:
                     result_iteration = pd.DataFrame()
                     position_inside_seeds_for_random -= self.MC
-                    with concurrent.futures.ProcessPoolExecutor() as executor:
+                    montecarlo_iteration_perfect_correlation = True
+                    with (concurrent.futures.ProcessPoolExecutor() as executor):
                         results_mc = {executor.submit(self.load_model_and_rerun_till_ok,
                                                       model_configuration, model_parameters, filename_for_iteration,
                                                       i, clear_previous_results, seeds_for_random,
                                                       position_inside_seeds_for_random, result_iteration_to_check) :
                                           i for i in range(self.MC)}
-                        for future in concurrent.futures.as_completed(results_mc):
-                            result_iteration = pd.concat([result_iteration, future.result()])
+
+                        for i, future in enumerate(concurrent.futures.as_completed(results_mc)):
+                            result_mc = future.result()
+                            # correlation of interest_rate -> bankruptcies
+                            if 'bankruptcies' in result_mc and (
+                               not ((np.all(result_mc['bankruptcies'] == 0) or
+                                     np.all(result_mc['bankruptcies'] == result_mc['bankruptcies'][0]) or
+                                     np.all(result_mc['interest_rate'] == 0) or
+                                     np.all(result_mc['interest_rate'] == result_mc['interest_rate'][0])))):
+                                correlation_coefficient, p_value = scipy.stats.pearsonr(result_mc['interest_rate'],
+                                                                                        result_mc['bankruptcies'])
+                                correlation_coefficient1, p_value1 = scipy.stats.pearsonr(
+                                    result_mc['interest_rate'][1:],
+                                    result_mc['bankruptcies'][:-1])
+                                correlation_file.write(
+                                    f"{filename_for_iteration}_{i} = {model_configuration} {model_parameters}\n")
+                                correlation_file.write(
+                                    self.__format_correlation_values(0, correlation_coefficient, p_value))
+                                correlation_file.write(
+                                    self.__format_correlation_values(1, correlation_coefficient1, p_value1))
+                                montecarlo_iteration_perfect_correlation = (
+                                        montecarlo_iteration_perfect_correlation and (
+                                             (correlation_coefficient1 > 0 and p_value1 <= 0.10) or
+                                             (correlation_coefficient > 0 and p_value <= 0.10)))
+                            result_iteration = pd.concat([result_iteration, result_mc])
+
+                    if montecarlo_iteration_perfect_correlation:
+                        montecarlo_iteration_perfect_correlations[
+                            str(model_configuration)+ ' '+str(model_parameters) ] = \
+                                self.__format_correlation_values(1, correlation_coefficient, p_value)
 
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
                     # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
@@ -459,6 +474,11 @@ class ExperimentRun:
                     progress_bar.next()
 
             progress_bar.finish()
+            if montecarlo_iteration_perfect_correlations:
+                for perfect_correlation in montecarlo_iteration_perfect_correlations:
+                    correlation_file.write(f"{perfect_correlation} : "
+                                           f"{montecarlo_iteration_perfect_correlations[perfect_correlation]}\n")
+            correlation_file.close()
             print(f"Saving results in {self.OUTPUT_DIRECTORY}...")
             self.save_csv(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
             self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
@@ -490,6 +510,8 @@ class ExperimentRun:
             base, ext = os.path.splitext(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
         elif os.path.exists(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
             base, ext = os.path.splitext(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+        else:
+            base, ext = "?", "???"
         offset = 1
         while True:
             new_name = f"{base}_discarded{offset}{ext}"
@@ -510,41 +532,43 @@ class ExperimentRun:
 
 
 class Runner:
-    def do(self, experiment_runner):
-        parser = argparse.ArgumentParser(description="Executes interbank model using " +
-                                                     experiment_runner.__name__)
-        parser.add_argument(
+    def __init__(self, experiment_runner:ExperimentRun):
+        self.experiment_runner = experiment_runner
+        self.parser = argparse.ArgumentParser(description="Executes MC experiments using interbank model")
+        self.parser.add_argument(
             "--do",
             default=False,
             action=argparse.BooleanOptionalAction,
-            help=f"Execute the experiment and saves the results in {experiment_runner.OUTPUT_DIRECTORY}",
+            help=f"Execute the experiment and saves the results in {self.experiment_runner.OUTPUT_DIRECTORY}",
         )
-        parser.add_argument(
+        self.parser.add_argument(
             "--listnames",
             default=False,
             action=argparse.BooleanOptionalAction,
             help="Print combinations to generate",
         )
-        parser.add_argument(
+        self.parser.add_argument(
             "--clear_results",
             default=False,
             action=argparse.BooleanOptionalAction,
             help="Ignore generated results.csv and create it again",
         )
-        parser.add_argument(
+        self.parser.add_argument(
             "--clear",
             default=False,
             action=argparse.BooleanOptionalAction,
             help="Ignore generated models and create them again",
         )
-        parser.add_argument(
+        self.parser.add_argument(
             "--errorbar",
             default=False,
             action=argparse.BooleanOptionalAction,
             help="Plot also the errorbar (deviation error)",
         )
-        args = parser.parse_args()
-        experiment = experiment_runner()
+
+    def do(self):
+        args = self.parser.parse_args()
+        experiment = self.experiment_runner()
         if args.clear_results:
             experiment.clear_results()
         experiment.error_bar = args.errorbar
@@ -554,4 +578,4 @@ class Runner:
             experiment.do(args.clear)
             return experiment
         else:
-            parser.print_help()
+            self.parser.print_help()

@@ -33,6 +33,6 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner()
-    runner.do(MarketPowerRun)
+    runner = exp_runner.Runner(MarketPowerRun)
+    runner.do()
 

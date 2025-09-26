@@ -27,5 +27,5 @@ class BoltzmannRun(exp_runner.ExperimentRun):
 
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner()
-    runner.do(BoltzmannRun)
+    runner = exp_runner.Runner(BoltzmannRun)
+    runner.do()

@@ -27,5 +27,5 @@ class SmallWorldRun(exp_runner.ExperimentRun):
     SEED_FOR_EXECUTION = 88993
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner()
-    runner.do(SmallWorldRun)
+    runner = exp_runner.Runner(SmallWorldRun)
+    runner.do()

@@ -43,6 +43,6 @@ class PreferentialRun(exp_runner.ExperimentRun):
 
 
 if __name__ == "__main__":
-    runner = exp_runner.Runner()
-    runner.do(PreferentialRun)
+    runner = exp_runner.Runner(PreferentialRun)
+    runner.do()
 
