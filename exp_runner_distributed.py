@@ -18,6 +18,7 @@ def actor_combination_execution(model_configuration, model_parameters,
                                 position_inside_seeds_for_random,
                                 filename_for_iteration,
                                 experiment:exp_runner.ExperimentRun):
+    experiment.verify_directories()
     result_iteration_to_check = pd.DataFrame()
     graphs_iteration = []
     # first round to load all the self.MC and estimate mean and standard deviation of the series
@@ -81,7 +82,6 @@ class Runner(exp_runner.Runner):
         else:
             results_to_plot, results_x_axis = experiment.load(f"{experiment.OUTPUT_DIRECTORY}/")
         if not results_to_plot:
-            experiment.__verify_directories__()
             seeds_for_random = experiment.generate_random_seeds_for_this_execution()
             progress_bar = Bar(
                 "Executing models", max=experiment.get_num_models()
