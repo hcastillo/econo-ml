@@ -6,69 +6,11 @@ Executor base class for the interbank model
 """
 import exp_runner
 import ray
-import concurrent.futures
-import os
 import pandas as pd
-import interbank
 import time
 from progress.bar import Bar
 import sys
-
-def run_model(filename, execution_config, execution_parameters, seed_random):
-    model = interbank.Model()
-    model.export_datafile = filename
-    model.config.lender_change = self.set_lender_change(execution_parameters)
-    model.configure(T=self.T, N=self.N,
-                    allow_replacement_of_bankrupted=self.ALLOW_REPLACEMENT_OF_BANKRUPTED, **execution_config)
-    model.configure(**self.EXTRA_MODEL_CONFIGURATION)
-    model.initialize(seed=seed_random, save_graphs_instants=None,
-                     export_datafile=filename,
-                     generate_plots=False)
-    model.simulate_full(interactive=False)
-    return model.finish()
-
-def load_or_execute_model(model_configuration, model_parameters, filename_for_iteration,
-                          output_directory,
-                          i, clear_previous_results, seed_for_this_model):
-    if (os.path.isfile(f"{output_directory}/{filename_for_iteration}_{i}.csv")
-            and not clear_previous_results):
-        result_mc = pd.read_csv(
-            f"{output_directory}/{filename_for_iteration}_{i}.csv", header=2)
-    elif (os.path.isfile(f"{output_directory}/{filename_for_iteration}_{i}.gdt")
-          and not clear_previous_results):
-        result_mc = interbank.Statistics.read_gdt(
-            f"{output_directory}/{filename_for_iteration}_{i}.gdt")
-    else:
-        result_mc = run_model(
-            f"{output_directory}/{filename_for_iteration}_{i}",
-            model_configuration, model_parameters, seed_for_this_model)
-    return result_mc
-
-
-def load_model_and_rerun_till_ok(model_configuration, model_parameters, filename_for_iteration,
-                                     output_directory, i, clear_previous_results, seeds_for_random,
-                                     position_inside_seeds_for_random, result_iteration_to_check):
-    """
-            Internal function in which we have result_iteration_to_check with the averages of the MC iterations, and
-            we check individually if any of those individual executions is an outlier, we replace it using a different
-            seed and incorporate to the results:
-            """
-    result_mc = load_or_execute_model(model_configuration, model_parameters,
-                                      filename_for_iteration, output_directory, i,
-                                      clear_previous_results,
-                                      seeds_for_random[i + position_inside_seeds_for_random])
-    offset = 1
-    while not data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check) \
-            and offset <= MAX_EXECUTIONS_OF_MODELS_OUTLIERS:
-        discard_execution_of_iteration(filename_for_iteration, i)
-        result_mc = load_or_execute_model(model_configuration, model_parameters,
-                                          filename_for_iteration, output_directory, i,
-                                          clear_previous_results,
-                                          (seeds_for_random[i + position_inside_seeds_for_random]+ offset))
-        offset += 1
-    return result_mc
-
-
+import concurrent.futures
 
 
 @ray.remote
@@ -81,17 +23,13 @@ def actor_combination_execution(model_configuration, model_parameters,
     graphs_iteration = []
     # first round to load all the self.MC and estimate mean and standard deviation of the series
     # inside result_iteration:
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results_mc = {executor.submit(experiment.load_or_execute_model,
-                                      model_configuration, model_parameters,
+    for i in range(experiment.MC):
+        result_mc = experiment.load_or_execute_model( model_configuration, model_parameters,
                                       filename_for_iteration, i,
                                       clear_previous_results,
-                                      seeds_for_random[i + position_inside_seeds_for_random]):
-                          i for i in range(experiment.MC)}
-        for future in concurrent.futures.as_completed(results_mc):
-            i = results_mc[future]
-            graphs_iteration.append(f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
-            result_iteration_to_check = pd.concat([result_iteration_to_check, future.result()])
+                                      seeds_for_random[i + position_inside_seeds_for_random])
+        graphs_iteration.append(f"{experiment.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}")
+        result_iteration_to_check = pd.concat([result_iteration_to_check,result_mc])
 
     # second round to verify if one of the models should be replaced because it presents abnormal
     # values comparing to the other (self.MC-1) stored in result_iteration_to_check:
