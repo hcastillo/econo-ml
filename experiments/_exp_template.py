@@ -8,7 +8,7 @@ import numpy as np
 from interbank_lenderchange import ShockedMarket3
 import exp_runner_distributed
 
-class MarketPowerRun(exp_runner_distributed.ExperimentRunDistributed):
+class MarketPowerRun(exp_runner_distributed.ExperimentRun):
     N = 50
     T = 100
     MC = 3

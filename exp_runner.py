@@ -290,7 +290,7 @@ class ExperimentRun:
                     result += i + '=' + str(param[i]) + " "
         return result
 
-    def __get_title_for(self, param1, param2):
+    def get_title_for(self, param1, param2):
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
@@ -470,7 +470,7 @@ class ExperimentRun:
                             results_to_plot[k].append([mean_estimated, std_estimated])
                         else:
                             results_to_plot[k] = [[mean_estimated, std_estimated]]
-                    results_x_axis.append(self.__get_title_for(model_configuration, model_parameters))
+                    results_x_axis.append(self.get_title_for(model_configuration, model_parameters))
                     progress_bar.next()
 
             progress_bar.finish()
@@ -488,7 +488,7 @@ class ExperimentRun:
         if self.log_replaced_data:
             print(self.log_replaced_data)
         print("Plotting...")
-        self.plot(results_to_plot, results_x_axis, self.__get_title_for(self.config, self.parameters),
+        self.plot(results_to_plot, results_x_axis, self.get_title_for(self.config, self.parameters),
                   f"{self.OUTPUT_DIRECTORY}/", results_comparing)
         self.results_to_plot = results_to_plot
         final_time = time.perf_counter()
