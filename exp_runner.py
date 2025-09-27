@@ -267,7 +267,7 @@ class ExperimentRun:
     def get_filename_for_parameters(self, parameters):
         return self.__filename_clean(parameters, self.LENGTH_FILENAME_PARAMETER)
 
-    def __verify_directories__(self):
+    def verify_directories(self):
         if not os.path.isdir(self.OUTPUT_DIRECTORY):
             os.mkdir(self.OUTPUT_DIRECTORY)
 
@@ -384,7 +384,7 @@ class ExperimentRun:
         else:
             results_to_plot, results_x_axis = self.load(f"{self.OUTPUT_DIRECTORY}/")
         if not results_to_plot:
-            self.__verify_directories__()
+            self.verify_directories()
             seeds_for_random = self.generate_random_seeds_for_this_execution()
             progress_bar = Bar(
                 "Executing models", max=self.get_num_models()

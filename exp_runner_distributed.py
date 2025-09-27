@@ -10,7 +10,6 @@ import pandas as pd
 import time
 from progress.bar import Bar
 import sys
-import concurrent.futures
 
 
 @ray.remote
@@ -35,14 +34,12 @@ def actor_combination_execution(model_configuration, model_parameters,
     # values comparing to the other (self.MC-1) stored in result_iteration_to_check:
     result_iteration = pd.DataFrame()
     position_inside_seeds_for_random -= experiment.MC
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        results_mc = {executor.submit(experiment.load_model_and_rerun_till_ok,
+    for i in range(experiment.MC):
+        result_mc = experiment.load_model_and_rerun_till_ok(
                                       model_configuration, model_parameters, filename_for_iteration,
                                       i, clear_previous_results, seeds_for_random,
-                                      position_inside_seeds_for_random, result_iteration_to_check):
-                          i for i in range(experiment.MC)}
-        for future in concurrent.futures.as_completed(results_mc):
-            result_iteration = pd.concat([result_iteration, future.result()])
+                                      position_inside_seeds_for_random, result_iteration_to_check)
+        result_iteration = pd.concat([result_iteration, result_mc])
 
     results = {}
     for k in result_iteration.keys():
