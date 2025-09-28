@@ -73,7 +73,8 @@ class Runner(exp_runner.Runner):
             sys.exit(-1)
 
 
-    def run_execution_distributed(self, experiment:exp_runner.ExperimentRun, clear_previous_results):
+    def run_execution_distributed(self, experiment:exp_runner.ExperimentRun, clear_previous_results:bool=False,
+                                  reverse_execution:bool=False):
         experiment.log_replaced_data = ""
         initial_time = time.perf_counter()
         if clear_previous_results:
@@ -91,15 +92,22 @@ class Runner(exp_runner.Runner):
             results_to_plot = {}
             results_x_axis = []
             futures = []
-            for model_i in experiment.get_models(experiment.config):
-                for parameter_j in experiment.get_models(experiment.parameters):
-                    futures.append( actor_combination_execution.remote(model_i, parameter_j,
+
+            array_of_configs = self.get_models(self.config)
+            array_of_parameters = self.get_models(self.parameters)
+            if reverse_execution:
+                array_of_configs = reversed(list(array_of_configs))
+                array_of_parameters = reversed(list(array_of_parameters))
+
+            for config_i in array_of_configs:
+                for parameter_j in array_of_parameters:
+                    futures.append( actor_combination_execution.remote(config_i, parameter_j,
                                                                        clear_previous_results, seeds_for_random,
                                                                        position_inside_seeds_for_random,
                                                                        experiment.get_filename_for_iteration(
-                                                                           model_i, parameter_j),
+                                                                           config_i, parameter_j),
                                                                        experiment))
-                    results_x_axis.append(experiment.get_title_for(model_i, parameter_j))
+                    results_x_axis.append(experiment.get_title_for(config_i, parameter_j))
 
             for results in ray.get(futures):
                 for k in results.keys():
@@ -144,9 +152,10 @@ class Runner(exp_runner.Runner):
             experiment.listnames()
         elif args.do:
             if self.ray_connected:
-                self.run_execution_distributed(experiment, args.clear)
+                self.run_execution_distributed(experiment=experiment,
+                                               clear_previous_results=args.clear, reverse_execution=args.reverse)
             else:
-                experiment.do(args.clear)
+                experiment.do(clear_previous_results=args.clear, reverse_execution=args.reverse)
             return experiment
         else:
             self.parser.print_help()

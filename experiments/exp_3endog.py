@@ -18,15 +18,15 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 10
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "c:\\experiments\\3_psiendog"
+    OUTPUT_DIRECTORY = "/experiments/3_psiendog_nonorm"
 
     parameters = {
         "p": np.linspace(0.0001, 0.2, num=5),
     }
 
-    config = { }
+    config = {}
 
-    EXTRA_MODEL_CONFIGURATION = { 'psi_endogenous':True }
+    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': True, 'normalize_interest_rate_max': 0}
     
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 0

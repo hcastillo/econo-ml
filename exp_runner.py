@@ -24,6 +24,13 @@ import time
 import scipy
 
 
+def format_correlation_values(delay, correlation_coefficient, p_value):
+    result = f"\tt={delay} "
+    result += f"pearson={correlation_coefficient} p_value={p_value}"
+    result += " !!!\n" if p_value < 0.1 and correlation_coefficient > 0 else "\n"
+    return result
+
+
 class ExperimentRun:
     N = 1
     T = 1
@@ -82,29 +89,29 @@ class ExperimentRun:
                 for j in range(len(array_with_data[i])):
                     # mean is 0, std is 1:
                     mean.append(array_with_data[i][j][0])
-                    deviation_error.append(array_with_data[i][j][1]/2)
-                    if array_comparing and i in array_comparing and j<len(array_comparing[i]):
+                    deviation_error.append(array_with_data[i][j][1] / 2)
+                    if array_comparing and i in array_comparing and j < len(array_comparing[i]):
                         mean_comparing.append(array_comparing[i][j][0])
                 plt.clf()
                 title = f"{i}"
                 title += f" x={title_x} MC={self.MC}"
 
                 if self.error_bar:
-                    plt.errorbar(array_with_x_values, mean,  yerr=deviation_error, fmt='-o', ecolor='blue',
+                    plt.errorbar(array_with_x_values, mean, yerr=deviation_error, fmt='-o', ecolor='blue',
                                  label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                                  else self.ALGORITHM.__name__ if array_comparing else "")
                 else:
                     plt.plot(array_with_x_values, mean, "b-",
-                         label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
-                         else self.ALGORITHM.__name__ if array_comparing else "")
+                             label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
+                             else self.ALGORITHM.__name__ if array_comparing else "")
                 logarithm_plot = False
                 if array_comparing and i in array_comparing:
                     ax = plt.gca()
-                    if len(mean_comparing)==1:
+                    if len(mean_comparing) == 1:
                         ax.plot(0, mean_comparing, "or", label=self.COMPARING_LABEL)
                     else:
                         ax.plot(array_with_x_values, mean_comparing, "r-", label=self.COMPARING_LABEL)
-                    if abs(mean[0]-mean_comparing[0])>1e6 and abs(mean[-1]-mean_comparing[-1])>1e6:
+                    if abs(mean[0] - mean_comparing[0]) > 1e6 and abs(mean[-1] - mean_comparing[-1]) > 1e6:
                         ax.set_yscale('log')
                         logarithm_plot = True
 
@@ -125,7 +132,7 @@ class ExperimentRun:
                 if not i.startswith('std_'):
                     array_with_data[i] = []
             for i in array_with_data.keys():
-                if i!='psi.1':
+                if i != 'psi.1':
                     for j in range(len(dataframe[i])):
                         array_with_data[i].append([dataframe[i][j], dataframe['std_' + i][j]])
             for j in dataframe[name_for_x_column]:
@@ -238,7 +245,7 @@ class ExperimentRun:
         return (dict(zip(parameters.keys(), values)) for values in sorted(product(*parameters.values())))
 
     def __filename_clean(self, value, max_length):
-        value = str(value).replace("np.float64(","").replace("np.float(","")
+        value = str(value).replace("np.float64(", "").replace("np.float(", "")
         for r in "{}[]()',: .":
             value = value.replace(r, "")
         if value.endswith(".0"):
@@ -259,7 +266,7 @@ class ExperimentRun:
         return value
 
     def get_filename_for_iteration(self, parameters, config):
-        return self.get_filename_for_parameters( parameters) + self.get_filename_for_config(config)
+        return self.get_filename_for_parameters(parameters) + self.get_filename_for_config(config)
 
     def get_filename_for_config(self, config):
         return self.__filename_clean(config, self.LENGTH_FILENAME_CONFIG)
@@ -298,7 +305,7 @@ class ExperimentRun:
         results_comparing = None
         if self.COMPARING_DATA:
             results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")
-            if len(results_x_comparing) not in (len(results_x_axis),1):
+            if len(results_x_comparing) not in (len(results_x_axis), 1):
                 results_comparing = None
         return results_comparing
 
@@ -311,7 +318,7 @@ class ExperimentRun:
             mean_individual_execution = individual_execution[k].mean()
             means = []
             for i in range(self.MC):
-                means.append(array_all_data[k][i * self.T:(i * self.T) + (self.T-1)].mean())
+                means.append(array_all_data[k][i * self.T:(i * self.T) + (self.T - 1)].mean())
             # IQR Method (Non-parametric, more robust)
             # How it works:
             # Calculate Q1 (25th percentile) and Q3 (75th percentile)
@@ -323,8 +330,8 @@ class ExperimentRun:
             lower_bound = q1 - self.LIMIT_OUTLIER * iqr
             upper_bound = q3 + self.LIMIT_OUTLIER * iqr
             if (not np.isnan(mean_individual_execution) and not np.isnan(iqr) and
-                not (lower_bound <= mean_individual_execution <= upper_bound) and
-                not (lower_bound==upper_bound)):
+                    not (lower_bound <= mean_individual_execution <= upper_bound) and
+                    not (lower_bound == upper_bound)):
                 return False
         return True
 
@@ -344,7 +351,6 @@ class ExperimentRun:
                 model_configuration, model_parameters, seed_for_this_model)
         return result_mc
 
-
     def load_model_and_rerun_till_ok(self, model_configuration, model_parameters, filename_for_iteration,
                                      i, clear_previous_results, seeds_for_random,
                                      position_inside_seeds_for_random, result_iteration_to_check):
@@ -355,27 +361,19 @@ class ExperimentRun:
         """
         result_mc = self.load_or_execute_model(model_configuration, model_parameters,
                                                filename_for_iteration, i, clear_previous_results,
-                                               seeds_for_random[i+position_inside_seeds_for_random])
+                                               seeds_for_random[i + position_inside_seeds_for_random])
         offset = 1
         while not self.data_seems_ok(filename_for_iteration, i, result_mc, result_iteration_to_check) \
                 and offset <= self.MAX_EXECUTIONS_OF_MODELS_OUTLIERS:
             self.discard_execution_of_iteration(filename_for_iteration, i)
             result_mc = self.load_or_execute_model(model_configuration, model_parameters,
                                                    filename_for_iteration, i, clear_previous_results,
-                                                   (seeds_for_random[i+position_inside_seeds_for_random]
+                                                   (seeds_for_random[i + position_inside_seeds_for_random]
                                                     + offset))
             offset += 1
         return result_mc
 
-
-    def __format_correlation_values(self, delay, correlation_coefficient, p_value):
-        result = f"\tt={delay} "
-        result += f"pearson={correlation_coefficient} p_value={p_value}"
-        result += " !!!\n" if  p_value < 0.1 and correlation_coefficient > 0 else "\n"
-        return result
-
-
-    def do(self, clear_previous_results=False):
+    def do(self, clear_previous_results=False, reverse_execution=False):
         self.log_replaced_data = ""
         initial_time = time.perf_counter()
         if clear_previous_results:
@@ -393,8 +391,14 @@ class ExperimentRun:
             correlation_file = open(f"{self.OUTPUT_DIRECTORY}/results.txt", "w")
             montecarlo_iteration_perfect_correlations = {}
             position_inside_seeds_for_random = 0
-            for model_configuration in self.get_models(self.config):
-                for model_parameters in self.get_models(self.parameters):
+
+            array_of_configs = self.get_models(self.config)
+            array_of_parameters = self.get_models(self.parameters)
+            if reverse_execution:
+                array_of_configs = reversed(list(array_of_configs))
+                array_of_parameters = reversed(list(array_of_parameters))
+            for model_configuration in array_of_configs:
+                for model_parameters in array_of_parameters:
                     result_iteration_to_check = pd.DataFrame()
                     graphs_iteration = []
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
@@ -405,7 +409,7 @@ class ExperimentRun:
                                                       model_configuration, model_parameters,
                                                       filename_for_iteration, i,
                                                       clear_previous_results,
-                                                      seeds_for_random[i+position_inside_seeds_for_random]) :
+                                                      seeds_for_random[i + position_inside_seeds_for_random]):
                                           i for i in range(self.MC)}
                         for future in concurrent.futures.as_completed(results_mc):
                             i = results_mc[future]
@@ -421,17 +425,17 @@ class ExperimentRun:
                         results_mc = {executor.submit(self.load_model_and_rerun_till_ok,
                                                       model_configuration, model_parameters, filename_for_iteration,
                                                       i, clear_previous_results, seeds_for_random,
-                                                      position_inside_seeds_for_random, result_iteration_to_check) :
+                                                      position_inside_seeds_for_random, result_iteration_to_check):
                                           i for i in range(self.MC)}
 
                         for i, future in enumerate(concurrent.futures.as_completed(results_mc)):
                             result_mc = future.result()
                             # correlation of interest_rate -> bankruptcies
                             if 'bankruptcies' in result_mc and (
-                               not ((np.all(result_mc['bankruptcies'] == 0) or
-                                     np.all(result_mc['bankruptcies'] == result_mc['bankruptcies'][0]) or
-                                     np.all(result_mc['interest_rate'] == 0) or
-                                     np.all(result_mc['interest_rate'] == result_mc['interest_rate'][0])))):
+                                    not ((np.all(result_mc['bankruptcies'] == 0) or
+                                          np.all(result_mc['bankruptcies'] == result_mc['bankruptcies'][0]) or
+                                          np.all(result_mc['interest_rate'] == 0) or
+                                          np.all(result_mc['interest_rate'] == result_mc['interest_rate'][0])))):
                                 correlation_coefficient, p_value = scipy.stats.pearsonr(result_mc['interest_rate'],
                                                                                         result_mc['bankruptcies'])
                                 correlation_coefficient1, p_value1 = scipy.stats.pearsonr(
@@ -440,19 +444,19 @@ class ExperimentRun:
                                 correlation_file.write(
                                     f"{filename_for_iteration}_{i} = {model_configuration} {model_parameters}\n")
                                 correlation_file.write(
-                                    self.__format_correlation_values(0, correlation_coefficient, p_value))
+                                    format_correlation_values(0, correlation_coefficient, p_value))
                                 correlation_file.write(
-                                    self.__format_correlation_values(1, correlation_coefficient1, p_value1))
+                                    format_correlation_values(1, correlation_coefficient1, p_value1))
                                 montecarlo_iteration_perfect_correlation = (
                                         montecarlo_iteration_perfect_correlation and (
-                                             (correlation_coefficient1 > 0 and p_value1 <= 0.10) or
-                                             (correlation_coefficient > 0 and p_value <= 0.10)))
+                                        (correlation_coefficient1 > 0 and p_value1 <= 0.10) or
+                                        (correlation_coefficient > 0 and p_value <= 0.10)))
                             result_iteration = pd.concat([result_iteration, result_mc])
 
                     if montecarlo_iteration_perfect_correlation:
                         montecarlo_iteration_perfect_correlations[
-                            str(model_configuration)+ ' '+str(model_parameters) ] = \
-                                self.__format_correlation_values(1, correlation_coefficient, p_value)
+                            str(model_configuration) + ' ' + str(model_parameters)] = \
+                                format_correlation_values(1, correlation_coefficient, p_value)
 
                     # When it arrives here, all the results are correct and inside the self.MC executions, if one
                     # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
@@ -522,17 +526,17 @@ class ExperimentRun:
 
     def clear_results(self):
         try:
-            os.remove( self.OUTPUT_DIRECTORY + '/results.csv')
+            os.remove(self.OUTPUT_DIRECTORY + '/results.csv')
         except FileNotFoundError:
             pass
         try:
-            os.remove( self.OUTPUT_DIRECTORY + '/results.gdt')
+            os.remove(self.OUTPUT_DIRECTORY + '/results.gdt')
         except FileNotFoundError:
             pass
 
 
 class Runner:
-    def __init__(self, experiment_runner:ExperimentRun):
+    def __init__(self, experiment_runner: ExperimentRun):
         self.experiment_runner = experiment_runner
         self.parser = argparse.ArgumentParser(description="Executes MC experiments using interbank model")
         self.parser.add_argument(
@@ -565,6 +569,12 @@ class Runner:
             action=argparse.BooleanOptionalAction,
             help="Plot also the errorbar (deviation error)",
         )
+        self.parser.add_argument(
+            "--reverse",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="Execute the experiment in opposite order",
+        )
 
     def do(self):
         args = self.parser.parse_args()
@@ -575,7 +585,8 @@ class Runner:
         if args.listnames:
             experiment.listnames()
         elif args.do:
-            experiment.do(args.clear)
+            print("hoooola que tal: ",args.reverse)
+            experiment.do(clear_previous_results=args.clear, reverse_execution=args.reverse)
             return experiment
         else:
             self.parser.print_help()
