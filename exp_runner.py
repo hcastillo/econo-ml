@@ -585,7 +585,6 @@ class Runner:
         if args.listnames:
             experiment.listnames()
         elif args.do:
-            print("hoooola que tal: ",args.reverse)
             experiment.do(clear_previous_results=args.clear, reverse_execution=args.reverse)
             return experiment
         else:
