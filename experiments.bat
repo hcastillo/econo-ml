@@ -1,5 +1,8 @@
 python -m experiments.exp_1psi0 --do --errorbar
-python -m experiments.exp_2psivar --do --errorbar
+python -m experiments.exp_1psi1 --do --errorbar
+python -m experiments.exp_1psi05 --do --errorbar
+python -m experiments.exp_1psi025 --do --errorbar
+python -m experiments.exp_1psi075 --do --errorbar
 python -m experiments.exp_3endog --do --errorbar
 rem python -m exp_surviving.psi --do
 rem python -m exp_surviving.4 --do

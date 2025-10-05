@@ -74,12 +74,15 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # If true, psi variable will be ignored:
-    psi_endogenous = False
+    psi_endogenous = True
     psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
-    # If it's a value greater than 0, instead of allowing interest rates for borrowers of any value, we normalize
-    # them to range [r_i0 .. normalize_interest_rate_max]:
-    normalize_interest_rate_max = 1
+    # Possible values for normalize_interest_rate_max:
+    #  -3 -> we use cubic root
+    #   0 -> no normalization
+    #  >0 -> instead of allowing interest rates for borrowers of any value, we normalize
+    #        them to range [r_i0 .. normalize_interest_rate_max]:
+    normalize_interest_rate_max = -3
 
     # banks initial parameters
     # L + C + R = D + E
@@ -1239,6 +1242,14 @@ class Model:
                         # if max_r = min_r or max_r< self.config.r_i0 we have maybe only one bank lending, so
                         # max interest rate:
                         self.banks[bank.lender].rij[bank.id] = self.config.normalize_interest_rate_max
+        elif self.config.normalize_interest_rate_max in (-2,-3):
+            # cubic root of the value instead of normalization:
+            import math
+            for bank in self.banks:
+                if not bank.lender is None:
+                    self.banks[bank.lender].rij[bank.id] = math.cbrt(self.banks[bank.lender].rij[bank.id]) \
+                        if self.config.normalize_interest_rate_max==-3 else \
+                            math.sqrt(self.banks[bank.lender].rij[bank.id])
 
         num_of_rationed = 0
         total_rationed = 0
