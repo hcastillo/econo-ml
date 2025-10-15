@@ -343,7 +343,7 @@ class ExperimentRun:
                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
         elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
               and not clear_previous_results):
-            result_mc = interbank.Statistics.read_gdt(
+            result_mc, _ = interbank.Statistics.read_gdt(
                 f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
         else:
             result_mc = self.run_model(

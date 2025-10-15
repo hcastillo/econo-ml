@@ -127,7 +127,7 @@ class SurvivingRun(exp_runner.ExperimentRun):
                 self.data_of_failures_rationed_accum[filename_for_iteration] = []
                 for i in range(self.MC):
                     if os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt"):
-                        result_mc = Statistics.read_gdt(
+                        result_mc, _ = Statistics.read_gdt(
                             f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
                         self.data_of_surviving_banks[filename_for_iteration].append(result_mc['num_banks'])
                         # bankruptcies and bankruptcies rationed are accumulated data:

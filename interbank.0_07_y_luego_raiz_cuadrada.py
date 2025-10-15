@@ -19,7 +19,7 @@ import sys
 import os
 import matplotlib.pyplot as plt
 import numpy
-import math
+
 import interbank_lenderchange
 import interbank_lenderchange as lc
 import pandas as pd
@@ -74,16 +74,15 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # If true, psi variable will be ignored:
-    psi_endogenous = False
+    psi_endogenous = True
     psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # Possible values for normalize_interest_rate_max:
     #  -3 -> we use cubic root
-    #  -2 -> we use square root
     #   0 -> no normalization
     #  >0 -> instead of allowing interest rates for borrowers of any value, we normalize
     #        them to range [r_i0 .. normalize_interest_rate_max]:
-    normalize_interest_rate_max = -2
+    normalize_interest_rate_max = 1
 
     # banks initial parameters
     # L + C + R = D + E
@@ -120,9 +119,6 @@ class Config:
     ELEMENTS_STATISTICS_GRAPHS = {
         'grade_avg': True, 'communities': True, 'communities_not_alone': True, 'gcs': True
     }
-    ELEMENTS_STATISTICS_LOG = { 'equity' }
-
-    ELEMENTS_TRANSLATIONS = { 'bankruptcy': 'bankruptcies', 'P': 'prob_change_lender', 'B': 'bad_debt' }
 
     def __str__(self, separator=''):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -161,9 +157,7 @@ class Config:
         if config_list:
             config_list.sort()
             for item in config_list:
-                if item == '':
-                    pass
-                elif item == '?':
+                if item == '?':
                     print(self.__str__(separator='\n'))
                     sys.exit(0)
                 elif item.startswith('lc='):
@@ -602,14 +596,7 @@ class Statistics:
         variable = element.variable
         xml_observations = element.observations
         observation = element.obs
-        num_variables = 0
-        for variable_name, _ in enumerate_results():
-            if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
-                num_variables += 2
-            else:
-                num_variables += 1
-
-        variables = xml_variables(count=f'{num_variables}')
+        variables = xml_variables(count='{}'.format(sum((1 for _ in enumerate_results()))))
         header_text = ''
         for item in header:
             header_text += item + ' '
@@ -626,20 +613,12 @@ class Statistics:
                                           label=self.get_cross_correlation_result(i - 2)))
             else:
                 variables.append(variable(name='{}'.format(variable_name)))
-            # if it is for example, equity, we add also the log as another extra variable:
-            if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
-                variables.append(variable(name='l_{}'.format(variable_name),
-                                          label=f"log of {variable_name}",
-                                          parent=f"{variable_name}", transform="logs"))
             i = i + 1
         xml_observations = xml_observations(count='{}'.format(self.model.config.T), labels='false')
         for i in range(self.model.config.T):
             string_obs = ''
-            for variable_name, variable in enumerate_results():
+            for _, variable in enumerate_results():
                 string_obs += '{}  '.format(variable[i])
-                if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
-                    string_obs += '{}  '.format(math.log(variable[i]))
-
             xml_observations.append(observation(string_obs))
         gdt_result = gretl_data(xml_description(header_text), variables,
                                 xml_observations, version='1.4', name='interbank',
@@ -664,39 +643,23 @@ class Statistics:
 
     @staticmethod
     def read_gdt(filename):
-        configuration = []
         tree = lxml.etree.parse(filename)
         root = tree.getroot()
         children = root.getchildren()
         values = []
         columns = []
-        columns_to_remove = []
-        result = pd.DataFrame()
         if len(children) == 3:
             for variable in children[1].getchildren():
                 column_name = variable.values()[0].strip()
                 if column_name == 'leverage_':
                     column_name = 'leverage'
                 columns.append(column_name)
-                # as the value is later in a string as "123.23 2123.5 323.2 4166.6 52562.2", we add it
-                # to columns_to_remove and we remove from the data later:
-                if 'parent' in variable.keys():
-                    columns_to_remove.append(column_name)
-                if len(variable.values())==2 and configuration==[]:
-                    configuration = (variable.values()[1].
-                                     replace(sys.argv[0]+' ', '').
-                                     replace(os.path.basename(sys.argv[0])+' ','').
-                                     split(' '))
             for value in children[2].getchildren():
                 values.append(Statistics.__transform_line_from_string(value.text))
-
         if columns and values:
-            result = pd.DataFrame(columns=columns, data=values)
-            for column_to_remove in columns_to_remove:
-                del result[column_to_remove]
-
-        return result, configuration
-
+            return pd.DataFrame(columns=columns, data=values)
+        else:
+            return pd.DataFrame()
 
     def save_data(self, export_datafile=None, export_description=None):
         if export_datafile:
@@ -724,16 +687,14 @@ class Statistics:
                 yield self.get_name(element), getattr(self, element)
 
     def get_name(self, variable):
-        try:
-            return self.model.config.ELEMENTS_TRANSLATIONS[variable]
-        except KeyError:
-            return variable
-
-    def unget_name(self, name):
-        try:
-            return {v: k for k, v in self.model.config.ELEMENTS_TRANSLATIONS.items()}[name]
-        except KeyError:
-            return name
+        match variable:
+            case 'bankruptcy':
+                return 'bankruptcies'
+            case 'P':
+                return 'prob_change_lender'
+            case 'B':
+                return 'bad_debt'
+        return variable
 
     def get_data(self):
         result = pd.DataFrame()
@@ -1000,7 +961,6 @@ class Model:
     export_description = None
     policy_actions_translation = [0.0, 0.5, 1.0]
     generate_plots = True
-    initialized = False
 
     def __init__(self, **configuration):
         self.log = Log(self)
@@ -1110,9 +1070,7 @@ class Model:
     def simulate_full(self, interactive=False):
         if interactive:
             self.log.do_progress_bar('Simulating t=0..{}'.format(self.config.T), self.config.T)
-            # if we don't start with 0
-            self.log.progress_bar.next(self.t)
-        for t in range(self.t, self.config.T):
+        for t in range(self.config.T):
             self.forward()
             if not self.config.allow_replacement_of_bankrupted and len(self.banks) <= 2:
                 self.config.T = self.t
@@ -1473,7 +1431,7 @@ class Model:
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c.append(c)
             if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE * 0.9 #TODO * 0.8
+                bank.psi = bank.E / self.maxE
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i = 0
@@ -1489,12 +1447,19 @@ class Model:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
                             if psi == 1:
                                 psi = 0.99999999999999
-                            bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
+                            if psi <= 0.7:
+                                bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
                                               - (1 - self.banks[j].p) * (
                                                           self.config.xi * self.banks[j].A - bank_i.c[j]))
                                              /
                                              (self.banks[j].p * bank_i.c[j] * (1 - psi)))
-
+                            else:
+                                import math
+                                bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
+                                              - (1 - self.banks[j].p) * (
+                                                          self.config.xi * self.banks[j].A - bank_i.c[j]))
+                                             /
+                                             (self.banks[j].p * bank_i.c[j] * (1 - (0.7 + math.sqrt(psi-0.7)))))
                             bank_i.asset_i += bank_i.A
                             bank_i.asset_j += self.banks[j].A
                             # bank_i.asset_j += 1 - self.banks[j].p
@@ -1709,7 +1674,11 @@ class ModelOptimized(Model):
 
         numerator = (self.config.chi * bank_i.A - self.config.phi * bank_j.A -
                      (1 - bank_j.p) * (self.config.xi * bank_j.A - c_ij))
-        denominator = bank_j.p * c_ij * (1 - psi)
+        if (psi<=0.7):
+            denominator = bank_j.p * c_ij * (1 - psi)
+        else:
+            import math
+            denominator = bank_j.p * c_ij * (1 - (0.7 + math.sqrt(psi-0.7)))
 
         if denominator == 0:
             return self.config.r_i0
@@ -1799,31 +1768,6 @@ class Utils:
                         raise ValueError('{} greater than Config.T or below 0'.format(t[-1]))
                 return t
 
-    def load_from_file(self, model_to_use:Model, filename:str,  t:int):
-        data, configuration = Statistics.read_gdt(filename)
-        # now we incorporate to the model_to_use the data and displace the time to the specified time
-        # if there are more data columns than the expected, we ignore them:
-        if 'num_banks' in data:
-            model_to_use.N = data['num_banks'][0]
-        model_to_use.T = len(data)
-        model_to_use.config.define_values_from_args(configuration)
-        model_to_use.initialize()
-
-        if t:
-            model_to_use.t = t
-        model_to_use.initialized = True
-        for item in data:
-            item_real_name = model_to_use.statistics.unget_name(item)
-            if item_real_name in model_to_use.statistics.__dict__:
-                setattr(model_to_use.statistics, item_real_name, data[item].to_numpy())
-        if t:
-            model_to_use.t = t
-        if 'num_banks' in data:
-            model_to_use.N = data['num_banks'][0]
-        model_to_use.T = len(data)
-        model_to_use.initialized = True
-        return model_to_use
-
     def run_interactive(self, model: Model):
         """
             Run interactively the model
@@ -1835,8 +1779,6 @@ class Utils:
                             help='Log only this modules (separated by ,)'.format())
         parser.add_argument('--logfile', default=None, help='File to send logs to')
         parser.add_argument('--save', default=None, help='Saves the output of this execution'.format())
-        parser.add_argument('--load', default=None, help='Load a previous execution. '
-                                                         'Then --t indicates the current time to go to'.format())
         parser.add_argument('--graph', default=None,
                             help='List of t in which save the network config (* for all)'.format())
         parser.add_argument('--gif_graph', default=False, type=bool,
@@ -1879,6 +1821,10 @@ class Utils:
             model = ModelOptimized()
         if args.graph_stats:
             lc.GraphStatistics.describe(args.graph_stats, interact=True)
+        if args.t != model.config.T:
+            model.config.T = args.t
+        if args.n != model.config.N:
+            model.config.N = args.n
         if args.eta != model.eta:
             model.eta = args.eta
         model.config.allow_replacement_of_bankrupted = not args.no_replace
@@ -1886,14 +1832,6 @@ class Utils:
         model.config.psi_endogenous = args.psi_endogenous
         model.config.lender_change = lc.determine_algorithm(args.lc, args.lc_p, args.lc_m)
         model.config.define_values_from_args(other_possible_config_args)
-        if args.load:
-            model = self.load_from_file(model, args.load, args.t)
-        else:
-            # T and N could not be set if there are a model loaded (firms and T are determined in file)
-            if args.t != model.config.T:
-                model.config.T = args.t
-            if args.n != model.config.N:
-                model.config.N = args.n
         if model.config.seed and model.config.seed != model.default_seed and args.seed is None:
             args.seed = model.config.seed
         model.config.lender_change.set_initial_graph_file(args.lc_ini_graph_file)
@@ -1911,9 +1849,8 @@ class Utils:
         if not save_graph_instants and Config.GRAPHS_MOMENTS:
             save_graph_instants = Config.GRAPHS_MOMENTS
         initial_time = time.perf_counter()
-        if not model.initialized:
-            model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants,
-                             output_directory=output_directory, seed=seed)
+        model.initialize(export_datafile=save, save_graphs_instants=save_graph_instants,
+                         output_directory=output_directory, seed=seed)
         model.simulate_full(interactive=interactive)
         result = model.finish()
         if interactive and model.statistics.get_cross_correlation_result(0):
@@ -1942,7 +1879,7 @@ class Utils:
 
 
 utils = Utils()
-model = Model()
+model = ModelOptimized()
 if Utils.is_notebook():
     model.statistics.OUTPUT_DIRECTORY = '/content'
     model.statistics.output_format = 'csv'
