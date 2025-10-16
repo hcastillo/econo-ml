@@ -83,7 +83,9 @@ class Config:
     #   0 -> no normalization
     #  >0 -> instead of allowing interest rates for borrowers of any value, we normalize
     #        them to range [r_i0 .. normalize_interest_rate_max]:
-    normalize_interest_rate_max = -2
+    normalize_interest_rate_max = 0
+
+    max_value_psi = 0.99
 
     # banks initial parameters
     # L + C + R = D + E
@@ -1473,7 +1475,7 @@ class Model:
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c.append(c)
             if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE * 0.9 #TODO * 0.8
+                bank.psi = bank.E / self.maxE  * self.config.max_value_psi #TODO * 0.8
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i = 0

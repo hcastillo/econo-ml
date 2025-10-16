@@ -13,7 +13,6 @@ Output: gdt file with the same variables but in a single file, for instance:
 @date:   10/2025
 """
 
-import pandas as pd
 import lxml.etree
 import lxml.builder
 import os
@@ -29,7 +28,9 @@ OUTPUT_FILE = 'output.gdt'
 class GretlUnifier:
     # renames can contain key values as { 'dir1':'d' } so resultant variable will be
     # bankruptcies_d instead of bankruptcies_dir1:
-    RENAMES = {'-not_exists-': '_n'}
+    RENAMES_DIRS = {'-not_exists-': '_n'}
+
+    REPLACES_COLUMNS = {'psi=':''}
 
     @staticmethod
     def transform_line_from_string(line_with_values):
@@ -41,25 +42,6 @@ class GretlUnifier:
                 items.append(float(i))
         return items
 
-    def read_gdt(self, filename):
-        tree = lxml.etree.parse(filename)
-        root = tree.getroot()
-        children = root.getchildren()
-        values = []
-        columns = []
-        if len(children) == 3:
-            for variable in children[1].getchildren():
-                column_name = variable.values()[0].strip()
-                if column_name == 'leverage_':
-                    column_name = 'leverage'
-                columns.append(column_name)
-            for value in children[2].getchildren():
-                values.append(GretlUnifier.transform_line_from_string(value.text))
-        if columns and values:
-            return pd.DataFrame(columns=columns, data=values)
-        else:
-            return pd.DataFrame()
-
     def save_gdt(self, data, filename, header_text):
         element = lxml.builder.ElementMaker()
         gretl_data = element.gretldata
@@ -69,8 +51,6 @@ class GretlUnifier:
         xml_observations = element.observations
         observation = element.obs
         variables = xml_variables(count='{}'.format(len(data.columns)))
-        # header_text will be present as label in the first variable
-        # correlation_result will be present as label in the second variable
         for i, variable_name in enumerate(data.columns):
             if variable_name == 'leverage':
                 variable_name += '_'
@@ -94,7 +74,9 @@ class GretlUnifier:
         print(f"{filename} created")
 
     def __determine_new_name(self, col, experiments, experiment, results):
-        new_name = col + '_' + experiments[experiment]
+        new_name = col + '_' + experiments[experiment].replace('.','')
+        for item in self.REPLACES_COLUMNS:
+            new_name = new_name.replace(item, self.REPLACES_COLUMNS[item])
         num = 0
         while len(new_name) > 30 or (results is not None and new_name in results.columns):
             new_name = new_name[:28] + (str(num) if num > 0 else '')
@@ -113,9 +95,9 @@ class GretlUnifier:
         experiments = {}
         for args_item in input_experiments:
             for item in args_item.strip().split(" "):
-                if item in self.RENAMES:
-                    experiments[item] = self.RENAMES[item][1:] \
-                        if self.RENAMES[item].startswith('_') else self.RENAMES[item]
+                if item in self.RENAMES_DIRS:
+                    experiments[item] = self.RENAMES_DIRS[item][1:] \
+                        if self.RENAMES_DIRS[item].startswith('_') else self.RENAMES_DIRS[item]
                 else:
                     if ':' in item:
                         item_split = item.split(':')
@@ -123,6 +105,7 @@ class GretlUnifier:
                             if item_split[1].startswith('_') else item_split[1]
                     else:
                         experiments[item] = item
+
         header = ''
         results = None
         for experiment in experiments:
@@ -136,7 +119,7 @@ class GretlUnifier:
                 if not os.path.isfile(file):
                     self.error(file + " not found (%s)" % experiment)
             if file:
-                data = Statistics.read_gdt(file)
+                data , _ = Statistics.read_gdt(file)
                 if experiments[experiment][1:] == experiment:
                     header += f"{experiment} "
                 else:
@@ -150,7 +133,7 @@ class GretlUnifier:
                     if len(data) != len(results):
                         self.error(f"{file} has {len(data)} rows and previous {len(results)}")
                     results = results.join(data, how='outer')
-        self.save_gdt(results, output_file, header)
+        self.save_gdt(results, working_dir+"/"+output_file, header)
 
 
 def run_interactive():

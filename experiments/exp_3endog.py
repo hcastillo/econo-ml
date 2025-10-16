@@ -15,7 +15,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 10
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/3_psiendog_nonorm"
+    OUTPUT_DIRECTORY = "/experiments/3_psiendog"
 
     parameters = {
         "p": np.linspace(0.0001, 0.2, num=5),

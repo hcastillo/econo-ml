@@ -10,69 +10,210 @@ Plots:
 @author: hector@bith.net
 @date:   10/2025
 """
-
-import sys
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import scipy.stats
 from interbank import Statistics
 
+class PlotPsi:
+    working_dir = '/experiments/20251015.psi_0a1_raiz_cuadrada'
+    output = 'psi_p'
 
-axis_x = ['equity', 'bankruptcies', 'interest_rate']
-titles_x = ['$E$', 'bankruptcy', '$i_r$']
-axis_y = ['1_psi0', '1_psi025', '1_psi05', '1_psi075', '1_psi1']  #, '3_psiendog']
-titles_y = ['psi=0', 'psi=0.25', 'psi=0.5', 'psi=0.75', 'psi=0.99']  #,'psi endogenous' ]
-output = 'psi_p.png'
-title_of_output = 'comparing psi/p'
+    axis_x = ['equity', 'bankruptcies', 'interest_rate', 'bad_debt']
+    with_log = ['equity']
 
-# x inside each individual plot (in this case, values of p):
-x = list(np.linspace(0.0001, 0.2, num=5))
+    titles_x = ['$log(E)$', 'bankruptcy', '$i_r$', '$B$']
+    axis_y = ['1_psi0', '1_psi025', '1_psi05', '1_psi075', '1_psi1']  #, '3_psiendog']
+    titles_y = ['psi=0', 'psi=0.25', 'psi=0.5', 'psi=0.75', 'psi=0.99']  #,'psi endogenous' ]
+    title_of_output = 'comparing psi/p'
 
-input_dir = '/experiments'
-rows, cols = len(axis_y), len(axis_x)
+    correlations = [['interest_rate','bad_debt'],['interest_rate','bankruptcies'],['interest_rate','equity'],['bad_debt','equity']]
+    # renames can contain key values as { 'dir1':'d' } so resultant variable will be
+    # bankruptcies_d instead of bankruptcies_dir1:
+    RENAMES = {'-not_exists-': '_n'}
 
-plt.title(title_of_output)
-fig, axes = plt.subplots(rows, cols, figsize=(12, 10))
-for i, item_i in enumerate(axis_y):
-    # load data:
-    if not os.path.isdir(input_dir + '\\' + item_i):
-        break
-    data = Statistics.read_gdt(input_dir + '\\' + item_i + '\\results.gdt')
-    yys = {}
-    for j, item_j in enumerate(axis_x):
+    # x inside each individual plot (in this case, values of p):
+    x = list(np.linspace(0.0001, 0.2, num=5))
 
-        y = data[item_j]
-        yerr = data['std_' + item_j] / 2
+    def get_cross_correlation_result1(self, data,column_a, column_b, t):
+        result = 'correl not valid            '
+        try:
+            if t==0:
+                correlation_value = scipy.stats.pearsonr(data[column_a], data[column_b])
+            else:
+                correlation_value = scipy.stats.pearsonr(data[column_a][t:], data[column_b][:-t])
+        except ValueError:
+            correlation_value = None
+        if correlation_value:
+            status = '  '
+            if correlation_value.pvalue < 0.05:
+                status = '**'
+            elif correlation_value.pvalue < 0.10:
+                status = '* '
+            result = (f'correl t={t} {column_a}/{column_b} {correlation_value.statistic:4.2} '
+                      f'p_value={correlation_value.pvalue:4.2} {status}')
+        return result
 
-        yys[item_j] = y
 
-        # y = np.random.normal(10, 0.5, size=len(x)) + i + 0.3 * j
-        # yerr = np.random.uniform(0.05, 0.15, size=len(x))
+    def format_cross_correlation_result(self, correlation_value):
+       if correlation_value:
+           status = '  '
+           if correlation_value.pvalue < 0.05:
+               status = '**'
+           elif correlation_value.pvalue < 0.10:
+               status = '* '
+           return '%4.2f p=%4.2f %s' % (correlation_value.statistic,correlation_value.pvalue,status)
+       else:
+           return '      '
 
-        # Plot line + error bars
-        axes[i, j].errorbar(x, y, yerr=yerr, fmt='o-', color='black', ecolor='black',
-                            capsize=3, elinewidth=1, markerfacecolor='none', markeredgecolor='black')
+    def get_cross_correlation_result(self, data,column_a, column_b, t):
+        try:
+            if t==0:
+                return scipy.stats.pearsonr(data[column_a], data[column_b])
+            else:
+                return scipy.stats.pearsonr(data[column_a][t:], data[column_b][:-t])
+        except ValueError:
+            return None
 
-        # Remove grid and background
-        axes[i, j].grid(False)
-        axes[i, j].set_facecolor('white')
-        # axes[i, j].set_title( 'a'+ ' '+ )
+    def determine_cross_correlation1(self, experiment_dir, file, column_a, column_b):
+        file_full_path = self.working_dir + f'/{experiment_dir}/{file}.gdt'
+        if not os.path.isfile(file_full_path):
+            print(f"file not found: {file_full_path}")
+            return '   '
 
-        # Optionally set axis labels
-        if i == rows - 1:
-            axes[i, j].set_xlabel(titles_x[j])
-        if j == 0:
-            axes[i, j].set_ylabel(titles_y[i])
-    print("-----------", titles_y[i], "-----------")
-    for k, value in enumerate(x):
-        result = "p=%5.3f" % value
-        result1 = "%-10s" % " "
-        for item_j in axis_x:
-            result += "%14.6f" % yys[item_j][k]
-            result1 += "%-13s" % item_j
-        print(result)
+        data, _ = Statistics.read_gdt(file_full_path)
+        if np.all(data[column_a] == 0) or np.all(data[column_a] == data[column_a][0]) or \
+                np.all(data[column_b] == 0) or np.all(data[column_b] == data[column_b][0]):
+            return "            "
+        else:
+            return  [self.get_cross_correlation_result(data, column_a, column_b, 0),
+                     self.get_cross_correlation_result(data, column_a, column_b, 1),
+                     self.get_cross_correlation_result(data, column_a, column_b, 2)]
 
-print(result1)
-plt.tight_layout()
-plt.savefig(output)
-print("\n\n", output)
+    def determine_cross_correlation(self, experiment_dir, file, column_a, column_b):
+        file_full_path = self.working_dir + f'/{experiment_dir}/{file}.gdt'
+        if not os.path.isfile(file_full_path):
+            print(f"file not found: {file_full_path}")
+            return [None,None,None]
+
+        data, _ = Statistics.read_gdt(file_full_path)
+        if np.all(data[column_a] == 0) or np.all(data[column_a] == data[column_a][0]) or \
+                np.all(data[column_b] == 0) or np.all(data[column_b] == data[column_b][0]):
+            return [None,None,None]
+        else:
+            return  [self.get_cross_correlation_result(data, column_a, column_b, 0),
+                    self.get_cross_correlation_result(data, column_a, column_b, 1),
+                    self.get_cross_correlation_result(data, column_a, column_b, 2)]
+
+    def plot(self, working_dir:str, input_experiments: list, output:str, correlations_files:list=None):
+        if input_experiments:
+            experiments = {}
+            for args_item in input_experiments:
+                for item in args_item.strip().split(" "):
+                    if item in self.RENAMES:
+                        experiments[item] = self.RENAMES[item][1:] \
+                            if self.RENAMES[item].startswith('_') else self.RENAMES[item]
+                    else:
+                        if ':' in item:
+                            item_split = item.split(':')
+                            experiments[item_split[0]] = item_split[1][1:] \
+                                if item_split[1].startswith('_') else item_split[1]
+                        else:
+                            experiments[item] = item
+            self.axis_y = list(experiments.keys())
+            self.titles_y = list(experiments.values())
+        self.working_dir = working_dir
+        self.output, _ = os.path.splitext(os.path.basename(output.lower()))
+        output_txt = self.working_dir + '/' + self.output +'.txt'
+        output_png = self.working_dir + '/' + self.output +'.png'
+        output_file = open(output_txt, "w")
+        rows, cols = len(self.axis_x), len(self.axis_y)
+        plt.title(self.title_of_output)
+        fig, axes = plt.subplots(rows, cols, figsize=(12, 10))
+
+        for i, item_i in enumerate(self.axis_x):
+            yys = {}
+            min_y = np.inf
+            max_y = 0
+            for j, item_j in enumerate(self.axis_y):
+                # Cargar datos para la psi correspondiente
+                if not os.path.isdir(self.working_dir + '/' + item_j):
+                    print(f"no encuentro {self.working_dir}/{item_j}")
+                    break
+                data, _ = Statistics.read_gdt(self.working_dir + '/' + item_j + '/results.gdt')
+
+                y = np.log(data[item_i]) if item_i in self.with_log else data[item_i]
+                yerr = np.array(y.std()/2) if item_i in self.with_log else data['std_' + item_i] / 2
+                yys[item_j] = y
+                if (y.max() + yerr.max()) > max_y:
+                    max_y = y.max() + yerr.max()
+                if (y.min() - yerr.max()) < min_y:
+                    min_y = y.min() - yerr.max()
+
+                    
+                axes[i, j].errorbar(self.x, y, yerr=yerr, fmt='o-', color='black', ecolor='black',
+                                    capsize=3, elinewidth=1, markerfacecolor='none', markeredgecolor='black')
+                axes[i, j].grid(False)
+                axes[i, j].set_facecolor('white')
+                if i == rows - 1:
+                    axes[i, j].set_xlabel(self.titles_y[j])
+                if j == 0:
+                    axes[i, j].set_ylabel(self.titles_x[i])
+
+            for j, item_j in enumerate(self.axis_y):
+                axes[i, j].set_ylim( min_y, max_y)
+            output_file.write(f"-----------{self.titles_x[i].replace('$','')}-----------\n")
+            title = "%7s" % ''
+            for item_j in self.titles_y:
+                title += "%14s" % item_j
+            output_file.write(title + '\n')
+            for k, value in enumerate(self.x):
+                result = "p=%5.3f" % value
+                for item_j in self.axis_y:
+                    result += "%14.6f" % yys[item_j][k]
+                output_file.write(result+'\n')
+
+        if correlations_files:
+            for file in correlations_files:
+                for correlation in self.correlations:
+                    result = f'-----------{file}-----------\n                        '
+                    data = [None] * len(self.axis_y)
+                    for i, experiment in enumerate(self.axis_y):
+                        result += "%15s" % self.titles_y[i]
+                        data[i] = self.determine_cross_correlation(experiment, file, correlation[0], correlation[1])
+
+                    for j in range(len(data[0])):
+                        result += "\n%10s/%10s t=%d " % (correlation[0][:10],correlation[1][:10],j)
+                        for i, experiment in enumerate(self.axis_y):
+                            result += "%-10s " % self.format_cross_correlation_result(data[i][j])
+                    result += '\n'
+                    output_file.write(result)
+
+        plt.savefig(output_png)
+        plt.tight_layout()
+        output_file.close()
+        print("plot: ", output_png )
+        print("data: ", output_txt )
+
+
+def run_interactive():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", action='append', help='List of executions to unify.'
+                        ' by default: '+ ' '.join(PlotPsi.axis_y))
+    parser.add_argument("--working_dir", default=PlotPsi.working_dir,
+                        help="Directory where this executions are located")
+    parser.add_argument("--output", default=PlotPsi.output,
+                        help=f"File to be generated (.png for plot and .txt for data)")
+    parser.add_argument("--correlations", action='append', default=[],
+                        help=f"Take from each execution is located, a file to determine correlations (p0200_8 p0200_3)")
+    args = parser.parse_args()
+    plot_psi = PlotPsi()
+    plot_psi.plot(working_dir=args.working_dir, input_experiments=args.input, output=args.output,
+                  correlations_files=args.correlations)
+
+
+if __name__ == "__main__":
+    run_interactive()
+
