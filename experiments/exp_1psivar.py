@@ -15,15 +15,17 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 10
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/2_psivar_nonorm"
+    OUTPUT_DIRECTORY = "/experiments/1_psivar"
 
     parameters = {
-        "p": np.linspace(0.0001, 0.2, num=5),
+        "p": [0.0001, 0.05, 0.07,
+                   0.08,
+              0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8,  1]
     }
 
     config = {'psi': np.linspace(0.0, 1, num=5)}
 
-    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': 0}
+    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2}
     
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 6

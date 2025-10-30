@@ -1475,7 +1475,7 @@ class Model:
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c.append(c)
             if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE  * self.config.max_value_psi #TODO * 0.8
+                bank.psi = bank.E / self.maxE  * 0.99
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i = 0
@@ -1705,7 +1705,6 @@ class ModelOptimized(Model):
     Improved version optimized for many executions
     """
     def _calculate_rij(self, bank_i, bank_j, c_ij, psi):
-        """Calcula el valor rij entre dos bancos."""
         if bank_j.p == 0 or c_ij == 0:
             return self.config.r_i0
 

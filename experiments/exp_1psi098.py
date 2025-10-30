@@ -15,7 +15,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 10
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/1_psi05"
+    OUTPUT_DIRECTORY = "/experiments/1_psi098"
 
     parameters = {
         "p": [0.0001, 0.05, 0.07,
@@ -25,7 +25,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
     config = {}
 
-    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2, 'psi': 0.5}
+    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2, 'psi': 0.98}
     
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 0
