@@ -83,7 +83,7 @@ class Config:
     #   0 -> no normalization
     #  >0 -> instead of allowing interest rates for borrowers of any value, we normalize
     #        them to range [r_i0 .. normalize_interest_rate_max]:
-    normalize_interest_rate_max = 0
+    normalize_interest_rate_max = -2
 
     max_value_psi = 0.99
 
