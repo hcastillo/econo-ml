@@ -16,7 +16,8 @@ class ExperimentComparerRun(exp_runner.ExperimentRun):
             self._colors = plt.colormaps['viridis'](np.linspace(0, 1, len(diff_lines)))
         return self._colors[i]
 
-    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
+    def plot(self, array_with_data, array_with_x_values, title_x, directory,
+             array_comparing=None, array_comparing2=None):
         x_values = []
         x_title = '-'
         legend_title = '-'

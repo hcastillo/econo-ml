@@ -40,8 +40,18 @@ class ExperimentRun:
 
     MAX_EXECUTIONS_OF_MODELS_OUTLIERS = 10
 
+    TICKS = ''
+    COLOR = ''
+
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
+    COMPARING_TICKS = ''
+    COMPARING_COLOR = ''
+
+    COMPARING_DATA2 = ""
+    COMPARING_LABEL2 = "Comparing2"
+    COMPARING_TICKS2 = ''
+    COMPARING_COLOR2 = ''
 
     XTICKS_DIVISOR = 1
 
@@ -50,7 +60,10 @@ class ExperimentRun:
 
     ALGORITHM = interbank_lenderchange.ShockedMarket
 
+    DESCRIPTION_TITLE = ''
+
     NAME_OF_X_SERIES = None
+    NAME_OF_Y_SERIES = None
 
     EXTRA_MODEL_CONFIGURATION = {}
 
@@ -74,7 +87,8 @@ class ExperimentRun:
 
     error_bar = False
 
-    def plot(self, array_with_data, array_with_x_values, title_x, directory, array_comparing=None):
+    def plot(self, array_with_data, array_with_x_values, title_x, directory,
+             array_comparing=None, array_comparing2=None):
         # we plot only x labels 1 of each 10:
         plot_x_values = []
         for j in range(len(array_with_x_values)):
@@ -82,44 +96,90 @@ class ExperimentRun:
         plot_x_values[-1] = array_with_x_values[-1]
         for i in array_with_data:
             i = i.strip()
-            if i != "t":
+            if i not in ["t","psi.1"]:
                 mean = []
                 deviation_error = []
                 mean_comparing = []
+                mean_comparing2= []
                 for j in range(len(array_with_data[i])):
                     # mean is 0, std is 1:
                     mean.append(array_with_data[i][j][0])
                     deviation_error.append(array_with_data[i][j][1] / 2)
                     if array_comparing and i in array_comparing and j < len(array_comparing[i]):
                         mean_comparing.append(array_comparing[i][j][0])
+                    if array_comparing2 and i in array_comparing2 and j < len(array_comparing2[i]):
+                        mean_comparing2.append(array_comparing2[i][j][0])
+
                 plt.clf()
                 title = f"{i}"
-                title += f" x={title_x} MC={self.MC}"
+                if not self.DESCRIPTION_TITLE:
+                    title += f" x={title_x} MC={self.MC}"
+                else:
+                    title += f" {self.DESCRIPTION_TITLE}"
 
                 if self.error_bar:
-                    plt.errorbar(array_with_x_values, mean, yerr=deviation_error, fmt='-o', ecolor='blue',
+                    plt.errorbar(array_with_x_values, mean, yerr=deviation_error,
+                                 fmt=('-o' if not self.TICKS else self.TICKS),
+                                 ecolor='blue' if not self.COLOR else self.COLOR,
                                  label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                                  else self.ALGORITHM.__name__ if array_comparing else "")
                 else:
-                    plt.plot(array_with_x_values, mean, "b-",
+                    plt.plot(array_with_x_values, mean, ('-' if not self.TICKS else self.TICKS),
+                             color='blue' if not self.COLOR else self.COLOR,
                              label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                              else self.ALGORITHM.__name__ if array_comparing else "")
                 logarithm_plot = False
                 if array_comparing and i in array_comparing:
                     ax = plt.gca()
                     if len(mean_comparing) == 1:
-                        ax.plot(0, mean_comparing, "or", label=self.COMPARING_LABEL)
+                        ax.plot(0, mean_comparing, "o" if not self.COMPARING_TICKS else self.COMPARING_TICKS,
+                                color='red' if not self.COMPARING_COLOR else self.COMPARING_COLOR,
+                                label=self.COMPARING_LABEL)
                     else:
-                        ax.plot(array_with_x_values, mean_comparing, "r-", label=self.COMPARING_LABEL)
+                        ax.plot(array_with_x_values, mean_comparing,
+                                "-" if not self.COMPARING_TICKS else self.COMPARING_TICKS,
+                                color='red' if not self.COMPARING_COLOR else self.COMPARING_COLOR,
+                                label=self.COMPARING_LABEL)
                     if abs(mean[0] - mean_comparing[0]) > 1e6 and abs(mean[-1] - mean_comparing[-1]) > 1e6:
                         ax.set_yscale('log')
                         logarithm_plot = True
+                    if array_comparing2 and i in array_comparing2:
+                        if len(mean_comparing2) == 1:
+                            ax.plot(0, mean_comparing2,
+                                    "o" if not self.COMPARING_TICKS2 else self.COMPARING_TICKS2,
+                                    color='green' if not self.COMPARING_COLOR2 else self.COMPARING_COLOR2,
+                                    label=self.COMPARING_LABEL2)
+                        else:
+                            ax.plot(array_with_x_values, mean_comparing2,
+                                    "-" if not self.COMPARING_TICKS2 else self.COMPARING_TICKS2,
+                                    color='green' if not self.COMPARING_COLOR2 else self.COMPARING_COLOR2,
+                                    label=self.COMPARING_LABEL2)
+                        if abs(mean[0] - mean_comparing2[0]) > 1e6 and abs(mean[-1] - mean_comparing2[-1]) > 1e6:
+                            ax.set_yscale('log')
+                            logarithm_plot = True
 
                 plt.title(title + (' (log)' if logarithm_plot else ''))
                 plt.xticks(plot_x_values, rotation=270, fontsize=5)
                 if array_comparing:
                     plt.legend(loc='best')
                 plt.savefig(f"{directory}{i}.png", dpi=300)
+
+                with open(f"{directory}{i}.txt", "w") as f:
+                    f.write(f"{' ':16}{self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES else i:15}(std_err) ")
+                    if array_comparing and i in array_comparing:
+                        f.write(f"{self.COMPARING_LABEL:15}")
+                    if array_comparing2 and i in array_comparing2:
+                        f.write(f"{self.COMPARING_LABEL2:15}")
+                    f.write('\n')
+                    for index_x, x in enumerate(array_with_x_values):
+                        f.write(f"{x:15}{mean[index_x]:15.10f} ({deviation_error[index_x]:7.4f})")
+                        if array_comparing and i in array_comparing:
+                            f.write(f"{mean_comparing[index_x]:15.10f}")
+                        if array_comparing2 and i in array_comparing2:
+                            f.write(f"{mean_comparing2[index_x]:15.10f}")
+                        f.write('\n')
+
+
 
     def load(self, directory):
         if os.path.exists(f"{directory}results.csv"):
@@ -301,13 +361,24 @@ class ExperimentRun:
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
-    def load_comparing(self, results_to_plot, results_x_axis):
+    def load_comparing(self, results_x_axis):
         results_comparing = None
+        results_comparing2 = None
         if self.COMPARING_DATA:
             results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")
             if len(results_x_comparing) not in (len(results_x_axis), 1):
                 results_comparing = None
-        return results_comparing
+            else:
+                print(f"Loaded data to compare from {self.COMPARING_DATA}")
+
+            if self.COMPARING_DATA2:
+                results_comparing2, results_x_comparing2 = self.load(f"{self.COMPARING_DATA2}/")
+                if len(results_x_comparing2) not in (len(results_x_axis), 1):
+                    results_comparing2 = None
+                else:
+                    print(f"Loaded data to compare from {self.COMPARING_DATA2}")
+
+        return results_comparing, results_comparing2
 
     def data_seems_ok(self, filename_for_iteration: str, i: int,
                       individual_execution: pd.core.frame.DataFrame, array_all_data: pd.core.frame.DataFrame):
@@ -393,11 +464,14 @@ class ExperimentRun:
             position_inside_seeds_for_random = 0
 
             array_of_configs = self.get_models(self.config)
-            array_of_parameters = self.get_models(self.parameters)
+
             if reverse_execution:
                 array_of_configs = reversed(list(array_of_configs))
-                array_of_parameters = reversed(list(array_of_parameters))
+
             for model_configuration in array_of_configs:
+                array_of_parameters = self.get_models(self.parameters)
+                if reverse_execution:
+                    array_of_parameters = reversed(list(array_of_parameters))
                 for model_parameters in array_of_parameters:
                     result_iteration_to_check = pd.DataFrame()
                     graphs_iteration = []
@@ -488,12 +562,12 @@ class ExperimentRun:
             self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
         else:
             print(f"Loaded data from previous work from {self.OUTPUT_DIRECTORY}")
-        results_comparing = self.load_comparing(results_to_plot, results_x_axis)
+        results_comparing, results_comparing2 = self.load_comparing(results_x_axis)
         if self.log_replaced_data:
             print(self.log_replaced_data)
         print("Plotting...")
         self.plot(results_to_plot, results_x_axis, self.get_title_for(self.config, self.parameters),
-                  f"{self.OUTPUT_DIRECTORY}/", results_comparing)
+                  f"{self.OUTPUT_DIRECTORY}/", results_comparing, results_comparing2)
         self.results_to_plot = results_to_plot
         final_time = time.perf_counter()
         print('execution_time: %2.5f secs' % (final_time - initial_time))

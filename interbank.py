@@ -97,6 +97,12 @@ class Config:
     E_i0: float = 15  # equity
     r_i0: float = 0.02  # initial rate
 
+    # to setup constant values during the execution of asset_i, asset_j, p and c:
+    p_avg_ir = 0.0
+    c_avg_ir = 0.0
+    asset_i_avg_ir = 0.0
+    asset_j_avg_ir = 0.0
+
     # if enabled and != [] the values of t in the array (for instance [150,350]) will generate
     # a graph with the relations of the firms. If * all the instants will generate a graph, and also an animated gif
     # with the results
@@ -350,9 +356,9 @@ class Statistics:
         for bank in self.model.banks:
             if bank.incrD >= 0:
                 if bank.active_borrowers:
-                    asset_i.append(bank.asset_i)
+                    asset_i.append(bank.asset_i_avg_ir)
             elif bank.d > 0:
-                asset_j.append(bank.asset_j)
+                asset_j.append(bank.asset_j_avg_ir)
             if bank.active_borrowers:
                 num_of_banks_that_are_lenders += 1
                 for bank_that_is_borrower in bank.active_borrowers:
@@ -453,7 +459,7 @@ class Statistics:
         self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy) if avg_prob_bankruptcy else np.nan
 
         probabilities = [bank.P for bank in self.model.banks if not bank.failed]
-        lender_capacities = [np.mean(bank.c) for bank in self.model.banks if not bank.failed]
+        lender_capacities = [np.mean(bank.c_avg_ir) for bank in self.model.banks if not bank.failed]
         num_banks = len(probabilities)
 
         self.P[self.model.t] = np.mean(probabilities) if probabilities else np.nan
@@ -1458,7 +1464,7 @@ class Model:
         self.maxE = max(self.banks, key=lambda k: k.E).E
         max_c = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
-            bank.p = bank.E / self.maxE
+            bank.p_avg_ir = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
@@ -1470,43 +1476,47 @@ class Model:
             bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
             bank.A = bank.C + bank.L + bank.R
         for bank in self.banks:
-            bank.c = []
+            bank.c_avg_ir = []
             for i in range(self.config.N):
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
-                bank.c.append(c)
+                bank.c_avg_ir.append(c)
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE  * 0.99
         min_r = sys.maxsize
         for bank_i in self.banks:
-            bank_i.asset_i = 0
-            bank_i.asset_j = 0
+            bank_i.asset_i_avg_ir = 0
+            bank_i.asset_j_avg_ir = 0
             for j in range(self.config.N):
                 try:
                     if j == bank_i.id:
                         bank_i.rij[j] = 0
                     else:
-                        if self.banks[j].p == 0 or bank_i.c[j] == 0:
+                        if self.banks[j].p_avg_ir == 0 or bank_i.c_avg_ir[j] == 0:
                             bank_i.rij[j] = self.config.r_i0
                         else:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
                             if psi == 1:
                                 psi = 0.99999999999999
-                            bank_i.rij[j] = ((self.config.chi * bank_i.A - self.config.phi * self.banks[j].A
-                                              - (1 - self.banks[j].p) * (
-                                                          self.config.xi * self.banks[j].A - bank_i.c[j]))
+                            asset_i = bank_i.A if not self.config.asset_i_avg_ir else self.config.asset_i_avg_ir
+                            asset_j = self.banks[j].A if not self.config.asset_j_avg_ir else self.config.asset_j_avg_ir
+                            c =  bank_i.c_avg_ir[j] if not self.config.c_avg_ir else self.config.c_avg_ir
+                            p =  self.banks[j].p_avg_ir if not self.config.p_avg_ir else self.config.p_avg_ir
+                            bank_i.rij[j] = ((self.config.chi * asset_i - self.config.phi * asset_j
+                                              - (1 - p) * (
+                                                          self.config.xi * asset_j - c))
                                              /
-                                             (self.banks[j].p * bank_i.c[j] * (1 - psi)))
+                                             (p * c * (1 - psi)))
 
-                            bank_i.asset_i += bank_i.A
-                            bank_i.asset_j += self.banks[j].A
+                            bank_i.asset_i_avg_ir += bank_i.A
+                            bank_i.asset_j_avg_ir += self.banks[j].A
                             # bank_i.asset_j += 1 - self.banks[j].p
                         if bank_i.rij[j] < 0:
                             bank_i.rij[j] = self.config.r_i0
                 except ZeroDivisionError:
                     bank_i.rij[j] = self.config.r_i0
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
-            bank_i.asset_i = bank_i.asset_i / (self.config.N - 1)
-            bank_i.asset_j = bank_i.asset_j / (self.config.N - 1)
+            bank_i.asset_i_avg_ir = bank_i.asset_i_avg_ir / (self.config.N - 1)
+            bank_i.asset_j_avg_ir = bank_i.asset_j_avg_ir / (self.config.N - 1)
             if bank_i.r < min_r:
                 min_r = bank_i.r
         for bank in self.banks:
@@ -1705,12 +1715,12 @@ class ModelOptimized(Model):
     Improved version optimized for many executions
     """
     def _calculate_rij(self, bank_i, bank_j, c_ij, psi):
-        if bank_j.p == 0 or c_ij == 0:
+        if bank_j.p_avg_ir == 0 or c_ij == 0:
             return self.config.r_i0
 
         numerator = (self.config.chi * bank_i.A - self.config.phi * bank_j.A -
-                     (1 - bank_j.p) * (self.config.xi * bank_j.A - c_ij))
-        denominator = bank_j.p * c_ij * (1 - psi)
+                     (1 - bank_j.p_avg_ir) * (self.config.xi * bank_j.A - c_ij))
+        denominator = bank_j.p_avg_ir * c_ij * (1 - psi)
 
         if denominator == 0:
             return self.config.r_i0
@@ -1724,7 +1734,7 @@ class ModelOptimized(Model):
         self.maxE = max(self.banks, key=lambda k: k.E).E
         max_c = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
-            bank.p = bank.E / self.maxE
+            bank.p_avg_ir = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
@@ -1736,18 +1746,18 @@ class ModelOptimized(Model):
             bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
             bank.A = bank.C + bank.L + bank.R
         for bank in self.banks:
-            bank.c = []
+            bank.c_avg_ir = []
             for i in range(self.config.N):
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
-                bank.c.append(c)
+                bank.c_avg_ir.append(c)
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE
 
         # optimized part ----------
         min_r = float('inf')
         for bank_i in self.banks:
-            bank_i.asset_i = 0
-            bank_i.asset_j = 0
+            bank_i.asset_i_avg_ir = 0
+            bank_i.asset_j_avg_ir = 0
             A_i = bank_i.A
             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
             psi = min(psi, 0.99999999999999)
@@ -1758,19 +1768,19 @@ class ModelOptimized(Model):
                     continue
 
                 bank_j = self.banks[j]
-                p_j = bank_j.p
-                c_ij = bank_i.c[j]
+                p_j = bank_j.p_avg_ir
+                c_ij = bank_i.c_avg_ir[j]
                 A_j = bank_j.A
                 bank_i.rij[j] = self._calculate_rij(bank_i, bank_j, c_ij, psi)
 
                 if p_j != 0 and c_ij != 0:
-                    bank_i.asset_i += A_i
-                    bank_i.asset_j += A_j
+                    bank_i.asset_i_avg_ir += A_i
+                    bank_i.asset_j_avg_ir += A_j
 
             N_minus_1 = self.config.N - 1
             bank_i.r = np.sum(bank_i.rij) / N_minus_1
-            bank_i.asset_i /= N_minus_1
-            bank_i.asset_j /= N_minus_1
+            bank_i.asset_i_avg_ir /= N_minus_1
+            bank_i.asset_j_avg_ir /= N_minus_1
             min_r = min(min_r, bank_i.r)
         # ----------
         for bank in self.banks:
@@ -1875,6 +1885,7 @@ class Utils:
                             default=model.config.reintroduce_with_median,
                             help='Reintroduce banks with the median of current banks')
         parser.add_argument('--seed', type=int, default=None, help='seed used for random generator')
+
         args, other_possible_config_args = parser.parse_known_args()
         if args.fast:
             model = ModelOptimized()

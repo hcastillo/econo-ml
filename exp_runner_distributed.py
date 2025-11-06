@@ -122,12 +122,12 @@ class Runner(exp_runner.Runner):
             experiment.save_gdt(results_to_plot, results_x_axis, f"{experiment.OUTPUT_DIRECTORY}/")
         else:
             print(f"Loaded data from previous work from {experiment.OUTPUT_DIRECTORY}")
-        results_comparing = experiment.load_comparing(results_to_plot, results_x_axis)
+        results_comparing, results_comparing2 = experiment.load_comparing(results_x_axis)
         if experiment.log_replaced_data:
             print(experiment.log_replaced_data)
         print("Plotting...")
         experiment.plot(results_to_plot, results_x_axis, experiment.get_title_for(experiment.config, experiment.parameters),
-                  f"{experiment.OUTPUT_DIRECTORY}/", results_comparing)
+                  f"{experiment.OUTPUT_DIRECTORY}/", results_comparing, results_comparing2)
         experiment.results_to_plot = results_to_plot
         final_time = time.perf_counter()
         print('execution_time: %2.5f secs' % (final_time - initial_time))

@@ -281,7 +281,7 @@ class ExperimentRun:
         result = self.__get_value_for(param1) + " " + self.__get_value_for(param2)
         return result.strip()
 
-    def load_comparing(self, results_to_plot, results_x_axis):
+    def load_comparing(self, results_x_axis):
         results_comparing = None
         if self.COMPARING_DATA:
             results_comparing, results_x_comparing = self.load(f"{self.COMPARING_DATA}/")

@@ -456,8 +456,8 @@ class Boltzmann(LenderChange):
             bank.rij = np.full(this_model.config.N, this_model.config.r_i0, dtype=float)
             bank.rij[bank.id] = 0
             bank.mu = 0
-            bank.asset_i = 0
-            bank.asset_j = 0
+            bank.asset_i_avg_ir = 0
+            bank.asset_j_avg_ir = 0
             bank.asset_equity = 0
             # if it's just created, only not to be ourselves is enough
             new_value = random.randrange(this_model.config.N - 1)
@@ -733,8 +733,8 @@ class RestrictedMarket(LenderChange):
         bank.rij[bank.id] = 0
         #bank.r = this_model.config.r_i0
         bank.mu = 0
-        bank.asset_i = 0
-        bank.asset_j = 0
+        bank.asset_i_avg_ir = 0
+        bank.asset_j_avg_ir = 0
         bank.asset_equity = 0
         return bank.lender
 
@@ -886,8 +886,8 @@ class SmallWorld(ShockedMarket):
         bank.rij[bank.id] = 0
         #bank.r = this_model.config.r_i0
         bank.mu = 0
-        bank.asset_i = 0
-        bank.asset_j = 0
+        bank.asset_i_avg_ir = 0
+        bank.asset_j_avg_ir = 0
         bank.asset_equity = 0
         return bank.lender
 
