@@ -14,7 +14,8 @@ class MarketPowerRun(exp_runner.ExperimentRun):
     MC = 5
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251105_ir_study_base_psi"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_psi"
+    COLOR = 'black'
 
     parameters = {
         "p": [0.2]

@@ -13,40 +13,50 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     T = 1000
     MC = 5
 
-    COMPARING_DATA = "/experiments/251105_ir_study_base_p"
+    COMPARING_DATA = "/experiments/251110_ir_study_base_p"
 
-    COMPARING_DATA2 = "/experiments/251105_ir_study_base_p_asset_j"
+    COMPARING_DATA2 = "/experiments/251110_ir_study_base_p_asset_j"
     COMPARING_LABEL = "Average"
     COMPARING_LABEL2 = "Smaller $A_j$"
     NAME_OF_X_SERIES = "Greater $A_j$"
     DESCRIPTION_TITLE = '(Forcing $A_j$)'
-    COMPARING_TICKS2 = ':'
+    COMPARING_MARKER = "o"
+    COMPARING_MARKER2 = "x"
+    COMPARING_STYLE2 = ':'
     COMPARING_COLOR2 = 'red'
-    COMPARING_TICKS = '-'
+    COMPARING_STYLE = '-'
     COMPARING_COLOR = 'black'
-    TICKS = '--'
+    STYLE = '--'
     COLOR = 'red'
+    MARKER = '+'
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251105_ir_study_base_p_asset_j1"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_p_asset_j1"
 
     parameters = {
-        "p": [0.0001, 0.05, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
+        # "p": [0.0001, 0.05, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
+        "p": [0.0001, 0.001, 0.01, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
     }
     extra_individual_parameters = [
-        {'asset_j_avg_ir': 1817.343},
-        {'asset_j_avg_ir': 1717.124},
-        {'asset_j_avg_ir': 1696.096},
-        {'asset_j_avg_ir': 1689.811},
-        {'asset_j_avg_ir': 1690.410},
-        {'asset_j_avg_ir': 1688.644},
-        {'asset_j_avg_ir': 1683.623},
-        {'asset_j_avg_ir': 1679.528},
-        {'asset_j_avg_ir': 1680.805},
-        {'asset_j_avg_ir': 1686.741},
-        {'asset_j_avg_ir': 1685.763},
-        {'asset_j_avg_ir': 1690.580},
+        {'asset_j_avg_ir': 182.0357},
+        {'asset_j_avg_ir': 182.5018},
+        {'asset_j_avg_ir': 179.4384},
+        {'asset_j_avg_ir': 173.8898},
+        {'asset_j_avg_ir': 173.4964},
+        {'asset_j_avg_ir': 172.0575},
+        {'asset_j_avg_ir': 171.1850},
+        {'asset_j_avg_ir': 169.6096},
+        {'asset_j_avg_ir': 168.9811},
+        {'asset_j_avg_ir': 169.0410},
+        {'asset_j_avg_ir': 168.8644},
+        {'asset_j_avg_ir': 168.3623},
+        {'asset_j_avg_ir': 167.9528},
+        {'asset_j_avg_ir': 168.0805},
+        {'asset_j_avg_ir': 168.6741},
+        {'asset_j_avg_ir': 168.5763},
+        {'asset_j_avg_ir': 169.0580},
     ]
+    extra_individual_parameters_multiplier = 10
 
     config = {}
 

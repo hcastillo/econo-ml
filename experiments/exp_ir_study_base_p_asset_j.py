@@ -13,29 +13,41 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     T = 1000
     MC = 5
 
-    COMPARING_DATA = "/experiments/251105_ir_study_base_p"
+    COMPARING_DATA = "/experiments/251110_ir_study_base_p"
     COMPARING_LABEL = "Average"
+    NAME_OF_X_SERIES = "Smaller $A_j$"
+    COMPARING_COLOR = 'black'
+    STYLE = '--'
+    COLOR = 'red'
+    MARKER = '+'
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251105_ir_study_base_p_asset_j"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_p_asset_j"
 
     parameters = {
-        "p": [0.0001, 0.05, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
+        # "p": [0.0001, 0.05, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
+        "p": [0.0001, 0.001, 0.01, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
     }
     extra_individual_parameters = [
-        {'asset_j_avg_ir': 18.17343},
-        {'asset_j_avg_ir': 17.17124},
-        {'asset_j_avg_ir':     16.96096},
-        {'asset_j_avg_ir':     16.89811},
-        {'asset_j_avg_ir':     16.90410},
-        {'asset_j_avg_ir':     16.88644},
-        {'asset_j_avg_ir':     16.83623},
-        {'asset_j_avg_ir':     16.79528},
-        {'asset_j_avg_ir': 16.80805},
-        {'asset_j_avg_ir': 16.86741},
-        {'asset_j_avg_ir': 16.85763},
-        {'asset_j_avg_ir':     16.90580},
+        {'asset_j_avg_ir': 182.0357},
+        {'asset_j_avg_ir': 182.5018},
+        {'asset_j_avg_ir': 179.4384},
+        {'asset_j_avg_ir': 173.8898},
+        {'asset_j_avg_ir': 173.4964},
+        {'asset_j_avg_ir': 172.0575},
+        {'asset_j_avg_ir': 171.1850},
+        {'asset_j_avg_ir': 169.6096},
+        {'asset_j_avg_ir': 168.9811},
+        {'asset_j_avg_ir': 169.0410},
+        {'asset_j_avg_ir': 168.8644},
+        {'asset_j_avg_ir': 168.3623},
+        {'asset_j_avg_ir': 167.9528},
+        {'asset_j_avg_ir': 168.0805},
+        {'asset_j_avg_ir': 168.6741},
+        {'asset_j_avg_ir': 168.5763},
+        {'asset_j_avg_ir': 169.0580},
     ]
+    extra_individual_parameters_multiplier=0.1
 
     config = {}
 

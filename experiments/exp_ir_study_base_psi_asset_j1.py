@@ -13,23 +13,28 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     T = 1000
     MC = 5
 
-    COMPARING_DATA = "/experiments/251105_ir_study_base_psi"
+    COMPARING_DATA = "/experiments/251110_ir_study_base_psi"
 
 
-    COMPARING_DATA2 = "/experiments/251105_ir_study_base_psi_asset_j"
+    COMPARING_DATA2 = "/experiments/251110_ir_study_base_psi_asset_j"
     COMPARING_LABEL = "Average"
     COMPARING_LABEL2 = "Smaller $A_j$"
     NAME_OF_X_SERIES = "Greater $A_j$"
     DESCRIPTION_TITLE = '(Forcing $A_i$)'
-    COMPARING_TICKS2 = ':'
+
+    COMPARING_MARKER = "o"
+    COMPARING_MARKER2 = "x"
+    COMPARING_STYLE2 = ':'
     COMPARING_COLOR2 = 'red'
-    COMPARING_TICKS = '-'
+    COMPARING_STYLE = '-'
     COMPARING_COLOR = 'black'
-    TICKS = '--'
+    STYLE = '--'
     COLOR = 'red'
+    MARKER= '+'
+
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251105_ir_study_base_psi_asset_j1"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_psi_asset_j1"
 
     parameters = {
             "p": [0.2]
@@ -38,14 +43,14 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     config = {"psi": [0, 0.25, 0.50, 0.75, 0.99]}
 
     extra_individual_parameters = [
-
-        {'asset_j_avg_ir': 1679.656},
-        {'asset_j_avg_ir': 1681.611},
-        {'asset_j_avg_ir': 1680.943},
-        {'asset_j_avg_ir': 1677.254},
-        {'asset_j_avg_ir': 1687.162},
+        {'asset_j_avg_ir': 168.0112},
+        {'asset_j_avg_ir':      167.1370},
+        {'asset_j_avg_ir':      168.2968},
+        {'asset_j_avg_ir':      168.8898},
+        {'asset_j_avg_ir': 168.5304},
 
     ]
+    extra_individual_parameters_multiplier = 10
 
     EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2}
 

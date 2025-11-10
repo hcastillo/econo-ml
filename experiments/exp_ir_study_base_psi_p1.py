@@ -13,23 +13,25 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     T = 1000
     MC = 5
 
-    COMPARING_DATA = "/experiments/251105_ir_study_base_psi"
-
-
-    COMPARING_DATA2 = "/experiments/251105_ir_study_base_psi_c"
+    COMPARING_DATA = "/experiments/251110_ir_study_base_psi"
+    COMPARING_DATA2 = "/experiments/251110_ir_study_base_psi_p"
     COMPARING_LABEL = "Average"
     COMPARING_LABEL2 = "Smaller p"
     NAME_OF_X_SERIES = "Greater p"
     DESCRIPTION_TITLE = '(Forcing probability of bankruptcy $p$)'
-    COMPARING_TICKS2 = ':'
+
+    COMPARING_MARKER = "o"
+    COMPARING_MARKER2 = "x"
+    COMPARING_STYLE2 = ':'
     COMPARING_COLOR2 = 'red'
-    COMPARING_TICKS = '-'
+    COMPARING_STYLE = '-'
     COMPARING_COLOR = 'black'
-    TICKS = '--'
+    STYLE = '--'
     COLOR = 'red'
+    MARKER= '+'
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251105_ir_study_base_psi_c1"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_psi_p1"
 
     parameters = {
             "p": [0.2]
@@ -38,12 +40,13 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     config = {"psi": [0, 0.25, 0.50, 0.75, 0.99]}
 
     extra_individual_parameters = [
-        {'p_avg_ir': 03.244191},
-        {'p_avg_ir': 03.352819},
-        {'p_avg_ir': 03.633483},
-        {'p_avg_ir': 03.855890},
-        {'p_avg_ir': 03.304037},
+        {'p_avg_ir': 0.3176117},
+        {'p_avg_ir': 0.3335269},
+        {'p_avg_ir': 0.3602519},
+        {'p_avg_ir': 0.3881468},
+        {'p_avg_ir': 0.3331875},
     ]
+    extra_individual_parameters_multiplier = 10
 
     EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2}
 

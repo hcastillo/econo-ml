@@ -40,20 +40,25 @@ class ExperimentRun:
 
     MAX_EXECUTIONS_OF_MODELS_OUTLIERS = 10
 
-    TICKS = ''
-    COLOR = ''
+    STYLE = '-'
+    MARKER= 'o'
+    COLOR = 'blue'
 
     COMPARING_DATA = ""
     COMPARING_LABEL = "Comparing"
-    COMPARING_TICKS = ''
-    COMPARING_COLOR = ''
+    COMPARING_STYLE = '--'
+    COMPARING_COLOR = 'red'
+    COMPARING_MARKER = 'o'
 
     COMPARING_DATA2 = ""
     COMPARING_LABEL2 = "Comparing2"
-    COMPARING_TICKS2 = ''
-    COMPARING_COLOR2 = ''
+    COMPARING_STYLE2 = ':'
+    COMPARING_COLOR2 = 'green'
+    COMPARING_MARKER2 = 'o'
 
+    # value greater than 1 means that instead of plotting all the xticks, only 1 of each XTICKS_DIVISOR where plot:
     XTICKS_DIVISOR = 1
+    XTICKS_SCALED = False
 
     LABEL = "Invalid"
     OUTPUT_DIRECTORY = "Invalid"
@@ -94,6 +99,14 @@ class ExperimentRun:
         for j in range(len(array_with_x_values)):
             plot_x_values.append(array_with_x_values[j] if (j % ExperimentRun.XTICKS_DIVISOR == 0) else " ")
         plot_x_values[-1] = array_with_x_values[-1]
+        if self.XTICKS_SCALED:
+            try:
+                x_only_one_variable_so_we_can_scale_it_properly = [float(x.split('=')[1]) for x in array_with_x_values]
+                # if arrives here, [x=0.0001,x=0.1,x=10,x=100] will be scaled properly, not as [x=1,x=2,x=3,x=4]
+                # labels are in plot_x_values now:
+                array_with_x_values = x_only_one_variable_so_we_can_scale_it_properly
+            except:
+                pass
         for i in array_with_data:
             i = i.strip()
             if i not in ["t","psi.1"]:
@@ -111,6 +124,7 @@ class ExperimentRun:
                         mean_comparing2.append(array_comparing2[i][j][0])
 
                 plt.clf()
+                fig, ax = plt.subplots()
                 title = f"{i}"
                 if not self.DESCRIPTION_TITLE:
                     title += f" x={title_x} MC={self.MC}"
@@ -118,52 +132,50 @@ class ExperimentRun:
                     title += f" {self.DESCRIPTION_TITLE}"
 
                 if self.error_bar:
-                    plt.errorbar(array_with_x_values, mean, yerr=deviation_error,
-                                 fmt=('-o' if not self.TICKS else self.TICKS),
-                                 ecolor='blue' if not self.COLOR else self.COLOR,
+                    ax.errorbar(array_with_x_values, mean, yerr=deviation_error,
+                                 linestyle=self.STYLE, marker=self.MARKER, color=self.COLOR,
                                  label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                                  else self.ALGORITHM.__name__ if array_comparing else "")
                 else:
-                    plt.plot(array_with_x_values, mean, ('-' if not self.TICKS else self.TICKS),
-                             color='blue' if not self.COLOR else self.COLOR,
+                    ax.plot(array_with_x_values, mean,
+                             linestyle=self.STYLE, marker=self.MARKER, color=self.COLOR,
                              label=self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES
                              else self.ALGORITHM.__name__ if array_comparing else "")
                 logarithm_plot = False
                 if array_comparing and i in array_comparing:
-                    ax = plt.gca()
+                    #ax = plt.gca()
                     if len(mean_comparing) == 1:
-                        ax.plot(0, mean_comparing, "o" if not self.COMPARING_TICKS else self.COMPARING_TICKS,
-                                color='red' if not self.COMPARING_COLOR else self.COMPARING_COLOR,
+                        ax.plot(0, mean_comparing, linestyle=self.COMPARING_STYLE,
+                                marker=self.COMPARING_MARKER,color=self.COMPARING_COLOR,
                                 label=self.COMPARING_LABEL)
                     else:
-                        ax.plot(array_with_x_values, mean_comparing,
-                                "-" if not self.COMPARING_TICKS else self.COMPARING_TICKS,
-                                color='red' if not self.COMPARING_COLOR else self.COMPARING_COLOR,
+                        ax.plot(array_with_x_values, mean_comparing, linestyle=self.COMPARING_STYLE,
+                                marker=self.COMPARING_MARKER, color=self.COMPARING_COLOR,
                                 label=self.COMPARING_LABEL)
                     if abs(mean[0] - mean_comparing[0]) > 1e6 and abs(mean[-1] - mean_comparing[-1]) > 1e6:
                         ax.set_yscale('log')
                         logarithm_plot = True
                     if array_comparing2 and i in array_comparing2:
                         if len(mean_comparing2) == 1:
-                            ax.plot(0, mean_comparing2,
-                                    "o" if not self.COMPARING_TICKS2 else self.COMPARING_TICKS2,
-                                    color='green' if not self.COMPARING_COLOR2 else self.COMPARING_COLOR2,
+                            ax.plot(0, mean_comparing2, linestyle=self.COMPARING_STYLE2,
+                                    marker=self.COMPARING_MARKER2, color=self.COMPARING_COLOR2,
                                     label=self.COMPARING_LABEL2)
                         else:
-                            ax.plot(array_with_x_values, mean_comparing2,
-                                    "-" if not self.COMPARING_TICKS2 else self.COMPARING_TICKS2,
-                                    color='green' if not self.COMPARING_COLOR2 else self.COMPARING_COLOR2,
+                            ax.plot(array_with_x_values, mean_comparing2, linestyle=self.COMPARING_STYLE2,
+                                    marker=self.COMPARING_MARKER2, color=self.COMPARING_COLOR2,
                                     label=self.COMPARING_LABEL2)
                         if abs(mean[0] - mean_comparing2[0]) > 1e6 and abs(mean[-1] - mean_comparing2[-1]) > 1e6:
                             ax.set_yscale('log')
                             logarithm_plot = True
 
                 plt.title(title + (' (log)' if logarithm_plot else ''))
-                plt.xticks(plot_x_values, rotation=270, fontsize=5)
+                # plt.xticks(plot_x_values, rotation=270, fontsize=5)
+                ax.set_xticks(array_with_x_values)
+                ax.set_xticklabels(plot_x_values, rotation=270, fontsize=5)
                 if array_comparing:
                     plt.legend(loc='best')
                 plt.savefig(f"{directory}{i}.png", dpi=300)
-
+                plt.close(fig)
                 with open(f"{directory}{i}.txt", "w") as f:
                     f.write(f"{' ':16}{self.NAME_OF_X_SERIES if self.NAME_OF_X_SERIES else i:15}(std_err) ")
                     if array_comparing and i in array_comparing:

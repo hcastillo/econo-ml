@@ -24,6 +24,7 @@ class ExperimentRunParametrized(exp_runner.ExperimentRun):
     extra_individual_config = [ ]
 
     extra_individual_parameters = [ ]
+    extra_individual_parameters_multiplier = None
 
     def do(self, clear_previous_results=False, reverse_execution=False):
         self.log_replaced_data = ""
@@ -63,6 +64,10 @@ class ExperimentRunParametrized(exp_runner.ExperimentRun):
                     filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
 
                     if self.extra_individual_parameters:
+                        if self.extra_individual_parameters_multiplier:
+                            for element in self.extra_individual_parameters[model_parameters_j]:
+                                self.extra_individual_parameters[model_parameters_j][element] *= (
+                                    self.extra_individual_parameters_multiplier)
                         model_configuration_parametrized1 = model_configuration_parametrized | \
                                                        self.extra_individual_parameters[model_parameters_j]
                     else:

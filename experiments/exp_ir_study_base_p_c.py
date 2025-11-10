@@ -13,29 +13,41 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     T = 1000
     MC = 5
 
-    COMPARING_DATA = "/experiments/251105_ir_study_base_p"
+    COMPARING_DATA = "/experiments/251110_ir_study_base_p"
     COMPARING_LABEL = "Average"
+    NAME_OF_X_SERIES = "Smaller c"
+    COMPARING_COLOR = 'black'
+    STYLE = '--'
+    COLOR = 'red'
+    MARKER = '+'
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251105_ir_study_base_p_c"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_p_c"
 
     parameters = {
-        "p": [0.0001, 0.05, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
+        # "p": [0.0001, 0.05, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
+        "p": [0.0001, 0.001, 0.01, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
     }
     extra_individual_parameters = [
-        {'c_avg_ir': 17.73839},
-        {'c_avg_ir': 16.73418},
-        {'c_avg_ir': 16.52463},
-        {'c_avg_ir': 16.46203},
-        {'c_avg_ir': 16.46314},
-        {'c_avg_ir': 16.44395},
-        {'c_avg_ir': 16.38981},
-        {'c_avg_ir': 16.34921},
-        {'c_avg_ir': 16.35836},
-        {'c_avg_ir': 16.42891},
-        {'c_avg_ir': 16.42932},
-        {'c_avg_ir': 16.47342},
-    ]
+             {'c_avg_ir':  177.6769},
+             {'c_avg_ir':  178.1187},
+             {'c_avg_ir':  175.1001},
+             {'c_avg_ir':  169.5551},
+             {'c_avg_ir':  169.0929},
+             {'c_avg_ir':  167.6825},
+             {'c_avg_ir':  166.7937},
+             {'c_avg_ir':  165.2463},
+             {'c_avg_ir':  164.6203},
+             {'c_avg_ir':  164.6314},
+             {'c_avg_ir':  164.4395},
+             {'c_avg_ir':  163.8981},
+             {'c_avg_ir':  163.4921},
+             {'c_avg_ir':  163.5836},
+             {'c_avg_ir':  164.2891},
+             {'c_avg_ir':  164.2932},
+             {'c_avg_ir': 164.7342},
+        ]
+    extra_individual_parameters_multiplier =  0.1
 
     config = {}
 

@@ -14,15 +14,16 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     MC = 5
 
     COMPARING_DATA = "/experiments/251110_ir_study_base_psi"
-    COMPARING_LABEL = "Average"
-    NAME_OF_X_SERIES = "Smaller $A_i$"
+    COMPARING_LABEL = "Using $A_i$"
+    NAME_OF_X_SERIES = 'Using $\\bar{A_i}$'
+    DESCRIPTION_TITLE = 'Montecarlo $\mathcal{M}=5$'
+    COMPARING_STYLE = ':'
     COMPARING_COLOR = 'black'
     STYLE = '--'
     COLOR = 'red'
-    MARKER = '+'
 
     ALGORITHM = ShockedMarket3
-    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_psi_asset_i"
+    OUTPUT_DIRECTORY = "/experiments/251110_ir_study_base_psi_asset_i_canary"
 
     parameters = {
             "p": [0.2]
@@ -35,9 +36,7 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
         {'asset_i_avg_ir': 166.6946},
         {'asset_i_avg_ir': 167.8455},
         {'asset_i_avg_ir': 168.6340},
-        {'asset_i_avg_ir': 167.7435},
-    ]
-    extra_individual_parameters_multiplier = 0.1
+        {'asset_i_avg_ir': 167.7435},    ]
 
     EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2}
 

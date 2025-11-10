@@ -28,6 +28,7 @@ import lxml.etree
 import lxml.builder
 import gzip
 import scipy.stats
+import warnings
 
 LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
 LENDER_CHANGE_DEFAULT_P = 0.2
@@ -68,7 +69,7 @@ class Config:
     chi: float = 0.015  # ji Χ
 
     xi: float = 0.3  # xi ξ liquidation cost of collateral
-    rho: float = 0.3  # ro ρ fire sale cost
+    rho: float = 0.0  # rho ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
@@ -487,13 +488,16 @@ class Statistics:
                 np.all(self.interest_rate == 0) or np.all(self.interest_rate == self.interest_rate[0]):
             self.correlation = []
         else:
+
             try:
-                self.correlation = [
-                    # correlation_coefficient = [-1..1] and p_value < 0.10
-                    scipy.stats.pearsonr(self.interest_rate, self.bankruptcy),
-                    # time delay 1:
-                    scipy.stats.pearsonr(self.interest_rate[1:], self.bankruptcy[:-1])
-                ]
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", scipy.stats.NearConstantInputWarning)
+                    self.correlation = [
+                        # correlation_coefficient = [-1..1] and p_value < 0.10
+                        scipy.stats.pearsonr(self.interest_rate, self.bankruptcy),
+                        # time delay 1:
+                        scipy.stats.pearsonr(self.interest_rate[1:], self.bankruptcy[:-1])
+                    ]
             except ValueError:
                 self.correlation = []
 
