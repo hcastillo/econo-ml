@@ -110,21 +110,23 @@ class ExperimentRunParametrized(exp_runner.ExperimentRun):
                                           np.all(result_mc['bankruptcies'] == result_mc['bankruptcies'][0]) or
                                           np.all(result_mc['interest_rate'] == 0) or
                                           np.all(result_mc['interest_rate'] == result_mc['interest_rate'][0])))):
-                                correlation_coefficient, p_value = scipy.stats.pearsonr(result_mc['interest_rate'],
-                                                                                        result_mc['bankruptcies'])
-                                correlation_coefficient1, p_value1 = scipy.stats.pearsonr(
-                                    result_mc['interest_rate'][1:],
-                                    result_mc['bankruptcies'][:-1])
-                                correlation_file.write(
-                                    f"{filename_for_iteration}_{i} = {model_configuration} {model_parameters}\n")
-                                correlation_file.write(
-                                    exp_runner.format_correlation_values(0, correlation_coefficient, p_value))
-                                correlation_file.write(
-                                    exp_runner.format_correlation_values(1, correlation_coefficient1, p_value1))
-                                montecarlo_iteration_perfect_correlation = (
-                                        montecarlo_iteration_perfect_correlation and (
-                                        (correlation_coefficient1 > 0 and p_value1 <= 0.10) or
-                                        (correlation_coefficient > 0 and p_value <= 0.10)))
+                                with warnings.catch_warnings():
+                                    warnings.simplefilter("ignore", scipy.stats.NearConstantInputWarning)
+                                    correlation_coefficient, p_value = scipy.stats.pearsonr(result_mc['interest_rate'],
+                                                                                            result_mc['bankruptcies'])
+                                    correlation_coefficient1, p_value1 = scipy.stats.pearsonr(
+                                        result_mc['interest_rate'][1:],
+                                        result_mc['bankruptcies'][:-1])
+                                    correlation_file.write(
+                                        f"{filename_for_iteration}_{i} = {model_configuration} {model_parameters}\n")
+                                    correlation_file.write(
+                                        exp_runner.format_correlation_values(0, correlation_coefficient, p_value))
+                                    correlation_file.write(
+                                        exp_runner.format_correlation_values(1, correlation_coefficient1, p_value1))
+                                    montecarlo_iteration_perfect_correlation = (
+                                            montecarlo_iteration_perfect_correlation and (
+                                            (correlation_coefficient1 > 0 and p_value1 <= 0.10) or
+                                            (correlation_coefficient > 0 and p_value <= 0.10)))
                             result_iteration = pd.concat([result_iteration, result_mc])
 
                     if montecarlo_iteration_perfect_correlation:

@@ -14,13 +14,19 @@ import exp_runner_surviving
 class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     N = 50
     T = 100
-    MC = 2
+    MC = 5
 
-    OUTPUT_DIRECTORY = "c:\\experiments\\surviving"
+    OUTPUT_DIRECTORY = "/experiments/251112/surviving"
+    DESCRIPTION_TITLE = "with \\rho=0.3"
 
-    parameters = {  # items should be iterable:
-        "p": np.linspace(0.0001, 0.6, num=4),
+    parameters = {
+        "p": [0.0001, 0.001, 0.01, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
     }
+    # parameters = {
+    #     "p": [0.0001, 0.05, 0.07,
+    #                0.08,
+    #           0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1] # np.linspace(0.0001, 0.2, num=5),
+    # }
 
     SEED_FOR_EXECUTION = 918994
 

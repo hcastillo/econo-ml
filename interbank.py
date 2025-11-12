@@ -69,7 +69,7 @@ class Config:
     chi: float = 0.015  # ji Χ
 
     xi: float = 0.3  # xi ξ liquidation cost of collateral
-    rho: float = 0.0  # rho ρ fire sale cost
+    rho: float = 0.3  # rho ρ fire sale cost
 
     beta: float = 5  # β beta intensity of breaking the connection (5)
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank

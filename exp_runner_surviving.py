@@ -62,7 +62,10 @@ class SurvivingRun(exp_runner.ExperimentRun):
     def generate_plot(self, title, output_file, data_to_plot, all_models, max_t,
                       logarithm=False, data_comparing_data_surviving=None):
         plt.clf()
-        plt.title(f"{title} with RestrictedMarket p (MC={self.MC})")
+        if self.DESCRIPTION_TITLE:
+            plt.title(f"{title} {self.DESCRIPTION_TITLE}")
+        else:
+            plt.title(f"{title} with RestrictedMarket p (MC={self.MC})")
         for i, iteration in enumerate(data_to_plot):
             plt.plot(data_to_plot[iteration], "-",
                      color=self.get_color(all_models, i),
@@ -148,6 +151,8 @@ class SurvivingRun(exp_runner.ExperimentRun):
     def plot_surviving(self):
         print("Plotting surviving data...")
         self.save_surviving_csv(self.data_of_surviving_banks_avg, '_surviving', self.max_t)
+        self.generate_plot("Surviving", "_surviving.png",
+                           self.data_of_surviving_banks_avg, self.all_models, self.max_t)
         self.save_surviving_csv(self.data_of_failures_rationed_avg, '_failures_rationed', self.max_t)
         self.generate_plot("Failures rationed accum", "_failures_rationed_accum.png",
                            self.data_of_failures_rationed_accum_avg, self.all_models, self.max_t,

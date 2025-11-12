@@ -14,9 +14,10 @@ import exp_runner_surviving
 class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     N = 50
     T = 1000
-    MC = 50
+    MC = 15
 
-    OUTPUT_DIRECTORY = "c:\\experiments\\surviving.4"
+    OUTPUT_DIRECTORY = "/experiments/251112/surviving.4"
+    DESCRIPTION_TITLE = "with \\rho=0.3"
 
     parameters = {
         "p": np.linspace(0.0001, 1, num=4),

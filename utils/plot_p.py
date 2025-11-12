@@ -157,12 +157,13 @@ class PlotPsi:
         self.working_dir = working_dir
         self.output, _ = os.path.splitext(os.path.basename(output.lower()))
         output_txt = self.working_dir + '/' + self.output + '.txt'
+        output_tex = self.working_dir + '/' + self.output + '.tex'
         output_png = self.working_dir + '/' + self.output + '.png'
         output_file = open(output_txt, "w")
+        output_filetext = open(output_tex, "w")
         rows, cols = len(self.axis_x), len(self.x)
         plt.title(self.title_of_output)
         fig, axes = plt.subplots(rows, cols, figsize=(23.4, 16.5))  # a2
-        # fig, axes = plt.subplots(rows, cols, figsize=(12, 10))
 
         for i, item_i in enumerate(self.axis_x):
             yys = {}
@@ -172,7 +173,7 @@ class PlotPsi:
             for j, item_j in enumerate(self.axis_y):
                 if item_j.strip() != '' and not os.path.isdir(self.working_dir + '/' + item_j):
                     print(f"not found {self.working_dir}/{item_j}")
-                    break
+                    continue
                 data, _ = Statistics.read_gdt(self.working_dir + '/' + item_j + '/results.gdt')
 
                 data_y = np.log(data[item_i]) if item_i in self.with_log else data[item_i]
@@ -185,6 +186,8 @@ class PlotPsi:
                     print(self.x, " with size ", len(self.x), " and len(y)=", len(y))
                     sys.exit(0)
             # we have now y[psi] = [p,p,p,p]  y[psi] = [p,p,p,p] and we will transpond it:
+            if y==[]:
+                break
             y_T = [list(col) for col in zip(*y)]
             #yerr_T = [list(col) for col in zip(*yerr)]
             min_y = np.inf
@@ -205,15 +208,29 @@ class PlotPsi:
                 axes[i, j].set_ylim(min_y, max_y)
 
             output_file.write(f"-----------{self.titles_x[i].replace('$', '')}-----------\n")
+            output_filetext.write("\\begin{table}[h!]\n")
+            output_filetext.write("\\centering\n")
+            output_filetext.write("\\begin{tabular}{|c|"+"c|"*len(self.axis_y)+"}\n")
+            output_filetext.write("\\hline\n")
             title = "%7s" % ''
+            title1 = title
             for item_j in self.titles_y:
                 title += "%14s" % item_j
+                title1+= " & $ %14s $" % item_j.replace('psi','\\psi')
+            output_filetext.write(title1 + " \\\\ \n\\hline \n")
             output_file.write(title + '\n')
             for k, value in enumerate(self.x):
                 result = "p=%5.3f" % value
+                result1 =  "$p=%5.3f$" % value
                 for item_j in self.axis_y:
                     result += "%14.6f" % yys[item_j][k]
+                    result1+= " & %14.6f" % yys[item_j][k]
                 output_file.write(result + '\n')
+                output_filetext.write(result1 + " \\\\\n")
+
+            output_filetext.write("\\hline\n")
+            output_filetext.write("\\end{tabular}\n")
+            output_filetext.write("\\end{table}\n\n\n")
 
         if correlations_files:
             for file in correlations_files:
@@ -234,8 +251,10 @@ class PlotPsi:
         plt.savefig(output_png)
         plt.tight_layout()
         output_file.close()
+        output_filetext.close()
         print("plot: ", output_png)
         print("data: ", output_txt)
+        print("latex: ", output_tex)
 
 
 def run_interactive():
