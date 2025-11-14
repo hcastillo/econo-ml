@@ -45,6 +45,8 @@ class PlotPsi:
     #                 0.08,
     #            0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
     x = [0.0001, 0.05, 0.1, 0.15, 0.2 ]
+    # x = [0.0001, 0.05, 0.1, 0.15, 0.2]
+    x =  [0.0001, 0.001, 0.01, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
 
     def get_cross_correlation_result1(self, data,column_a, column_b, t):
         result = 'correl not valid            '
@@ -142,8 +144,10 @@ class PlotPsi:
         self.working_dir = working_dir
         self.output, _ = os.path.splitext(os.path.basename(output.lower()))
         output_txt = self.working_dir + '/' + self.output +'.txt'
+        output_tex = self.working_dir + '/' + self.output + '.tex'
         output_png = self.working_dir + '/' + self.output +'.png'
         output_file = open(output_txt, "w")
+        output_filetext = open(output_tex, "w")
         rows, cols = len(self.axis_x), len(self.axis_y)
         plt.title(self.title_of_output)
         fig, axes = plt.subplots(rows, cols, figsize=(23.4, 16.5)) # a2
@@ -182,15 +186,27 @@ class PlotPsi:
             for j, item_j in enumerate(self.axis_y):
                 axes[i, j].set_ylim( min_y, max_y)
             output_file.write(f"-----------{self.titles_x[i].replace('$','')}-----------\n")
+            output_filetext.write("\\begin{table}[h!]\n")
+            output_filetext.write("\\centering\n")
+            output_filetext.write("\\begin{tabular}{|c|" + "c|" * len(self.axis_y) + "}\n")
+            output_filetext.write("\\hline\n")
             title = "%7s" % ''
+            title1 = self.titles_x[i]
             for item_j in self.titles_y:
                 title += "%14s" % item_j
+                title1 += " & $ %14s $" % item_j.replace('psi', '\\psi')
             output_file.write(title + '\n')
             for k, value in enumerate(self.x):
                 result = "p=%5.3f" % value
+                result1 = "$p=%5.3f$" % value
                 for item_j in self.axis_y:
                     result += "%14.6f" % yys[item_j][k]
+                    result1 += " & %14.6f" % yys[item_j][k]
                 output_file.write(result+'\n')
+                output_filetext.write(result1 + " \\\\\n")
+            output_filetext.write("\\hline\n")
+            output_filetext.write("\\end{tabular}\n")
+            output_filetext.write("\\end{table}\n\n\n")
 
         if correlations_files:
             for file in correlations_files:
@@ -211,8 +227,10 @@ class PlotPsi:
         plt.savefig(output_png)
         plt.tight_layout()
         output_file.close()
+        output_filetext.close()
         print("plot: ", output_png )
         print("data: ", output_txt )
+        print("latex: ", output_tex)
 
 
 def run_interactive():

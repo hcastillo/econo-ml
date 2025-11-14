@@ -47,8 +47,8 @@ class PlotPsi:
     # x = [0.0001, 0.05, 0.07,
     #                 0.08,
     #            0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
-    x = [0.0001, 0.05, 0.1, 0.15, 0.2]
-
+    # x = [0.0001, 0.05, 0.1, 0.15, 0.2]
+    x =  [0.0001, 0.001, 0.01, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.15, 0.2, 0.4, 0.6, 0.8, 1]
     def get_cross_correlation_result1(self, data, column_a, column_b, t):
         result = 'correl not valid            '
         try:
@@ -163,7 +163,9 @@ class PlotPsi:
         output_filetext = open(output_tex, "w")
         rows, cols = len(self.axis_x), len(self.x)
         plt.title(self.title_of_output)
-        fig, axes = plt.subplots(rows, cols, figsize=(23.4, 16.5))  # a2
+        # fig, axes = plt.subplots(rows, cols, figsize=(23.4, 16.5))  # a2
+        # fig, axes = plt.subplots(rows, cols, figsize=(46.81,33.11 )) # a0
+        fig, axes = plt.subplots(rows, cols, figsize=(92, 66))  # 2xa0 formato landscape
 
         for i, item_i in enumerate(self.axis_x):
             yys = {}
@@ -213,7 +215,7 @@ class PlotPsi:
             output_filetext.write("\\begin{tabular}{|c|"+"c|"*len(self.axis_y)+"}\n")
             output_filetext.write("\\hline\n")
             title = "%7s" % ''
-            title1 = title
+            title1 = self.titles_x[i]
             for item_j in self.titles_y:
                 title += "%14s" % item_j
                 title1+= " & $ %14s $" % item_j.replace('psi','\\psi')

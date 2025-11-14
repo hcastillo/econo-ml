@@ -16,7 +16,7 @@ class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     T = 100
     MC = 5
 
-    OUTPUT_DIRECTORY = "/experiments/251112/surviving"
+    OUTPUT_DIRECTORY = "/experiments/251113/surviving"
     DESCRIPTION_TITLE = "with \\rho=0.3"
 
     parameters = {
