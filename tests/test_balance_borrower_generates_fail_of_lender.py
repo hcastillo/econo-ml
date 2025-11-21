@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
 import interbank
-import interbank_lenderchange
 import tests.interbank_testclass
 from mock import patch
 

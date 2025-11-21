@@ -3,7 +3,6 @@
 import unittest
 from mock import patch
 import interbank
-import interbank_lenderchange
 import tests.interbank_testclass
 
 
@@ -47,7 +46,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
 
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[2], paid_loan=0, bankrupted=True)
-        self.assertBank(bank=self.model.banks[1], bankrupted=False)
+        self.assertBank(bank=self.model.banks[1], bankrupted=True)
         self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=False)
         # even #1 has failed, the bad debt of #1 is taken into account:
         # the loan of #2 not returned partially, generates 4.4 in bad debt

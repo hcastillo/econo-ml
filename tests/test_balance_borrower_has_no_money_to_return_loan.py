@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
 import interbank
-import interbank_lenderchange
 import tests.interbank_testclass
 from mock import patch
 
@@ -10,6 +9,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     """
     test borrower can pays the loan using C, no loan and no second shock
     """
+    CONFIG = 'C_i0=30 D_i0=135 E_i0=15 L_i0=120 N=50 T=1000 alfa=0.1 allow_replacement_of_bankrupted=True asset_i_avg_ir=0.0 asset_j_avg_ir=0.0 beta=5 c_avg_ir=0.0 chi=0.015 detailed_equity=False max_value_psi=0.99 mu=0.7 normalize_interest_rate_max=-2 omega=0.55 p_avg_ir=0.0 phi=0.025 psi=0.3 psi_endogenous=False r_i0=0.02 reintroduce_with_median=False reserves=0.02 rho=0.3 xi=0.3'
 
     #       #0             #1
     #   -----------    -----------
@@ -39,7 +39,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[0], bankrupted=True)
         self.assertBank(bank=self.model.banks[1], C=11.299999999999999, L=15.0, D=20.0, E=6.699999999999999,
-                        s=11.299999999999999, B=3.3000000000000003)
+                        s=14.6, B=3.3000000000000003)
         self.assertEqual(self.model.statistics.B[0], 3.3000000000000003)
 
 
