@@ -1,0 +1,3 @@
+python -m utils.plot_p --input "1_psi0:psi=0.00 1_psi025:psi=0.25 1_psi05:psi=0.50 1_psi075:psi=0.75 1_psi098:psi=0.98 1_psi1:psi=1.00 1_psiendog:endogenous" --working_dir /experiments/rho00 --p_values "0.0001 0.001 0.01 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.15 0.2 0.4 0.6 0.8 1"
+
+python -m utils.plot_p --input "1_psi0:psi=0.00 1_psi025:psi=0.25 1_psi05:psi=0.50 1_psi075:psi=0.75 1_psi098:psi=0.98 1_psi1:psi=1.00 1_psiendog:endogenous" --working_dir /experiments/rho03 --p_values "0.0001 0.001 0.01 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.15 0.2 0.4 0.6 0.8 1"

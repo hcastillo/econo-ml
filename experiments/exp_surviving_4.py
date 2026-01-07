@@ -16,8 +16,8 @@ class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     T = 1000
     MC = 15
 
-    OUTPUT_DIRECTORY = "/experiments/251113/surviving.4"
-    DESCRIPTION_TITLE = "with \\rho=0.3"
+    OUTPUT_DIRECTORY = "/experiments/251123.surviving.4"
+    #DESCRIPTION_TITLE = "with \\rho=0.3"
 
     parameters = {
         "p": np.linspace(0.0001, 1, num=4),

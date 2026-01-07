@@ -1485,7 +1485,7 @@ class Model:
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c_avg_ir.append(c)
             if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE  * 0.99
+                bank.psi = bank.E / self.maxE * 0.99
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i_avg_ir = 0
