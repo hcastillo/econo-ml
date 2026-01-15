@@ -16,7 +16,7 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     COMPARING_DATA = "/experiments/251110_ir_study_base_psi"
     COMPARING_LABEL = "Using $A_i$"
     NAME_OF_X_SERIES = 'Using $\\bar{A_i}$'
-    DESCRIPTION_TITLE = 'Montecarlo $\mathcal{M}=5$'
+    DESCRIPTION_TITLE = 'Montecarlo $\\mathcal{M}=5$'
     COMPARING_STYLE = ':'
     COMPARING_COLOR = 'black'
     STYLE = '--'
@@ -38,7 +38,7 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
         {'asset_i_avg_ir': 168.6340},
         {'asset_i_avg_ir': 167.7435},    ]
 
-    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2}
+    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': 1}
 
     LENGTH_FILENAME_PARAMETER = 0
     LENGTH_FILENAME_CONFIG = 6

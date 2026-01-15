@@ -52,7 +52,7 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     ]
     extra_individual_parameters_multiplier = 10
 
-    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': -2}
+    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': 1}
 
     LENGTH_FILENAME_PARAMETER = 0
     LENGTH_FILENAME_CONFIG = 6

@@ -84,7 +84,7 @@ class Config:
     #   0 -> no normalization
     #  >0 -> instead of allowing interest rates for borrowers of any value, we normalize
     #        them to range [r_i0 .. normalize_interest_rate_max]:
-    normalize_interest_rate_max = -2
+    normalize_interest_rate_max = 1
 
     max_value_psi = 0.99
 
@@ -1507,9 +1507,9 @@ class Model:
                             p =  self.banks[j].p_avg_ir if not self.config.p_avg_ir else self.config.p_avg_ir
                             bank_i.rij[j] = ((self.config.chi * asset_i - self.config.phi * asset_j
                                               - (1 - p) * (
-                                                          self.config.xi * asset_j - c))
+                                                          self.config.xi * asset_j - c))*(1+psi)
                                              /
-                                             (p * c * (1 - psi)))
+                                             (p * c))
 
                             bank_i.asset_i_avg_ir += bank_i.A
                             bank_i.asset_j_avg_ir += self.banks[j].A
@@ -1722,9 +1722,9 @@ class ModelOptimized(Model):
         if bank_j.p_avg_ir == 0 or c_ij == 0:
             return self.config.r_i0
 
-        numerator = (self.config.chi * bank_i.A - self.config.phi * bank_j.A -
-                     (1 - bank_j.p_avg_ir) * (self.config.xi * bank_j.A - c_ij))
-        denominator = bank_j.p_avg_ir * c_ij * (1 - psi)
+        numerator = ((self.config.chi * bank_i.A - self.config.phi * bank_j.A -
+                     (1 - bank_j.p_avg_ir) * (self.config.xi * bank_j.A - c_ij))) * (1 + psi)
+        denominator = bank_j.p_avg_ir * c_ij
 
         if denominator == 0:
             return self.config.r_i0

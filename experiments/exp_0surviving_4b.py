@@ -16,12 +16,15 @@ class RestrictedMarketSurvivingRun(exp_runner_surviving.SurvivingRun):
     T = 1000
     MC = 15
 
-    OUTPUT_DIRECTORY = "/experiments/251123.surviving.4"
+    OUTPUT_DIRECTORY = "/experiments/0/surviving.psi0.4"
     #DESCRIPTION_TITLE = "with \\rho=0.3"
 
     parameters = {
         "p": np.linspace(0.0001, 1, num=4),
     }
+
+    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': 0, 'psi': 0.3}
+
 
     SEED_FOR_EXECUTION = 918995
 

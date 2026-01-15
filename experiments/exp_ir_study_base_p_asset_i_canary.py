@@ -16,7 +16,7 @@ class MarketPowerRun(exp_runner_parametrized.ExperimentRunParametrized):
     COMPARING_DATA = "/experiments/251110_ir_study_base_p"
     COMPARING_LABEL = "Using $A_i$"
     NAME_OF_X_SERIES = 'Using $\\bar{A_i}$'
-    DESCRIPTION_TITLE = 'Montecarlo $\mathcal{M}=5$'
+    DESCRIPTION_TITLE = 'Montecarlo $\\mathcal{M}=5$'
     COMPARING_STYLE = ':'
     COMPARING_COLOR = 'black'
     STYLE = '--'
