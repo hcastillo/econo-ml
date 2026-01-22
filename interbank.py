@@ -996,6 +996,7 @@ class Model:
         model.backward() # t=4 again
     """
     banks = []
+    banks = []
     t: int = 0
     eta: float = 1
     test = False
@@ -1485,7 +1486,7 @@ class Model:
                 c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
                 bank.c_avg_ir.append(c)
             if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE * 0.99
+                bank.psi = bank.E / self.maxE
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i_avg_ir = 0
@@ -1499,8 +1500,8 @@ class Model:
                             bank_i.rij[j] = self.config.r_i0
                         else:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-                            if psi == 1:
-                                psi = 0.99999999999999
+                            #TODO if psi == 1:
+                            #    psi = 0.99999999999999
                             asset_i = bank_i.A if not self.config.asset_i_avg_ir else self.config.asset_i_avg_ir
                             asset_j = self.banks[j].A if not self.config.asset_j_avg_ir else self.config.asset_j_avg_ir
                             c =  bank_i.c_avg_ir[j] if not self.config.c_avg_ir else self.config.c_avg_ir
@@ -1764,7 +1765,7 @@ class ModelOptimized(Model):
             bank_i.asset_j_avg_ir = 0
             A_i = bank_i.A
             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
-            psi = min(psi, 0.99999999999999)
+            #TODO psi = min(psi, 0.99999999999999)
 
             for j in range(self.config.N):
                 if j == bank_i.id:

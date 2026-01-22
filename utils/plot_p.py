@@ -25,10 +25,11 @@ class PlotPsi:
     output = 'p_psi'
 
     axis_x = ['equity', 'bankruptcies', 'interest_rate', 'bad_debt', 'asset_i', 'asset_j',
-              'prob_bankruptcy', 'rationing']
+              'prob_bankruptcy', 'rationing', 'deposits']
     with_log = ['equity']
 
-    titles_x = ['$log(E)$', 'bankruptcy', '$i_r$', '$B$', '$asset_i$', '$asset_j$', '$prob_{bank}$', 'rationing']
+    titles_x = ['$log(E)$', 'bankruptcy', '$i_r$', '$B$', '$asset_i$', '$asset_j$', '$prob_{bank}$',
+                'rationing','deposits']
     axis_y = ['1_psi0', '1_psi025', '1_psi05', '1_psi075', '1_psi1']  #, '3_psiendog']
     titles_y = ['psi=0', 'psi=0.25', 'psi=0.5', 'psi=0.75', 'psi=0.99']  #,'psi endogenous' ]
     title_of_output = 'comparing psi/p'
