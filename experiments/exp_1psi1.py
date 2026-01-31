@@ -12,7 +12,7 @@ import exp_runner
 class MarketPowerRun(exp_runner.ExperimentRun):
     N = 50
     T = 1000
-    MC = 5
+    MC = 15
 
     ALGORITHM = ShockedMarket3
     OUTPUT_DIRECTORY = "/experiments/1/psi1"

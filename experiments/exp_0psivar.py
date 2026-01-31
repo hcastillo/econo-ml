@@ -25,7 +25,10 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
     config = {'psi': np.linspace(0.0, 1, num=5)}
 
-    EXTRA_MODEL_CONFIGURATION = {'psi_endogenous': False, 'normalize_interest_rate_max': 0}
+    EXTRA_MODEL_CONFIGURATION = {
+        'psi_endogenous': False,
+        'remove_nans': True,
+        'normalize_interest_rate_max': 0}
     
     LENGTH_FILENAME_PARAMETER = 5
     LENGTH_FILENAME_CONFIG = 6
