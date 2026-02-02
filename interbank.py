@@ -113,7 +113,7 @@ class Config:
 
     # what elements are in the results.csv file, and also which are plot.
     # 1 if also plot, 0 not to plot:
-    ELEMENTS_STATISTICS = {'B': True, 'liquidity': True, 'interest_rate_loans':True,
+    ELEMENTS_STATISTICS = {'B': True, 'liquidity': True,
                            'interest_rate': True, 'asset_i': True, 'asset_j': True,
                            'equity': True, 'equity_borrowers': True, 'bankruptcy': True,
                            'potential_credit_channels': True,
@@ -126,9 +126,19 @@ class Config:
                            'psi': True, 'psi_lenders': True,
                            'potential_lenders': False,
                            'active_lenders': False, 'active_borrowers': False,
-                           'prob_bankruptcy': False, 'prob_bankruptcy_lenders': False,
+                           'prob_bankruptcy': False,
+                           'interest_rate_loans': False,
                            'num_banks': True, 'bankruptcy_rationed': True,
                            }
+    ELEMENTS_STATISTICS_REMOVE_NANS = [
+        'real_t',
+        'interest_rate_loans',
+        'asset_i_lenders', 'asset_j_borrowers',
+        'equity', 'bankruptcy', 'B',
+        'prob_bankruptcy_lenders', 'rationing',
+        'deposits', 'loans'
+    ]
+
     # only if we have a graph for lender_change:
     ELEMENTS_STATISTICS_GRAPHS = {
         'grade_avg': True, 'communities': True, 'communities_not_alone': True, 'gcs': True
@@ -140,6 +150,8 @@ class Config:
     def __str__(self, separator=''):
         description = sys.argv[0] if __name__ == '__main__' else ''
         for attr, value in self:
+            if attr == '__firstlineno__':
+                continue
             description += ' {}={}{}'.format(attr, value, separator)
         return description + ' '
 
@@ -232,6 +244,8 @@ class Statistics:
         self.loans = []
         self.asset_i = []
         self.asset_j = []
+        self.asset_i_lenders = []
+        self.asset_j_borrowers = []
         self.equity = []
         self.equity_borrowers = []
         self.P = []
@@ -293,6 +307,8 @@ class Statistics:
         self.interest_rate_loans = np.zeros(self.model.config.T, dtype=float)
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
         self.asset_j = np.zeros(self.model.config.T, dtype=float)
+        self.asset_i_lenders = np.zeros(self.model.config.T, dtype=float)
+        self.asset_j_borrowers = np.zeros(self.model.config.T, dtype=float)
         self.equity = np.zeros(self.model.config.T, dtype=float)
         self.equity_borrowers = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
@@ -361,6 +377,8 @@ class Statistics:
         psi_lenders = []
         asset_i = []
         asset_j = []
+        asset_i_lenders = []
+        asset_j_borrowers = []
         sum_of_loans = 0
         interest_rates = []
         num_of_banks_that_are_lenders = 0
@@ -370,6 +388,11 @@ class Statistics:
                 asset_i.append(bank.asset_i_avg_ir)
             else:
                 asset_j.append(bank.asset_j_avg_ir)
+            if bank.incrD >= 0:
+                if bank.active_borrowers:
+                    asset_i_lenders.append(bank.asset_i_avg_ir)
+            elif bank.d > 0:
+                asset_j_borrowers.append(bank.asset_j_avg_ir)
             if bank.active_borrowers:
                 num_of_banks_that_are_lenders += 1
                 for bank_that_is_borrower in bank.active_borrowers:
@@ -396,6 +419,8 @@ class Statistics:
             if num_of_banks_that_are_lenders else np.nan
         self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
         self.active_borrowers[self.model.t] = num_of_banks_that_are_borrowers
+        self.asset_i_lenders[self.model.t] = np.mean(asset_i_lenders)  if asset_i_lenders else 0.0
+        self.asset_j_borrowers[self.model.t] = np.mean(asset_j_borrowers)  if asset_j_borrowers else 0.0
 
     def compute_leverage_and_equity(self):
         sum_of_equity = 0
@@ -621,11 +646,13 @@ class Statistics:
             return path + self.output_format.lower()
 
     def __generate_csv_or_txt(self, export_datafile, header, delimiter):
+        file_header = ''
+        for line_header in header:
+            file_header += '# {}\n'.format(line_header)
+        file_header += "# pd.read_csv('file{}',header={}', delimiter='{}')\nt".format(self.output_format,
+                                                                                       len(header) + 1, delimiter)
         with open(export_datafile, 'w', encoding='utf-8') as save_file:
-            for line_header in header:
-                save_file.write('# {}\n'.format(line_header))
-            save_file.write("# pd.read_csv('file{}',header={}', delimiter='{}')\nt".format(self.output_format,
-                                                                                           len(header) + 1, delimiter))
+            save_file.write(file_header)
             for element_name, _ in self.enumerate_statistics_results():
                 save_file.write('{}{}'.format(delimiter, element_name))
             save_file.write('\n')
@@ -634,6 +661,27 @@ class Statistics:
                 for _, element in self.enumerate_statistics_results():
                     save_file.write('{}{}'.format(delimiter, element[i]))
                 save_file.write('\n'.format())
+        if self.model.config.remove_nans:
+            with open(export_datafile.replace('.txt','b.txt').replace('.csv','b.csv'),
+                      'w', encoding='utf-8') as save_file:
+                save_file.write(file_header)
+                for element_name, _ in self.enumerate_statistics_results(remove_nans=True):
+                    save_file.write('{}{}'.format(delimiter, element_name))
+                save_file.write('\n')
+                i_seq = 0
+                for i in range(self.model.config.T):
+                    save_line = True
+                    line = '{}'.format(i_seq)
+                    for name_element, element in self.enumerate_statistics_results(remove_nans=True):
+                        if name_element == 'real_t':
+                            line += '{}{}'.format(delimiter,i)
+                        else:
+                            line += '{}{}'.format(delimiter, element[i])
+                            if np.isnan(element[i]):
+                                save_line = False
+                    if save_line:
+                        i_seq += 1
+                        save_file.write(line+'\n')
 
     def __generate_gdt_file(self, filename, enumerate_results, header,
                             remove_nans=False):
@@ -645,7 +693,7 @@ class Statistics:
         xml_observations = element.observations
         observation = element.obs
         num_variables = 0
-        for variable_name, _ in enumerate_results():
+        for variable_name, _ in enumerate_results(remove_nans):
             if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
                 num_variables += 2
             else:
@@ -658,7 +706,7 @@ class Statistics:
         # header_text will be present as label in the first variable
         # correlation_result will be present as label in the second variable
         i = 1
-        for variable_name, _ in enumerate_results():
+        for variable_name, _ in enumerate_results(remove_nans):
             if variable_name == 'leverage':
                 variable_name += '_'
             if i == 1:
@@ -679,12 +727,15 @@ class Statistics:
         for i in range(self.model.config.T):
             string_obs = ''
             save_instance = True
-            for variable_name, variable in enumerate_results():
-                string_obs += '{}  '.format(variable[i])
-                if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
-                    string_obs += '{}  '.format(math.log(variable[i]))
-                if np.isnan(variable[i]) and remove_nans:
-                    save_instance = False
+            for variable_name, variable in enumerate_results(remove_nans):
+                if variable_name == 'real_t':
+                    string_obs += f'{i:3} '
+                else:
+                    string_obs += '{}  '.format(variable[i])
+                    if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
+                        string_obs += '{}  '.format(math.log(variable[i]))
+                    if np.isnan(variable[i]) and remove_nans:
+                        save_instance = False
             if not save_instance:
                 continue
             else:
@@ -704,7 +755,8 @@ class Statistics:
         self.__generate_gdt_file(export_datafile, self.enumerate_statistics_results, header)
         if self.model.config.remove_nans:
             self.__generate_gdt_file(export_datafile.replace('.gdt','b.gdt'),
-                                    self.enumerate_statistics_results, header, remove_nans=True)
+                                     self.enumerate_statistics_results,
+                                     header, remove_nans=True)
 
     @staticmethod
     def __transform_line_from_string(line_with_values):
@@ -770,12 +822,16 @@ class Statistics:
             else:
                 self.__generate_gdt(self.get_export_path(export_datafile), header)
 
-    def enumerate_statistics_results(self):
-        for element in Config.ELEMENTS_STATISTICS:
-            yield self.get_name(element), getattr(self, element)
-        if self.model.config.lender_change.GRAPH_NAME:
-            for element in Config.ELEMENTS_STATISTICS_GRAPHS:
+    def enumerate_statistics_results(self, remove_nans=False):
+        if remove_nans:
+            for element in Config.ELEMENTS_STATISTICS_REMOVE_NANS:
+                yield self.get_name(element), getattr(self, element) if element != 'real_t' else None
+        else:
+            for element in Config.ELEMENTS_STATISTICS:
                 yield self.get_name(element), getattr(self, element)
+            if self.model.config.lender_change.GRAPH_NAME:
+                for element in Config.ELEMENTS_STATISTICS_GRAPHS:
+                    yield self.get_name(element), getattr(self, element)
 
     def get_name(self, variable):
         try:

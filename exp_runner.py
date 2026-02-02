@@ -213,8 +213,8 @@ class ExperimentRun:
         else:
             return {}, []
 
-    def save_csv(self, array_with_data, array_with_x_values, directory):
-        with open(f"{directory}results.csv", "w") as file:
+    def save_csv(self, array_with_data, array_with_x_values, directory, filename='results.csv'):
+        with open(f"{directory}{filename}", "w") as file:
             file.write(
                 f"# MC={self.MC} N={self.N} T={self.T} {self.ALGORITHM.__name__}\n"
             )
@@ -233,7 +233,7 @@ class ExperimentRun:
                     )
                 file.write("\n")
 
-    def save_gdt(self, array_with_data, array_with_x_values, directory):
+    def save_gdt(self, array_with_data, array_with_x_values, directory, filename='results.gdt'):
         E = lxml.builder.ElementMaker()
         GRETLDATA = E.gretldata
         DESCRIPTION = E.description
@@ -284,7 +284,7 @@ class ExperimentRun:
             version="1.4", name='prueba', frequency="special:1", startobs="1",
             endobs=f"{len(array_with_x_values)}", type="cross-section"
         )
-        with open(f"{directory}results.gdt", 'b+w') as output_file:
+        with open(f"{directory}{filename}", 'b+w') as output_file:
             output_file.write(
                 b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
             output_file.write(
@@ -419,19 +419,23 @@ class ExperimentRun:
         return True
 
     def load_or_execute_model(self, model_configuration, model_parameters, filename_for_iteration,
-                              i, clear_previous_results, seed_for_this_model):
-        if (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv")
+                              i, clear_previous_results=False, seed_for_this_model=None, remove_nans=False):
+
+        filename_to_open = f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}"
+        if remove_nans:
+            filename_to_open +='b'
+        if (os.path.isfile(f"{filename_to_open}.csv")
                 and not clear_previous_results):
-            result_mc = pd.read_csv(
-                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.csv", header=2)
-        elif (os.path.isfile(f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
-              and not clear_previous_results):
-            result_mc, _ = interbank.Statistics.read_gdt(
-                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}.gdt")
+            result_mc = pd.read_csv(f"{filename_to_open}.csv", header=2)
+        elif os.path.isfile(f"{filename_to_open}.gdt") and not clear_previous_results:
+            result_mc, _ = interbank.Statistics.read_gdt(f"{filename_to_open}.gdt")
         else:
-            result_mc = self.run_model(
-                f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}",
-                model_configuration, model_parameters, seed_for_this_model)
+            if seed_for_this_model is None:
+                print(f"file_not_found {filename_to_open}")
+                result_mc = {}
+            else:
+                result_mc = self.run_model(f"{filename_to_open}",
+                                           model_configuration, model_parameters, seed_for_this_model)
         return result_mc
 
     def load_model_and_rerun_till_ok(self, model_configuration, model_parameters, filename_for_iteration,
@@ -456,7 +460,9 @@ class ExperimentRun:
             offset += 1
         return result_mc
 
-    def do(self, clear_previous_results=False, reverse_execution=False):
+
+    def do(self, clear_previous_results=False,
+           reverse_execution=False):
         self.log_replaced_data = ""
         initial_time = time.perf_counter()
         if clear_previous_results:
@@ -572,7 +578,7 @@ class ExperimentRun:
                     correlation_file.write(f"{perfect_correlation} : "
                                            f"{montecarlo_iteration_perfect_correlations[perfect_correlation]}\n")
             correlation_file.close()
-            print(f"Saving results in {self.OUTPUT_DIRECTORY}...")
+            print(f"Saving results in {self.OUTPUT_DIRECTORY}/results.gdt|csv...")
             self.save_csv(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
             self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/")
         else:
@@ -587,6 +593,57 @@ class ExperimentRun:
         final_time = time.perf_counter()
         print('execution_time: %2.5f secs' % (final_time - initial_time))
         return results_to_plot, results_x_axis
+
+    def do_remove_nans(self):
+        self.log_replaced_data = ""
+        results_to_plot = {}
+        results_x_axis = []
+        self.verify_directories()
+        progress_bar = Bar(
+            "Executing models (remove_nans)", max=self.get_num_models()
+        )
+        progress_bar.update()
+        array_of_configs = self.get_models(self.config)
+        for model_configuration in array_of_configs:
+            array_of_parameters = self.get_models(self.parameters)
+            for model_parameters in array_of_parameters:
+                filename_for_iteration = self.get_filename_for_iteration(model_parameters, model_configuration)
+                # load from files previously generated:
+                result_iteration = pd.DataFrame()
+                for i in range(self.MC):
+                    result_iteration = pd.concat( [result_iteration,
+                                                   self.load_or_execute_model(model_configuration, model_parameters,
+                                                                              filename_for_iteration, i,
+                                                                              remove_nans=True)])
+
+
+                # When it arrives here, all the results are correct and inside the self.MC executions, if one
+                # it is outside the limits of LIMIT_MEAN we have replaced the file and the execution by a new
+                # file and execution using a different seed.
+                # We save now mean and std inside results_to_plot to create later the results:
+                for k in result_iteration.keys():
+                    if k.strip() == "t": #  <or k.strip() == 'real_t':>
+                        continue
+                    mean_estimated = result_iteration[k].mean()
+                    warnings.filterwarnings(
+                        "ignore"
+                    )  # it generates RuntimeWarning: overflow encountered in multiply
+                    std_estimated = result_iteration[k].std()
+                    if k in results_to_plot:
+                        results_to_plot[k].append([mean_estimated, std_estimated])
+                    else:
+                        results_to_plot[k] = [[mean_estimated, std_estimated]]
+                results_x_axis.append(self.get_title_for(model_configuration, model_parameters))
+                progress_bar.next()
+
+        progress_bar.finish()
+        print(f"Saving results in {self.OUTPUT_DIRECTORY}/resultsb.gdt|csv...")
+        self.save_csv(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/", "resultsb.csv")
+        self.save_gdt(results_to_plot, results_x_axis, f"{self.OUTPUT_DIRECTORY}/", "resultsb.gdt")
+        if self.log_replaced_data:
+            print(self.log_replaced_data)
+        self.plot(results_to_plot, results_x_axis, self.get_title_for(self.config, self.parameters),
+                  f"{self.OUTPUT_DIRECTORY}/")
 
     def generate_random_seeds_for_this_execution(self):
         seeds_for_random = []
@@ -664,6 +721,13 @@ class Runner:
             action=argparse.BooleanOptionalAction,
             help="Execute the experiment in opposite order",
         )
+        self.parser.add_argument(
+            "--remove_nans",
+            default=False,
+            action=argparse.BooleanOptionalAction,
+            help="Generate also resultsb.txt|resultsb.gdt with the statistics "
+                 "of variables without nans (asset_i_lenders...)",
+        )
 
     def do(self):
         args = self.parser.parse_args()
@@ -674,7 +738,12 @@ class Runner:
         if args.listnames:
             experiment.listnames()
         elif args.do:
-            experiment.do(clear_previous_results=args.clear, reverse_execution=args.reverse)
+            experiment.do(clear_previous_results=args.clear,
+                          reverse_execution=args.reverse)
+            if args.remove_nans:
+                experiment.do_remove_nans()
             return experiment
+        elif args.remove_nans:
+            experiment.do_remove_nans()
         else:
             self.parser.print_help()

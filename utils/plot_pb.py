@@ -22,20 +22,21 @@ import sys
 
 class PlotPsi:
     working_dir = '/experiments/0'
-    output = 'p_psi'
+    output = 'p_psi_real_loans'
 
-    axis_x = ['equity', 'bankruptcies', 'interest_rate', 'bad_debt', 'asset_i', 'asset_j',
-              'prob_bankruptcy', 'rationing', 'deposits']
+    axis_x = ['equity', 'bankruptcies', 'interest_rate_loans',
+              'bad_debt', 'asset_i_lenders', 'asset_j_borrowers',
+              'prob_bankruptcy_lenders', 'rationing', 'deposits', 'real_t']
     with_log = ['equity']
 
     titles_x = ['$log(E)$', 'bankruptcy', '$i_r$', '$B$', '$asset_i$', '$asset_j$', '$prob_{bank}$',
-                'rationing','deposits']
+                'rationing','deposits','t']
     axis_y = ['1_psi0', '1_psi025', '1_psi05', '1_psi075', '1_psi1']  #, '3_psiendog']
     titles_y = ['psi=0', 'psi=0.25', 'psi=0.5', 'psi=0.75', 'psi=0.99']  #,'psi endogenous' ]
-    title_of_output = 'comparing psi/p'
+    title_of_output = 'comparing psi/p (only real loans)'
 
-    correlations = [['interest_rate', 'bad_debt'], ['interest_rate', 'bankruptcies'], ['interest_rate', 'equity'],
-                    ['bad_debt', 'equity']]
+    correlations = [['interest_rate_loans', 'bad_debt'], ['interest_rate_loans', 'bankruptcies'],
+                    ['interest_rate_loans', 'equity'], ['bad_debt', 'equity']]
     # renames can contain key values as { 'dir1':'d' } so resultant variable will be
     # bankruptcies_d instead of bankruptcies_dir1:
     RENAMES = {'-not_exists-': '_n'}
@@ -90,7 +91,7 @@ class PlotPsi:
             return None
 
     def determine_cross_correlation1(self, experiment_dir, file, column_a, column_b):
-        file_full_path = self.working_dir + f'/{experiment_dir}/{file}.gdt'
+        file_full_path = self.working_dir + f'/{experiment_dir}/{file}b.gdt'
         if not os.path.isfile(file_full_path):
             print(f"file not found: {file_full_path}")
             return '   '
@@ -105,7 +106,7 @@ class PlotPsi:
                     self.get_cross_correlation_result(data, column_a, column_b, 2)]
 
     def determine_cross_correlation(self, experiment_dir, file, column_a, column_b):
-        file_full_path = self.working_dir + f'/{experiment_dir}/{file}.gdt'
+        file_full_path = self.working_dir + f'/{experiment_dir}/{file}b.gdt'
         if not os.path.isfile(file_full_path):
             print(f"file not found: {file_full_path}")
             return [None, None, None]
@@ -177,7 +178,7 @@ class PlotPsi:
                 if item_j.strip() != '' and not os.path.isdir(self.working_dir + '/' + item_j):
                     print(f"not found {self.working_dir}/{item_j}")
                     continue
-                data, _ = Statistics.read_gdt(self.working_dir + '/' + item_j + '/results.gdt')
+                data, _ = Statistics.read_gdt(self.working_dir + '/' + item_j + '/resultsb.gdt')
 
                 data_y = np.log(data[item_i]) if item_i in self.with_log else data[item_i]
                 y.append(data_y)
