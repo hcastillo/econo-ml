@@ -116,6 +116,7 @@ class Config:
     ELEMENTS_STATISTICS = {'B': True, 'liquidity': True,
                            'interest_rate': True, 'asset_i': True, 'asset_j': True,
                            'equity': True, 'equity_borrowers': True, 'bankruptcy': True,
+                           'asset_i_lenders': True, 'asset_j_borrowers': True,
                            'potential_credit_channels': True,
                            'P': True, 'best_lender': True,
                            'policy': False, 'fitness': False, 'best_lender_clients': False,
@@ -136,7 +137,7 @@ class Config:
         'asset_i_lenders', 'asset_j_borrowers',
         'equity', 'bankruptcy', 'B',
         'prob_bankruptcy_lenders', 'rationing',
-        'deposits', 'loans'
+        'deposits', 'loans', 'psi', 'psi_lenders'
     ]
 
     # only if we have a graph for lender_change:
