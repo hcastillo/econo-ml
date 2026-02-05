@@ -133,7 +133,7 @@ class Config:
                            }
     ELEMENTS_STATISTICS_REMOVE_NANS = [
         'real_t',
-        'interest_rate_loans',
+        'interest_rate_loans', 'interest_rate',
         'asset_i_lenders', 'asset_j_borrowers',
         'equity', 'bankruptcy', 'B',
         'prob_bankruptcy_lenders', 'rationing',
@@ -678,7 +678,7 @@ class Statistics:
                             line += '{}{}'.format(delimiter,i)
                         else:
                             line += '{}{}'.format(delimiter, element[i])
-                            if np.isnan(element[i]):
+                            if np.isnan(element[i]) and name_element == 'loans':
                                 save_line = False
                     if save_line:
                         i_seq += 1
@@ -735,7 +735,7 @@ class Statistics:
                     string_obs += '{}  '.format(variable[i])
                     if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
                         string_obs += '{}  '.format(math.log(variable[i]))
-                    if np.isnan(variable[i]) and remove_nans:
+                    if np.isnan(variable[i]) and remove_nans and variable_name == 'loans':
                         save_instance = False
             if not save_instance:
                 continue

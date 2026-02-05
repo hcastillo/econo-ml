@@ -109,7 +109,7 @@ class ExperimentRun:
                 pass
         for i in array_with_data:
             i = i.strip()
-            if i not in ["t","psi.1"]:
+            if i not in ["t", "psi.1", 'cross_psi_ir_lenders', 'cross_psi_ir']:
                 mean = []
                 deviation_error = []
                 mean_comparing = []
@@ -594,9 +594,19 @@ class ExperimentRun:
         print('execution_time: %2.5f secs' % (final_time - initial_time))
         return results_to_plot, results_x_axis
 
+    def get_cross_correlation_result(self, data, column_a, column_b):
+        try:
+            correlation_value = scipy.stats.pearsonr(data[column_a], data[column_b])
+        except ValueError:
+            correlation_value = None
+        if correlation_value:
+            return [correlation_value.statistic, correlation_value.pvalue]
+        else:
+            return [0,0]
+
     def do_remove_nans(self):
         self.log_replaced_data = ""
-        results_to_plot = {}
+        results_to_plot = {k: [] for k in ['cross_psi_ir','cross_psi_ir_lenders']}
         results_x_axis = []
         self.verify_directories()
         progress_bar = Bar(
@@ -633,6 +643,10 @@ class ExperimentRun:
                         results_to_plot[k].append([mean_estimated, std_estimated])
                     else:
                         results_to_plot[k] = [[mean_estimated, std_estimated]]
+                results_to_plot['cross_psi_ir'].append(self.get_cross_correlation_result(result_iteration,
+                                                                            'psi','interest_rate'))
+                results_to_plot['cross_psi_ir_lenders'].append(self.get_cross_correlation_result(result_iteration,
+                                                                            'psi_lenders', 'interest_rate_loans'))
                 results_x_axis.append(self.get_title_for(model_configuration, model_parameters))
                 progress_bar.next()
 
