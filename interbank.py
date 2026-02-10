@@ -31,7 +31,7 @@ import scipy.stats
 import warnings
 
 LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
-LENDER_CHANGE_DEFAULT_P = 0.2
+LENDER_CHANGE_DEFAULT_P = 1.0
 
 
 class Config:
@@ -44,7 +44,7 @@ class Config:
     reserves: float = 0.02
 
     # seed applied for random values (set during initialize)
-    seed: int = None
+    seed: int = 26462
 
     # if False, when a bank fails it's not replaced and N is reduced
     allow_replacement_of_bankrupted = True
@@ -79,7 +79,7 @@ class Config:
     alfa: float = 0.1  # α alfa below this level of E or D, we will bankrupt the bank
 
     # If true, psi variable will be ignored:
-    psi_endogenous = False
+    psi_endogenous = True
     psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # Possible values for normalize_interest_rate_max:
@@ -101,7 +101,7 @@ class Config:
     r_i0: float = 0.02  # initial rate
 
     # to setup constant values during the execution of asset_i, asset_j, p and c:
-    p_avg_ir = 0.0
+    # p_avg_ir = 0.0
     c_avg_ir = 0.0
     asset_i_avg_ir = 0.0
     asset_j_avg_ir = 0.0
@@ -502,8 +502,7 @@ class Statistics:
         ]
         self.prob_bankruptcy_lenders[self.model.t] = np.mean(
             avg_prob_bankruptcy_lenders) if avg_prob_bankruptcy_lenders else np.nan
-        self.prob_bankruptcy_lenders[self.model.t] = np.mean(avg_prob_bankruptcy)
-
+        self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy)
         probabilities = [bank.P for bank in self.model.banks if not bank.failed]
         lender_capacities = [np.mean(bank.c_avg_ir) for bank in self.model.banks if not bank.failed]
         num_banks = len(probabilities)
@@ -1568,7 +1567,7 @@ class Model:
         self.maxE = max(self.banks, key=lambda k: k.E).E
         max_c = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
-            bank.p_avg_ir = bank.E / self.maxE
+            bank.prob_bankruptcy = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
@@ -1596,14 +1595,14 @@ class Model:
                     if j == bank_i.id:
                         bank_i.rij[j] = 0
                     else:
-                        if self.banks[j].p_avg_ir == 0 or bank_i.c_avg_ir[j] == 0:
+                        if self.banks[j].prob_bankruptcy == 0 or bank_i.c_avg_ir[j] == 0:
                             bank_i.rij[j] = self.config.r_i0
                         else:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
                             asset_i = bank_i.A if not self.config.asset_i_avg_ir else self.config.asset_i_avg_ir
                             asset_j = self.banks[j].A if not self.config.asset_j_avg_ir else self.config.asset_j_avg_ir
                             c =  bank_i.c_avg_ir[j] if not self.config.c_avg_ir else self.config.c_avg_ir
-                            p =  self.banks[j].p_avg_ir if not self.config.p_avg_ir else self.config.p_avg_ir
+                            p =  self.banks[j].prob_bankruptcy # if not self.config.prob_bankruptcy else self.config.prob_bankruptcy
                             bank_i.rij[j] = ((self.config.chi * asset_i - self.config.phi * asset_j
                                               - (1 - p) * (
                                                           self.config.xi * asset_j - c))*(1+psi)
@@ -1818,12 +1817,12 @@ class ModelOptimized(Model):
     Improved version optimized for many executions
     """
     def _calculate_rij(self, bank_i, bank_j, c_ij, psi):
-        if bank_j.p_avg_ir == 0 or c_ij == 0:
+        if bank_j.prob_bankruptcy == 0 or c_ij == 0:
             return self.config.r_i0
 
         numerator = ((self.config.chi * bank_i.A - self.config.phi * bank_j.A -
-                     (1 - bank_j.p_avg_ir) * (self.config.xi * bank_j.A - c_ij))) * (1 + psi)
-        denominator = bank_j.p_avg_ir * c_ij
+                     (1 - bank_j.prob_bankruptcy) * (self.config.xi * bank_j.A - c_ij))) * (1 + psi)
+        denominator = bank_j.prob_bankruptcy * c_ij
 
         if denominator == 0:
             return self.config.r_i0
@@ -1837,7 +1836,7 @@ class ModelOptimized(Model):
         self.maxE = max(self.banks, key=lambda k: k.E).E
         max_c = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
-            bank.p_avg_ir = bank.E / self.maxE
+            bank.prob_bankruptcy = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
@@ -1869,7 +1868,7 @@ class ModelOptimized(Model):
                     continue
 
                 bank_j = self.banks[j]
-                p_j = bank_j.p_avg_ir
+                p_j = bank_j.prob_bankruptcy
                 c_ij = bank_i.c_avg_ir[j]
                 A_j = bank_j.A
                 bank_i.rij[j] = self._calculate_rij(bank_i, bank_j, c_ij, psi)
