@@ -35,8 +35,8 @@ class PlotPsi:
     titles_y = ['psi=0', 'psi=0.25', 'psi=0.5', 'psi=0.75', 'psi=0.99']  #,'psi endogenous' ]
     title_of_output = 'comparing psi/p (only real loans)'
 
-    correlations = [['interest_rate_loans', 'bad_debt'], ['interest_rate_loans', 'bankruptcies'],
-                    ['interest_rate_loans', 'equity'], ['bad_debt', 'equity']]#  ['psi_lenders', 'interest_rate_loans']]
+    correlations = [['interest_rate', 'bad_debt'], ['interest_rate', 'bankruptcies'],
+                    ['interest_rate', 'equity'], ['bad_debt', 'equity']]#  ['psi_lenders', 'interest_rate_loans']]
     # renames can contain key values as { 'dir1':'d' } so resultant variable will be
     # bankruptcies_d instead of bankruptcies_dir1:
     RENAMES = {'-not_exists-': '_n'}

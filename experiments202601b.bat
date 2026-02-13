@@ -2,14 +2,14 @@
 mkdir \experiments\0
 
 
-python -m experiments.exp_0psi0 --do --errorbar --remove_nans
-python -m experiments.exp_0psi05 --do --errorbar --remove_nans
-python -m experiments.exp_0psi025 --do --errorbar --remove_nans
-python -m experiments.exp_0psi075 --do --errorbar --remove_nans
-python -m experiments.exp_0psi098 --do --errorbar --remove_nans
-python -m experiments.exp_0psi1 --do --errorbar --remove_nans
-python -m experiments.exp_0psivar --do --errorbar --remove_nans
-python -m experiments.exp_0endog --do --errorbar --remove_nans
+python -m experiments.exp_0psi0 --do --errorbar --stats_market
+python -m experiments.exp_0psi05 --do --errorbar --stats_market
+python -m experiments.exp_0psi025 --do --errorbar --stats_market
+python -m experiments.exp_0psi075 --do --errorbar --stats_market
+python -m experiments.exp_0psi098 --do --errorbar --stats_market
+python -m experiments.exp_0psi1 --do --errorbar --stats_market
+python -m experiments.exp_0psivar --do --errorbar --stats_market
+python -m experiments.exp_0endog --do --errorbar --stats_market
 python -m experiments.exp_0surviving_4 --do 
 python -m experiments.exp_0surviving_4b --do
 

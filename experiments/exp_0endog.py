@@ -4,7 +4,6 @@
 Executor for the interbank model using different values for the lc ShockedMarket
 @author: hector@bith.net
 """
-import numpy as np
 from interbank_lenderchange import ShockedMarket3
 import exp_runner
 
@@ -25,7 +24,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
     EXTRA_MODEL_CONFIGURATION = {
         'psi_endogenous': True,
-        'remove_nans': True,
+        'stats_market': True,
         'normalize_interest_rate_max': 0}
     
     LENGTH_FILENAME_PARAMETER = 5

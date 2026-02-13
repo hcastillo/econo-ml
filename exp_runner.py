@@ -419,10 +419,10 @@ class ExperimentRun:
         return True
 
     def load_or_execute_model(self, model_configuration, model_parameters, filename_for_iteration,
-                              i, clear_previous_results=False, seed_for_this_model=None, remove_nans=False):
+                              i, clear_previous_results=False, seed_for_this_model=None, stats_market=False):
 
         filename_to_open = f"{self.OUTPUT_DIRECTORY}/{filename_for_iteration}_{i}"
-        if remove_nans:
+        if stats_market:
             filename_to_open +='b'
         if (os.path.isfile(f"{filename_to_open}.csv")
                 and not clear_previous_results):
@@ -461,8 +461,7 @@ class ExperimentRun:
         return result_mc
 
 
-    def do(self, clear_previous_results=False,
-           reverse_execution=False):
+    def do(self, clear_previous_results=False, reverse_execution=False):
         self.log_replaced_data = ""
         initial_time = time.perf_counter()
         if clear_previous_results:
@@ -480,12 +479,9 @@ class ExperimentRun:
             correlation_file = open(f"{self.OUTPUT_DIRECTORY}/results.txt", "w")
             montecarlo_iteration_perfect_correlations = {}
             position_inside_seeds_for_random = 0
-
             array_of_configs = self.get_models(self.config)
-
             if reverse_execution:
                 array_of_configs = reversed(list(array_of_configs))
-
             for model_configuration in array_of_configs:
                 array_of_parameters = self.get_models(self.parameters)
                 if reverse_execution:
@@ -604,13 +600,13 @@ class ExperimentRun:
         else:
             return [0,0]
 
-    def do_remove_nans(self):
+    def do_stats_market(self):
         self.log_replaced_data = ""
         results_to_plot = {k: [] for k in ['cross_psi_ir','cross_psi_ir_lenders']}
         results_x_axis = []
         self.verify_directories()
         progress_bar = Bar(
-            "Executing models (remove_nans)", max=self.get_num_models()
+            "Executing models (stats_market)", max=self.get_num_models()
         )
         progress_bar.update()
         array_of_configs = self.get_models(self.config)
@@ -624,7 +620,7 @@ class ExperimentRun:
                     result_iteration = pd.concat( [result_iteration,
                                                    self.load_or_execute_model(model_configuration, model_parameters,
                                                                               filename_for_iteration, i,
-                                                                              remove_nans=True)])
+                                                                              stats_market=True)])
 
 
                 # When it arrives here, all the results are correct and inside the self.MC executions, if one
@@ -736,7 +732,7 @@ class Runner:
             help="Execute the experiment in opposite order",
         )
         self.parser.add_argument(
-            "--remove_nans",
+            "--stats_market",
             default=False,
             action=argparse.BooleanOptionalAction,
             help="Generate also resultsb.txt|resultsb.gdt with the statistics "
@@ -754,10 +750,10 @@ class Runner:
         elif args.do:
             experiment.do(clear_previous_results=args.clear,
                           reverse_execution=args.reverse)
-            if args.remove_nans:
-                experiment.do_remove_nans()
+            if args.stats_market:
+                experiment.do_stats_market()
             return experiment
-        elif args.remove_nans:
-            experiment.do_remove_nans()
+        elif args.stats_market:
+            experiment.do_stats_market()
         else:
             self.parser.print_help()

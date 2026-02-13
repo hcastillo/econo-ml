@@ -59,7 +59,7 @@ class Config:
 
     # when storing data, remove 0...t instants in which values with np.nan are obtained
     # (those with no loans):
-    remove_nans = False
+    stats_market = False
 
     # shocks parameters: mi=0.7 omega=0.55 for perfect balance
     mu: float = 0.7  # mi µ
@@ -113,32 +113,11 @@ class Config:
 
     # what elements are in the results.csv file, and also which are plot.
     # 1 if also plot, 0 not to plot:
-    ELEMENTS_STATISTICS = {'B': True, 'liquidity': True,
-                           'interest_rate': True, 'asset_i': True, 'asset_j': True,
-                           'equity': True, 'equity_borrowers': True, 'bankruptcy': True,
-                           'asset_i_lenders': True, 'asset_j_borrowers': True,
-                           'potential_credit_channels': True,
-                           'P': True, 'best_lender': True,
-                           'policy': False, 'fitness': False, 'best_lender_clients': False,
-                           'rationing': True, 'leverage': False, 'systemic_leverage': False,
-                           'num_of_rationed': True,
-                           'loans': False, 'c': True,
-                           'reserves': True, 'deposits': True,
-                           'psi': True, 'psi_lenders': True,
-                           'potential_lenders': False,
-                           'active_lenders': False, 'active_borrowers': False,
-                           'prob_bankruptcy': False,
-                           'interest_rate_loans': False,
-                           'num_banks': True, 'bankruptcy_rationed': True,
-                           }
-    ELEMENTS_STATISTICS_REMOVE_NANS = [
-        'real_t',
-        'interest_rate_loans', 'interest_rate',
-        'asset_i_lenders', 'asset_j_borrowers',
-        'equity', 'bankruptcy', 'B',
-        'prob_bankruptcy_lenders', 'rationing',
-        'deposits', 'loans', 'psi', 'psi_lenders'
-    ]
+    ELEMENTS_STATISTICS_NO_PLOT = ['best_lender_clients', 'fitness', 'policy', 'leverage', 'systemic_leverage',
+                                   'loans', 'potential_lenders', 'active_lenders', 'active_borrowers',
+                                   'prob_bankruptcy' ]
+    ELEMENTS_STATISTICS_NO_SHOW = [ 'P_max','P_min', 'P_std','gcs','grade_avg',
+                                    'communities','communities_not_alone' ]
 
     # only if we have a graph for lender_change:
     ELEMENTS_STATISTICS_GRAPHS = {
@@ -223,7 +202,8 @@ class Config:
 
 
 class Statistics:
-    def __init__(self, in_model):
+    def __init__(self, in_model, stats_market:bool = False):
+        self.stats_market = stats_market
         self.lender_no_d = []
         self.no_lender = []
         self.enough_money = []
@@ -236,7 +216,6 @@ class Statistics:
         self.deposits = []
         self.reserves = []
         self.interest_rate = []
-        self.interest_rate_loans = []
         self.incrementD = []
         self.fitness = []
         self.rationing = []
@@ -245,13 +224,11 @@ class Statistics:
         self.loans = []
         self.asset_i = []
         self.asset_j = []
-        self.asset_i_lenders = []
-        self.asset_j_borrowers = []
         self.equity = []
-        self.equity_borrowers = []
         self.P = []
         self.B = []
         self.c = []
+        self.profits = []
         self.P_max = []
         self.P_min = []
         self.P_std = []
@@ -259,10 +236,8 @@ class Statistics:
         self.active_lenders = []
         self.potential_lenders = []
         self.prob_bankruptcy = []
-        self.prob_bankruptcy_lenders = []
         self.num_of_rationed = []
         self.psi = []
-        self.psi_lenders = []
         self.num_banks = []
         self.bankruptcy_rationed = []
         self.model = in_model
@@ -280,10 +255,21 @@ class Statistics:
         self.communities = []
         self.communities_not_alone = []
         self.gcs = []
-
         self.detailed_equity = None
         self.model = in_model
 
+    def increase_bankruptcy_count(self):
+        self.bankruptcy[self.model.t] += 1
+
+    def increase_increment_d(self, bank_incr_d):
+        self.incrementD[self.model.t] += bank_incr_d
+
+    def determine_profits(self, total_profits):
+        self.profits[self.model.t] = total_profits
+
+    def determine_rationed_rationing(self, num_of_rationed, amount_rationed):
+        self.num_of_rationed[self.model.t] = num_of_rationed
+        self.rationing[self.model.t] = amount_rationed
 
     def set_gif_graph(self, gif_graph):
         if gif_graph:
@@ -295,23 +281,18 @@ class Statistics:
         if not os.path.isdir(self.OUTPUT_DIRECTORY):
             os.mkdir(self.OUTPUT_DIRECTORY)
         self.best_lender = np.full(self.model.config.T, -1, dtype=int)
-        self.best_lender_clients = np.zeros(self.model.config.T, dtype=int)
+        self.best_lender_clients = np.full(self.model.config.T, -1, dtype=int)
         self.potential_credit_channels = np.zeros(self.model.config.T, dtype=int)
         self.active_borrowers = np.zeros(self.model.config.T, dtype=int)
         self.prob_bankruptcy = np.zeros(self.model.config.T, dtype=float)
-        self.prob_bankruptcy_lenders = np.zeros(self.model.config.T, dtype=float)
         self.active_lenders = np.zeros(self.model.config.T, dtype=int)
         self.potential_lenders = np.zeros(self.model.config.T, dtype=int)
         self.fitness = np.zeros(self.model.config.T, dtype=float)
         self.c = np.zeros(self.model.config.T, dtype=float)
         self.interest_rate = np.zeros(self.model.config.T, dtype=float)
-        self.interest_rate_loans = np.zeros(self.model.config.T, dtype=float)
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
         self.asset_j = np.zeros(self.model.config.T, dtype=float)
-        self.asset_i_lenders = np.zeros(self.model.config.T, dtype=float)
-        self.asset_j_borrowers = np.zeros(self.model.config.T, dtype=float)
         self.equity = np.zeros(self.model.config.T, dtype=float)
-        self.equity_borrowers = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
@@ -319,6 +300,7 @@ class Statistics:
         self.systemic_leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
         self.P = np.zeros(self.model.config.T, dtype=float)
+        self.profits = np.zeros(self.model.config.T, dtype=float)
         self.P_max = np.zeros(self.model.config.T, dtype=float)
         self.P_min = np.zeros(self.model.config.T, dtype=float)
         self.P_std = np.zeros(self.model.config.T, dtype=float)
@@ -331,7 +313,6 @@ class Statistics:
         self.bankruptcy_rationed = np.zeros(self.model.config.T, dtype=int)
         self.num_of_rationed = np.zeros(self.model.config.T, dtype=int)
         self.psi = np.zeros(self.model.config.T, dtype=float)
-        self.psi_lenders = np.zeros(self.model.config.T, dtype=float)
         self.grade_avg = np.zeros(self.model.config.T, dtype=float)
         self.communities = np.zeros(self.model.config.T, dtype=int)
         self.communities_not_alone = np.zeros(self.model.config.T, dtype=int)
@@ -348,19 +329,22 @@ class Statistics:
         best = -1
         best_value = -1
         for lender in lenders.keys():
+            if self.stats_market and not lender.is_real_lender_or_borrower():
+                continue
             if lenders[lender] > best_value:
                 best = lender
                 best_value = lenders[lender]
         self.best_lender[self.model.t] = best
         self.best_lender_clients[self.model.t] = best_value
         credit_channels = self.model.config.lender_change.get_credit_channels()
-        if credit_channels is None:
-            self.potential_credit_channels[self.model.t] = len(self.model.banks)
-        else:
-            self.potential_credit_channels[self.model.t] = credit_channels
+        if not self.stats_market:
+            if credit_channels is None:
+                self.potential_credit_channels[self.model.t] = len(self.model.banks)
+            else:
+                self.potential_credit_channels[self.model.t] = credit_channels
 
     def compute_statistics_of_graph(self):
-        if self.model.config.lender_change.GRAPH_NAME:
+        if self.model.config.lender_change.GRAPH_NAME and not self.stats_market:
             self.communities[self.model.t] = self.model.config.lender_change.determine_current_communities()
             self.communities_not_alone[self.model.t] = self.model.config.lender_change.determine_current_communities_not_alone()
             self.gcs[self.model.t] = self.model.config.lender_change.determine_current_graph_gcs()
@@ -368,67 +352,55 @@ class Statistics:
 
     def compute_potential_lenders(self):
         for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
             if bank.incrD > 0:
                 self.potential_lenders[self.model.t] += 1
 
-
-
     def compute_interest_rates_and_loans(self):
-        interests_rates_of_borrowers = []
-        psi_lenders = []
         asset_i = []
         asset_j = []
-        asset_i_lenders = []
-        asset_j_borrowers = []
         sum_of_loans = 0
         interest_rates = []
         num_of_banks_that_are_lenders = 0
         num_of_banks_that_are_borrowers = 0
+        psi = []
         for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
+            psi.append(bank.psi)
             if bank.incrD >= 0:
                 asset_i.append(bank.asset_i_avg_ir)
             else:
                 asset_j.append(bank.asset_j_avg_ir)
-            if bank.incrD >= 0:
-                if bank.active_borrowers:
-                    asset_i_lenders.append(bank.asset_i_avg_ir)
-            elif bank.d > 0:
-                asset_j_borrowers.append(bank.asset_j_avg_ir)
             if bank.active_borrowers:
                 num_of_banks_that_are_lenders += 1
                 for bank_that_is_borrower in bank.active_borrowers:
                     sum_of_loans += bank.active_borrowers[bank_that_is_borrower]
-                psi_lenders.append(bank.psi)
             elif bank.l > 0:
                 num_of_banks_that_are_borrowers += 1
-                interests_rates_of_borrowers.append(bank.get_loan_interest())
-            bank.has_a_loan = bank.get_loan_interest() is not None and bank.l > 0
             if bank.get_loan_interest():
                 interest_rates.append(bank.get_loan_interest())
-        self.interest_rate_loans[self.model.t] = np.mean(interests_rates_of_borrowers) \
-            if interests_rates_of_borrowers else np.nan
-        self.interest_rate[self.model.t] = np.mean(interest_rates) if interest_rates else 0.0
+        self.interest_rate[self.model.t] = np.mean(interest_rates) if interest_rates else\
+            (np.nan if self.stats_market else 0.0)
         self.asset_i[self.model.t] = np.mean(asset_i) if asset_i else 0.0
         self.asset_j[self.model.t] = np.mean(asset_j) if asset_j else 0.0
         if self.model.config.psi_endogenous:
-             self.psi_lenders[self.model.t] = np.mean(psi_lenders) if psi_lenders else np.nan
-             self.psi[self.model.t] = sum(bank.psi for bank in self.model.banks) / len(self.model.banks)
+             self.psi[self.model.t] = np.mean(psi) if psi else (np.nan if self.stats_market else 0.0)
         else:
-             self.psi_lenders[self.model.t] = self.model.config.psi
              self.psi[self.model.t] = self.model.config.psi
         self.loans[self.model.t] = sum_of_loans / num_of_banks_that_are_lenders \
             if num_of_banks_that_are_lenders else np.nan
         self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
         self.active_borrowers[self.model.t] = num_of_banks_that_are_borrowers
-        self.asset_i_lenders[self.model.t] = np.mean(asset_i_lenders)  if asset_i_lenders else 0.0
-        self.asset_j_borrowers[self.model.t] = np.mean(asset_j_borrowers)  if asset_j_borrowers else 0.0
 
     def compute_leverage_and_equity(self):
         sum_of_equity = 0
-        sum_of_equity_borrowers = 0
         leverage_of_lenders = []
         self.model.statistics.save_detailed_equity(self.model.t)
         for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
             if not bank.failed:
                 sum_of_equity += bank.E
                 if bank.l == 0:
@@ -436,15 +408,11 @@ class Statistics:
                     if bank.get_lender() is not None and bank.get_lender().l > 0:
                         amount_of_loan = bank.get_lender().l
                     leverage_of_lenders.append(amount_of_loan / bank.E)
-                if bank.active_borrowers:
-                    for borrower in bank.active_borrowers:
-                        sum_of_equity_borrowers += self.model.banks[borrower].E
                 self.model.statistics.save_detailed_equity(bank.E)
             else:
                 self.model.statistics.save_detailed_equity('')
         self.model.statistics.save_detailed_equity('\n')
         self.equity[self.model.t] = sum_of_equity
-        self.equity_borrowers[self.model.t] = sum_of_equity_borrowers
         self.leverage[self.model.t] = np.mean(leverage_of_lenders) if leverage_of_lenders else np.nan
         # systemic_leverage = how the system is in relation to the total population of banks (big value  of 10 borrowers
         # against a population of 100 banks means that there is a risk
@@ -454,6 +422,8 @@ class Statistics:
     def compute_liquidity(self):
         total_liquidity = 0
         for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
             if not bank.failed:
                 total_liquidity += bank.C
         self.liquidity[self.model.t] = total_liquidity
@@ -464,6 +434,8 @@ class Statistics:
             total_fitness = 0
             num_items = 0
             for bank in self.model.banks:
+                if self.stats_market and not bank.is_real_lender_or_borrower():
+                    continue
                 if not bank.failed:
                     total_fitness += bank.mu
                     num_items += 1
@@ -473,15 +445,19 @@ class Statistics:
         self.policy[self.model.t] = self.model.eta
 
     def compute_bad_debt(self):
-        self.B[self.model.t] = sum((bank.B for bank in self.model.banks))
-
-    def compute_rationing(self):
-        self.rationing[self.model.t] = sum((bank.rationing for bank in self.model.banks))
+        total_bad_debt = 0
+        for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
+            total_bad_debt += bank.B
+        self.B[self.model.t] = total_bad_debt
 
     def compute_deposits_and_reserves(self):
         total_deposits = 0
         total_reserves = 0
         for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
             if not bank.failed:
                 total_deposits += bank.D
                 total_reserves += bank.R
@@ -489,24 +465,26 @@ class Statistics:
         self.reserves[self.model.t] = total_reserves
 
     def compute_probability_of_lender_change_num_banks_prob_bankruptcy(self):
-        self.model.maxE = max((bank.E for bank in self.model.banks), default=0)
-        avg_prob_bankruptcy_lenders = [
-            1 - bank.E / self.model.maxE
-            for bank in self.model.banks
-            if bank.active_borrowers
-        ]
-        avg_prob_bankruptcy = [
-            1 - bank.E / self.model.maxE
-            for bank in self.model.banks
-            if not bank.failed
-        ]
-        self.prob_bankruptcy_lenders[self.model.t] = np.mean(
-            avg_prob_bankruptcy_lenders) if avg_prob_bankruptcy_lenders else np.nan
-        self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy)
-        probabilities = [bank.P for bank in self.model.banks if not bank.failed]
-        lender_capacities = [np.mean(bank.c_avg_ir) for bank in self.model.banks if not bank.failed]
-        num_banks = len(probabilities)
+        self.model.maxE = 0.0
+        for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
+            if bank.E > self.model.maxE:
+                self.model.maxE = bank.E
 
+        avg_prob_bankruptcy = []
+        probabilities = []
+        lender_capacities = []
+        for bank in self.model.banks:
+            if self.stats_market and not bank.is_real_lender_or_borrower():
+                continue
+            if not bank.failed:
+                avg_prob_bankruptcy.append(1 - bank.E / self.model.maxE)
+                probabilities.append(bank.P)
+                lender_capacities.append(np.mean(bank.c_avg_ir))
+
+        self.prob_bankruptcy[self.model.t] = np.mean(avg_prob_bankruptcy)
+        num_banks = len(probabilities)
         self.P[self.model.t] = np.mean(probabilities) if probabilities else np.nan
         self.P_max[self.model.t] = max(probabilities) if probabilities else np.nan
         self.c[self.model.t] = np.mean(lender_capacities) if lender_capacities else np.nan
@@ -541,15 +519,8 @@ class Statistics:
                     self.correlation = [
                         # correlation_coefficient = [-1..1] and p_value < 0.10
                         scipy.stats.pearsonr(self.psi, self.interest_rate),
+                        scipy.stats.pearsonr(self.psi, self.liquidity),
                     ]
-
-                    if len(self.psi_lenders) > 0 and len(self.interest_rate_loans) > 0:
-                        self.correlation.append(
-                            scipy.stats.pearsonr(
-                                self.psi_lenders[~np.isnan(self.psi_lenders)],
-                                self.interest_rate_loans[~np.isnan(self.interest_rate_loans)]
-                            )
-                        )
             except ValueError:
                 self.correlation = []
 
@@ -649,6 +620,9 @@ class Statistics:
         file_header = ''
         for line_header in header:
             file_header += '# {}\n'.format(line_header)
+        if self.stats_market:
+            file_header += '# stats_market=1'
+            export_datafile = export_datafile.replace('.txt', 'b.txt').replace('.csv', 'b.csv')
         file_header += "# pd.read_csv('file{}',header={}', delimiter='{}')\nt".format(self.output_format,
                                                                                        len(header) + 1, delimiter)
         with open(export_datafile, 'w', encoding='utf-8') as save_file:
@@ -661,30 +635,29 @@ class Statistics:
                 for _, element in self.enumerate_statistics_results():
                     save_file.write('{}{}'.format(delimiter, element[i]))
                 save_file.write('\n'.format())
-        if self.model.config.remove_nans:
+        if self.model.config.stats_market:
             with open(export_datafile.replace('.txt','b.txt').replace('.csv','b.csv'),
                       'w', encoding='utf-8') as save_file:
                 save_file.write(file_header)
-                for element_name, _ in self.enumerate_statistics_results(remove_nans=True):
+                for element_name, _ in self.enumerate_statistics_results(stats_market=True):
                     save_file.write('{}{}'.format(delimiter, element_name))
                 save_file.write('\n')
                 i_seq = 0
                 for i in range(self.model.config.T):
                     save_line = True
                     line = '{}'.format(i_seq)
-                    for name_element, element in self.enumerate_statistics_results(remove_nans=True):
+                    for name_element, element in self.enumerate_statistics_results(stats_market=True):
                         if name_element == 'real_t':
                             line += '{}{}'.format(delimiter,i)
                         else:
                             line += '{}{}'.format(delimiter, element[i])
-                            if np.isnan(element[i]) and name_element == 'loans':
+                            if self.stats_market and np.isnan(element[i]) and name_element == 'loans':
                                 save_line = False
                     if save_line:
                         i_seq += 1
                         save_file.write(line+'\n')
 
-    def __generate_gdt_file(self, filename, enumerate_results, header,
-                            remove_nans=False):
+    def __generate_gdt_file(self, filename, enumerate_results, header, stats_market=False):
         element = lxml.builder.ElementMaker()
         gretl_data = element.gretldata
         xml_description = element.description
@@ -693,7 +666,7 @@ class Statistics:
         xml_observations = element.observations
         observation = element.obs
         num_variables = 0
-        for variable_name, _ in enumerate_results(remove_nans):
+        for variable_name, _ in enumerate_results(stats_market):
             if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
                 num_variables += 2
             else:
@@ -701,12 +674,15 @@ class Statistics:
 
         variables = xml_variables(count=f'{num_variables}')
         header_text = ''
+        if self.stats_market:
+            filename = filename.replace('.gdt', 'b.gdt')
+            header_text = 'stats_market=1 '
         for item in header:
             header_text += item + ' '
         # header_text will be present as label in the first variable
         # correlation_result will be present as label in the second variable
         i = 1
-        for variable_name, _ in enumerate_results(remove_nans):
+        for variable_name, _ in enumerate_results(stats_market):
             if variable_name == 'leverage':
                 variable_name += '_'
             if i == 1:
@@ -727,14 +703,14 @@ class Statistics:
         for i in range(self.model.config.T):
             string_obs = ''
             save_instance = True
-            for variable_name, variable in enumerate_results(remove_nans):
+            for variable_name, variable in enumerate_results(stats_market):
                 if variable_name == 'real_t':
                     string_obs += f'{i:3} '
                 else:
                     string_obs += '{}  '.format(variable[i])
                     if variable_name in self.model.config.ELEMENTS_STATISTICS_LOG:
                         string_obs += '{}  '.format(math.log(variable[i]))
-                    if np.isnan(variable[i]) and remove_nans and variable_name == 'loans':
+                    if np.isnan(variable[i]) and stats_market and variable_name == 'loans':
                         save_instance = False
             if not save_instance:
                 continue
@@ -749,14 +725,14 @@ class Statistics:
                                 type='time-series')
         with gzip.open(filename, 'w') as output_file:
             output_file.write(b'<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE gretldata SYSTEM "gretldata.dtd">\n')
-            output_file.write(lxml.etree.tostring(gdt_result, pretty_print=True, encoding=str).encode('ascii'))
+            output_file.write(lxml.etree.tostring(gdt_result, encoding=str).encode('ascii'))
 
     def __generate_gdt(self, export_datafile, header):
         self.__generate_gdt_file(export_datafile, self.enumerate_statistics_results, header)
-        if self.model.config.remove_nans:
+        if self.model.config.stats_market:
             self.__generate_gdt_file(export_datafile.replace('.gdt','b.gdt'),
                                      self.enumerate_statistics_results,
-                                     header, remove_nans=True)
+                                     header, stats_market=True)
 
     @staticmethod
     def __transform_line_from_string(line_with_values):
@@ -822,16 +798,15 @@ class Statistics:
             else:
                 self.__generate_gdt(self.get_export_path(export_datafile), header)
 
-    def enumerate_statistics_results(self, remove_nans=False):
-        if remove_nans:
-            for element in Config.ELEMENTS_STATISTICS_REMOVE_NANS:
-                yield self.get_name(element), getattr(self, element) if element != 'real_t' else None
-        else:
-            for element in Config.ELEMENTS_STATISTICS:
+    def enumerate_statistics_results(self, stats_market=False):
+        for element in dir(self):
+            if isinstance(getattr(self, element), np.ndarray) and not element in Config.ELEMENTS_STATISTICS_NO_SHOW:
                 yield self.get_name(element), getattr(self, element)
-            if self.model.config.lender_change.GRAPH_NAME:
-                for element in Config.ELEMENTS_STATISTICS_GRAPHS:
-                    yield self.get_name(element), getattr(self, element)
+        if stats_market:
+            yield 'real_t', 'real_t'
+        if not stats_market and self.model.config.lender_change.GRAPH_NAME:
+            for element in Config.ELEMENTS_STATISTICS_GRAPHS:
+                yield self.get_name(element), getattr(self, element)
 
     def get_name(self, variable):
         try:
@@ -908,8 +883,8 @@ class Statistics:
         self.plot_pyplot(xx, [(yy, 'blue', '-', '')], variable, title, export_datafile, 'Time', '')
 
     def get_plots(self, export_datafile):
-        for variable in Config.ELEMENTS_STATISTICS:
-            if Config.ELEMENTS_STATISTICS[variable]:
+        for variable in dir(self):
+            if isinstance(getattr(self, variable), np.ndarray) and variable not in Config.ELEMENTS_STATISTICS_NO_PLOT:
                 if 'plot_{}'.format(variable) in dir(Statistics):
                     eval('self.plot_{}(export_datafile)'.format(variable))
                 else:
@@ -998,6 +973,9 @@ class Statistics:
             elif value != '\n':
                 value = '{};'.format(value)
             self.detailed_equity.write(value)
+
+    def compute_replaced_banks(self, num_of_replaced_banks):
+        self.bankruptcy_rationed[self.model.t] = num_of_replaced_banks
 
 
 class Log:
@@ -1094,7 +1072,6 @@ class Model:
         model.backward() # t=4 again
     """
     banks = []
-    banks = []
     t: int = 0
     eta: float = 1
     test = False
@@ -1106,6 +1083,7 @@ class Model:
     log = None
     maxE = Config.E_i0
     statistics = None
+    statistics_market = None
     config = None
     export_datafile = None
     export_description = None
@@ -1124,6 +1102,7 @@ class Model:
             self.configure(**configuration)
         if self.backward_enabled:
             self.banks_backward_copy = []
+        self.stats_market = Statistics(self, stats_market=self.config.stats_market)
 
     def configure_json(self, json_string: str):
         import re, json
@@ -1152,6 +1131,7 @@ class Model:
     def initialize(self, seed=None, dont_seed=False, save_graphs_instants=None, export_datafile=None,
                    export_description=None, generate_plots=True, output_directory=None):
         self.statistics.reset(output_directory=output_directory)
+        self.stats_market.reset(output_directory=output_directory)
         if not seed is None and not dont_seed:
             applied_seed = seed if seed else self.default_seed
             random.seed(applied_seed)
@@ -1180,10 +1160,13 @@ class Model:
             self.banks_backward_copy = copy.deepcopy(self.banks)
         self.do_shock('shock1')
         self.statistics.compute_potential_lenders()
+        self.stats_market.compute_fitness()
         self.do_loans()
         self.log.debug_banks()
         self.statistics.compute_interest_rates_and_loans()
         self.statistics.compute_leverage_and_equity()
+        self.stats_market.compute_interest_rates_and_loans()
+        self.stats_market.compute_leverage_and_equity()
         self.do_shock('shock2')
         self.do_repayments()
         self.log.debug_banks()
@@ -1194,10 +1177,20 @@ class Model:
         self.statistics.compute_fitness()
         self.statistics.compute_policy()
         self.statistics.compute_deposits_and_reserves()
-        self.statistics.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
+        num_of_replaced_banks = self.replace_bankrupted_banks()
+        self.statistics.compute_replaced_banks(num_of_replaced_banks)
+        self.stats_market.compute_replaced_banks(num_of_replaced_banks)
+        self.stats_market.compute_liquidity()
+        self.stats_market.compute_credit_channels_and_best_lender()
+        self.stats_market.compute_fitness()
+        self.stats_market.compute_policy()
+        self.stats_market.compute_deposits_and_reserves()
+        self.stats_market.bankruptcy_rationed[self.t] = self.replace_bankrupted_banks()
         self.setup_links()
         self.statistics.compute_statistics_of_graph()
         self.statistics.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
+        self.stats_market.compute_statistics_of_graph()
+        self.stats_market.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
         self.log.debug_banks()
         if self.save_graphs is not None and (self.save_graphs == '*' or self.t in self.save_graphs):
             filename = self.statistics.get_graph(self.t)
@@ -1236,6 +1229,11 @@ class Model:
             self.statistics.export_data(export_datafile=self.export_datafile,
                                         export_description=self.export_description,
                                         generate_plots=self.generate_plots)
+            self.stats_market.determine_cross_correlation()
+            self.stats_market.export_data(export_datafile=self.export_datafile,
+                                        export_description=self.export_description,
+                                        generate_plots=self.generate_plots)
+
         summary = 'Finish: model T={}  N={}'.format(self.config.T, self.config.N)
         if not self.__policy_recommendation_changed__():
             summary += ' ŋ={}'.format(self.eta)
@@ -1367,7 +1365,7 @@ class Model:
                             bank.incrD, bank.d), which_shock)
                     else:
                         bank.C = 0
-            self.statistics.incrementD[self.t] += bank.incrD
+            self.statistics.increase_increment_d(bank.incrD)
 
     def do_loans(self):
         self.config.lender_change.extra_relationships_change(self)
@@ -1387,7 +1385,7 @@ class Model:
                     if max_r > self.config.r_i0 and max_r != min_r:
                         # normalize in range [a,b], where a = self.config.r_i0
                         #                                 b =  self.config.normalize_interest_rate_max
-                        # x = a + \frac{(x - x_{\min})}{x_{\max} - x_{\min}} (b - a)
+                        # x = a + \frac{(x - x_{\min})}{x_{\max} - x_{\min} (b - a)
                         self.banks[bank.lender].rij[bank.id] = \
                             self.config.r_i0 + (self.banks[bank.lender].rij[bank.id] - min_r) / (max_r - min_r) * \
                             (self.config.normalize_interest_rate_max - self.config.r_i0)
@@ -1420,16 +1418,17 @@ class Model:
                     total_rationed += rationing_of_bank
                     num_of_rationed += 1
                     bank.do_fire_sales(rationing_of_bank,
-                                       f'rationing={{rationing_of_bank}} as no lender for this bank' if lender is None
-                                       else f'rationing={{rationing_of_bank}} as lender {{lender.get_id(short=True)}} has no money',
-                                       'loans')
+                                    f"rationing={rationing_of_bank} as no lender for this bank"
+                                        if lender is None else
+                                    f"rationing={rationing_of_bank} as lender {lender.get_id(short=True)} has no money",
+                                    'loans')
                 elif demand > lender.s:
                     rationing_of_bank = demand - lender.s
                     total_rationed += rationing_of_bank
                     num_of_rationed += 1
                     bank.do_fire_sales(rationing_of_bank,
-                                       f'lender.s={{lender.s}} but need d={{demand}}, rationing={{rationing_of_bank}}',
-                                       'loans')
+                                    f"lender.s={lender.s} but need d={demand}, rationing={rationing_of_bank}",
+                                    'loans')
                     loan = lender.s if lender.s > 0 else 0
                     bank.l = loan
                     if loan > 0:
@@ -1448,10 +1447,13 @@ class Model:
                 if bank.active_borrowers:
                     pass  # can skip string building/logging
             bank.rationing = rationing_of_bank
-        self.statistics.num_of_rationed[self.t] = num_of_rationed
-        self.statistics.rationing[self.t] = total_rationed
+        self.statistics.determine_rationed_rationing(num_of_rationed, total_rationed)
+
+
 
     def do_repayments(self):
+        total_profits = 0
+        total_profits_only_in_market = 0
         for bank in self.banks:
             if bank.l > 0 and bank.d > 0 and (not bank.failed):
                 amount_we_need = bank.l + bank.d - bank.C
@@ -1497,6 +1499,9 @@ class Model:
                     del bank_lender.active_borrowers[bank.id]
                 bank_lender.s += bank.paid_loan
                 bank.E -= loan_profits
+                total_profits += bank.paid_profits
+                if bank.is_real_lender_or_borrower():
+                    total_profits_only_in_market += bank.paid_profits
                 if bank.E < 0:
                     bank.failed = True
                     self.log.debug('repay',
@@ -1509,10 +1514,13 @@ class Model:
                     bank.d = 0
                 if bank.d > 0:
                     bank.do_fire_sales(bank.d, 'fire sales due to not enough C'.format(), 'repay')
+        self.statistics.determine_profits(total_profits)
+        self.stats_market.determine_profits(total_profits_only_in_market)
 
     def replace_bankrupted_banks(self):
         self.estimate_average_values_for_replacement_of_banks()
         self.statistics.compute_bad_debt()
+        self.stats_market.compute_bad_debt()
         lists_to_remove_because_replacement_of_bankrupted_is_disabled = []
         num_banks_failed_rationed = 0
         total_removed = 0
@@ -1666,6 +1674,9 @@ class Bank:
             #import math
             #return math.sqrt(math.sqrt(self.model.banks[self.lender].rij[self.id]))/20
 
+    def is_real_lender_or_borrower(self):
+        return self.lender is not None or (self.get_loan_interest() is not None and self.l > 0)
+
     def get_id(self, short: bool = False):
         init = 'bank#' if not short else '#'
         if self.failures > 0:
@@ -1714,7 +1725,8 @@ class Bank:
 
     def do_bankruptcy(self, phase):
         self.failed = True
-        self.model.statistics.bankruptcy[self.model.t] += 1
+        self.model.statistics.increase_bankruptcy_count()
+        self.model.stats_market.increase_bankruptcy_count()
         recovered_in_fire_sales = self.L * self.model.config.rho
         recovered = recovered_in_fire_sales - self.D
         if recovered < 0:
@@ -1984,10 +1996,10 @@ class Utils:
         parser.add_argument('--reintr_with_median', action='store_true',
                             default=model.config.reintroduce_with_median,
                             help='Reintroduce banks with the median of current banks')
-        parser.add_argument('--remove_nans', action='store_true',
-                            default=model.config.remove_nans,
-                            help='When data is saved (--save) store also a second file without'
-                                 ' instants t with np.nans values')
+        parser.add_argument('--stats_market', action='store_true',
+                            default=model.config.stats_market,
+                            help='When data is saved (--save) store also a second file with only'
+                                 ' instants t when we have loans')
         parser.add_argument('--seed', type=int, default=None, help='seed used for random generator')
 
         args, other_possible_config_args = parser.parse_known_args()
@@ -2000,7 +2012,7 @@ class Utils:
         model.config.allow_replacement_of_bankrupted = not args.no_replace
         model.config.reintroduce_with_median = args.reintr_with_median
         model.config.psi_endogenous = args.psi_endogenous
-        model.config.remove_nans = args.remove_nans
+        model.config.stats_market = args.stats_market
         model.config.lender_change = lc.determine_algorithm(args.lc, args.lc_p, args.lc_m)
         model.config.define_values_from_args(other_possible_config_args)
         if args.load:
@@ -2019,6 +2031,8 @@ class Utils:
         model.statistics.set_gif_graph(args.gif_graph)
         model.statistics.define_plot_format(args.plot_format)
         model.statistics.define_detailed_equity(args.detailed_equity, args.save)
+        model.stats_market.define_output_format(args.output_format)
+        model.stats_market.define_plot_format(args.plot_format)
         self.run(model, save=args.save, save_graph_instants=self.__extract_t_values_from_arg__(args.graph),
                  output_directory=args.output, seed=args.seed,
                  interactive=args.log == 'ERROR' or args.logfile is not None)
@@ -2063,6 +2077,8 @@ model = Model()
 if Utils.is_notebook():
     model.statistics.OUTPUT_DIRECTORY = '/content'
     model.statistics.output_format = 'csv'
+    model.stats_market.OUTPUT_DIRECTORY = '/content'
+    model.stats_market.output_format = 'csv'
     model.config.lender_change = interbank_lenderchange.determine_algorithm( LENDER_CHANGE_DEFAULT,
                                                                              p=LENDER_CHANGE_DEFAULT_P)
     utils.run(model, save='results')

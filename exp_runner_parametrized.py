@@ -16,9 +16,7 @@ import numpy as np
 import scipy
 import warnings
 
-class ExperimentRunParametrized(exp_runner.ExperimentRun):
-
-
+class ExperimentRun(exp_runner.ExperimentRun):
     # same length as combinations we have in config, for instance config = { 'p':[0,1,2,], 'w':[3,4] }
     # should have 6 items:
     extra_individual_config = [ ]
@@ -176,7 +174,7 @@ class ExperimentRunParametrized(exp_runner.ExperimentRun):
         return results_to_plot, results_x_axis
 
 
-class Runner:
+class Runner(exp_runner.Runner):
     def __init__(self, experiment_runner: ExperimentRunParametrized):
         self.experiment_runner = experiment_runner
         self.parser = argparse.ArgumentParser(description="Executes MC experiments using interbank model")

@@ -27,7 +27,7 @@ class MarketPowerRun(exp_runner.ExperimentRun):
 
     EXTRA_MODEL_CONFIGURATION = {
         'psi_endogenous': False,
-        'remove_nans': True,
+        'stats_market': True,
         'normalize_interest_rate_max': 0}
     
     LENGTH_FILENAME_PARAMETER = 5
