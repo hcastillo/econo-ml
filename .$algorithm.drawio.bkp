@@ -1,4 +1,4 @@
-<mxfile host="Electron" modified="2026-02-14T19:49:42.392Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.16 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="372P8YkLW8Bk7cNuM969" version="22.1.16" type="device" pages="2">
+<mxfile host="Electron" modified="2026-01-28T21:43:47.700Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.16 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="rGXRe0zA11yFKaDcPPCf" version="22.1.16" type="device" pages="2">
   <diagram id="C5RBs43oDa-KdzZeNtuy" name="Page-1">
     <mxGraphModel dx="794" dy="511" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -329,7 +329,7 @@
     </mxGraphModel>
   </diagram>
   <diagram id="PTCLvMcaK89kQo44bGaH" name="Página-2">
-    <mxGraphModel dx="794" dy="511" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1323" dy="852" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -595,13 +595,13 @@
         <mxCell id="_w6eeUE_SBoRkJvL0yLL-94" value="asset_i psi_lenders&lt;br&gt;asset_j&amp;nbsp; &amp;nbsp;psi&amp;nbsp; loans&lt;br&gt;active_lenders/borrowers" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
           <mxGeometry x="60" y="359" width="170" height="51" as="geometry" />
         </mxCell>
-        <mxCell id="_w6eeUE_SBoRkJvL0yLL-95" value="&lt;br&gt;leverage&lt;br&gt;systemic_leverage" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
+        <mxCell id="_w6eeUE_SBoRkJvL0yLL-95" value="equity&lt;br&gt;leverage&lt;br&gt;systemic_leverage" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
           <mxGeometry x="230" y="352" width="140" height="48" as="geometry" />
         </mxCell>
         <mxCell id="_w6eeUE_SBoRkJvL0yLL-96" value="liquidity&lt;br&gt;potential_credit_channels&lt;br&gt;best_lender&lt;br&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
           <mxGeometry x="50" y="526" width="165" height="44" as="geometry" />
         </mxCell>
-        <mxCell id="_w6eeUE_SBoRkJvL0yLL-99" value="equity&lt;br&gt;fitness&lt;br&gt;policy&lt;br&gt;deposits&lt;br&gt;reservers&lt;br&gt;bankruptcy_rationed" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
+        <mxCell id="_w6eeUE_SBoRkJvL0yLL-99" value="fitness&lt;br&gt;policy&lt;br&gt;deposits&lt;br&gt;reservers&lt;br&gt;bankruptcy_rationed" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
           <mxGeometry x="50" y="573" width="165" height="137" as="geometry" />
         </mxCell>
         <mxCell id="_w6eeUE_SBoRkJvL0yLL-100" value="P&lt;br&gt;P_max, P_min, P_std&lt;br&gt;prob_bankruptcy&lt;br&gt;" style="shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;" parent="1" vertex="1">
@@ -611,6 +611,12 @@
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="226" y="473" as="sourcePoint" />
             <mxPoint x="226" y="485" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gf2lB0fuEwT7Ptq8eaH1-1" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;entryX=0.188;entryY=1.023;entryDx=0;entryDy=0;entryPerimeter=0;fillColor=#fff2cc;strokeColor=#d6b656;" edge="1" parent="1" target="_w6eeUE_SBoRkJvL0yLL-94">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="240" y="880" as="sourcePoint" />
+            <mxPoint x="460" y="660" as="targetPoint" />
           </mxGeometry>
         </mxCell>
       </root>
