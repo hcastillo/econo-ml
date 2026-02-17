@@ -173,58 +173,5 @@ class ExperimentRun(exp_runner.ExperimentRun):
         print('execution_time: %2.5f secs' % (final_time - initial_time))
         return results_to_plot, results_x_axis
 
-
 class Runner(exp_runner.Runner):
-    def __init__(self, experiment_runner: ExperimentRunParametrized):
-        self.experiment_runner = experiment_runner
-        self.parser = argparse.ArgumentParser(description="Executes MC experiments using interbank model")
-        self.parser.add_argument(
-            "--do",
-            default=False,
-            action=argparse.BooleanOptionalAction,
-            help=f"Execute the experiment and saves the results in {self.experiment_runner.OUTPUT_DIRECTORY}",
-        )
-        self.parser.add_argument(
-            "--listnames",
-            default=False,
-            action=argparse.BooleanOptionalAction,
-            help="Print combinations to generate",
-        )
-        self.parser.add_argument(
-            "--clear_results",
-            default=False,
-            action=argparse.BooleanOptionalAction,
-            help="Ignore generated results.csv and create it again",
-        )
-        self.parser.add_argument(
-            "--clear",
-            default=False,
-            action=argparse.BooleanOptionalAction,
-            help="Ignore generated models and create them again",
-        )
-        self.parser.add_argument(
-            "--errorbar",
-            default=False,
-            action=argparse.BooleanOptionalAction,
-            help="Plot also the errorbar (deviation error)",
-        )
-        self.parser.add_argument(
-            "--reverse",
-            default=False,
-            action=argparse.BooleanOptionalAction,
-            help="Execute the experiment in opposite order",
-        )
-
-    def do(self):
-        args = self.parser.parse_args()
-        experiment = self.experiment_runner()
-        if args.clear_results:
-            experiment.clear_results()
-        experiment.error_bar = args.errorbar
-        if args.listnames:
-            experiment.listnames()
-        elif args.do:
-            experiment.do(clear_previous_results=args.clear, reverse_execution=args.reverse)
-            return experiment
-        else:
-            self.parser.print_help()
+    pass

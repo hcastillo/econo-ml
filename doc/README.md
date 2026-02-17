@@ -111,7 +111,7 @@
 # Basic usage of the model
 
 <figure id="fig:algorithm" data-latex-placement="htb">
-<embed src="algorithm.drawio.pdf" />
+<img src="algorithm.png" />
 <figcaption>Flujo del modelo interbancario: shocks, préstamos, repagos y
 ventas forzosas</figcaption>
 </figure>
@@ -120,12 +120,9 @@ ventas forzosas</figcaption>
 
 - Usage:
 
-  **Nombre**       **Descripción**                                   **Individual**   **OnlyMarket**   **Stats**
-  ---------------- ------------------------------------------------ ---------------- ---------------- -----------
-  ShockedMarket3   Mecanismo de cambio de prestamista con shock                                       
-  Preferential     Attachment preferencial con $m$ nodos                                              
-  Fast Algorithm   Algoritmo optimizado para simulaciones grandes                                     
-  PPO Agent        Aprendizaje por refuerzo PPO                                                       
-  TD3              Algoritmo TD3                                                                      
-
-  : Comparativa de opciones del modelo
+::: tabular
+\|l\|c\|r\| Name & Explanation & Global & **stats_market** & Individual
+& Graphs\
+**gcs** & bla bla & & & & $\checkmark$\
+**gcs** & bla bla & & & & $\checkmark$\
+:::

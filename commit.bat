@@ -16,3 +16,5 @@ if %errorlevel%==0 (
  git commit -a
  git push
 )
+
+pandoc README.tex -o README.md

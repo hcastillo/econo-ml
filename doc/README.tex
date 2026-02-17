@@ -1,0 +1,128 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amssymb}
+\usepackage{graphicx}
+
+
+\title{econo-ml: Reinforce Learning Policy Recommendation for Interbank Network Stability}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Auxiliary files}
+\begin{itemize}
+    \item \texttt{requirements.txt}: list of the necessary python packages
+\end{itemize}
+
+\section{Interbank model}
+
+\begin{itemize}
+    \item \texttt{interbank.py}: use to execute standalone the Interbank simulation.
+    \begin{itemize}
+        \item It accepts command line options. For instance:
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+interbank.py --log DEBUG --n 150 --t 2000
+interbank.py --save results.gdt --p 0.5 eta=0.35 param=X
+\end{lstlisting}
+        \item When it is used as a package, the sequence should be:
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small]
+import interbank
+model = interbank.Model()
+model.config.configure( param=x )
+model.forward()
+μ = model.get_current_fitness()
+model.set_policy_recommendation( ŋ=0.5 )
+\end{lstlisting}
+    \end{itemize}
+
+    \item Basic options:
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+# To list all options:
+interbank.py --help
+
+# Using lender's change mechanism ShockedMarket3 with probability of attachment 0.3:
+interbank.py --lc ShockedMarket3 --p 0.3
+
+# Same for Preferential with m nodes:
+interbank.py --lc Preferential --m 0.3
+
+# To use a fastest algorithm to run in big simulations:
+interbank.py --fast
+
+# To run a simulation based on exp_runner:
+python -m experiments.exp_shockedmarket --do
+\end{lstlisting}
+
+    \item \texttt{colab\_interbank.ipynb}: Notebook version of the standalone \texttt{interbank.py} with the same results but plotted using Bokeh.
+    \item \texttt{interbank\_lenderchange.py}: It contains the different algorithms that control the change of lender in the model.
+    \item \texttt{exp\_runner.py}: A prototype for executing experiments with different parameters and using MonteCarlo (using concurrent.futures to allow multiple threads).
+    \item \texttt{exp\_runner\_distributed.py}: A sub-prototype that uses ray library to execute in a cluster.
+    \item \texttt{exp\_runner\_no\_concurrent.py}: Another sub-prototype that avoids the use of parallelism.
+    \item \texttt{exp\_runner\_no\_concurrent.py}: Another sub-prototype that avoids the use of parallelism.
+    \item \texttt{exp\_runner\_comparer.py}: A derivation of the former prototype though to compare the evolution with \texttt{p} (probability of attachment in an Erdos-Renyi graph) in the \texttt{x} axis and other parameters accross the \texttt{y} axis.
+    \item \texttt{exp\_runner\_surviving.py}: A derivation of the former prototype using ray library to execute in a cluster.
+    \item \texttt{experiments/}: directory with all the experiments conducted. The results of that executions are stored in a folder determined inside each experiment.
+    \item \texttt{utils/plot\_psi.py}: Generate a table of axis\_x x axis\_y plots.
+    \item \texttt{utils/labplot2\_interbank.lml}: \href{https://labplot.org/}{LabPlot2} file to plot the results of the \texttt{interbank.py}. By the way the best way is to use \href{https://gretl.sourceforge.net/}{Gretl} as an export format.
+    \item \texttt{algorithm.drawio} and \texttt{algorithm.drawio.pf}: the \href{https://www.drawio.com/}{draw.io} and PDF schema of the algorithm used in the model to propagate shocks and to balance sheets.
+\end{itemize}
+
+\section{RL with Stable Baselines3}
+\begin{itemize}
+    \item \texttt{interbank\_agent.py}: agent to test using PPO
+    \item \texttt{run\_ppo.py}: run and simulate with PPO agent
+    \item \texttt{run\_td3.py}: run and simulate with TD3 algorithm
+    \item \texttt{models/XXXX.zip}: instances of Gymnasium.env trained to use with \texttt{run\_XXXX.py}
+    \item \texttt{utils/plot\_ppo.py}: auxiliary creator of plots to play the results of PPO
+    \item Usage:
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+# train first and save the model env:
+run_ppo.py --train ppo_10000 --t 10000 --verbose
+
+# use the trained env and generate a simulation of T=1000 with Interbank model
+run_ppo.py --load ppo_10000 --save results_ppo.txt
+\end{lstlisting}
+\end{itemize}
+
+\section{Basic usage of the model}
+
+
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{algorithm}
+  \caption{Flujo del modelo interbancario: shocks, préstamos, repagos y ventas forzosas}
+  \label{fig:algorithm}
+\end{figure}
+
+
+\begin{itemize}
+    \item \texttt{interbank\_agent.py}: agent to test using PPO
+    \item Usage:
+\end{itemize}
+
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|r|}
+\hline
+Name & Explanation & Global & \textbf{stats\_market} & Individual & Graphs \\
+\hline
+\textbf{gcs} & bla bla &  &  &  & $\checkmark$ \\
+\hline
+\textbf{gcs} & bla bla &  &  &  & $\checkmark$ \\
+\hline
+\end{tabular}
+\caption{Simple table example.}
+\end{table}
+
+
+
+\end{document}

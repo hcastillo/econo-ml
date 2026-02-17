@@ -24,9 +24,9 @@ class PlotPsi:
     working_dir = '/experiments/0'
     output = 'p_psi_real_loans'
 
-    axis_x = ['equity', 'bankruptcies', 'interest_rate_loans',
-              'bad_debt', 'asset_i_lenders', 'asset_j_borrowers',
-              'prob_bankruptcy_lenders', 'rationing', 'deposits', 'real_t']
+    axis_x = ['equity', 'bankruptcies', 'interest_rate',
+              'bad_debt', 'asset_i', 'asset_j',
+              'prob_bankruptcy', 'rationing', 'deposits', 'real_t']
     with_log = ['equity']
 
     titles_x = ['$log(E)$', 'bankruptcy', '$i_r$', '$B$', '$asset_i$', '$asset_j$', '$prob_{bank}$',

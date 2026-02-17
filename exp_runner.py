@@ -642,7 +642,7 @@ class ExperimentRun:
                 results_to_plot['cross_psi_ir'].append(self.get_cross_correlation_result(result_iteration,
                                                                             'psi','interest_rate'))
                 results_to_plot['cross_psi_ir_lenders'].append(self.get_cross_correlation_result(result_iteration,
-                                                                            'psi_lenders', 'interest_rate_loans'))
+                                                                            'psi', 'bankruptcies'))
                 results_x_axis.append(self.get_title_for(model_configuration, model_parameters))
                 progress_bar.next()
 

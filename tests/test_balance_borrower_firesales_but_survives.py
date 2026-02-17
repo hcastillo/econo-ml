@@ -8,7 +8,7 @@ from mock import patch
 
 class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     """
-       test borrower bank does fire sales but it is covered ok
+       test borrower bank does fire sales, but it is covered ok
        """
 
     #       #0             #1
