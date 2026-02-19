@@ -20,6 +20,7 @@ doc/README.aux
 doc/README.out 
 doc/README.log
 doc/README.md
+texput.log
 tests/*.gdt
 tests/tests/
 tests/output/

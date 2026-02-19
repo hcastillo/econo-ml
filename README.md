@@ -113,7 +113,7 @@
 # Basic usage of the model
 
 <figure id="fig:algorithm" data-latex-placement="htb">
-<img src="algorithm" />
+<img src="doc/algorithm.png" />
 <figcaption>Sequence of steps: grey boxes indicates moments in which
 that statistic is obtained</figcaption>
 </figure>
@@ -239,22 +239,70 @@ usage. Possible statistics obtained from the model are:
 - **systemic_leverage**: Financial leverage but considering in the mean
   the total banks of the model $N$
 
-<!-- -->
+The different statistics of information obtained in table
+[1](#table1){reference-type="ref" reference="table1"} are classified as:
 
-- Global: using `--save`: each data column marked in the table with
-  \"Global\" column will be obtained for all the $N$ banks in the model
+- Global: using **--save filename**: each data column in
+  **filename.gdt** will be obtained for all the $N$ banks in the model
   for all instants time $T$ (rows)
 
-- With **--stats_market** what we obtain will be statistics for the
-  subsets of banks that in each time are engaged in a real loan. So if
-  in the time $t$ there are no loans, it is removed from this
-  statistics. The special value `real_t` indicates which was the
-  original time.
+- With **--stats_market** what we obtain will be a file as
+  **filenameb.gdt** for the subsets of banks that in each time are
+  engaged in a real loan. So if in the time $t$ there are no loans, it
+  is removed from this statistics. The special value `real_t` indicates
+  which was the original time.
 
 - Individual is data obtained when we use **--detail_times** or
-  **--detail_banks** and it stores statistics of those moments for all
-  the banks individually or specific banks.
+  **--detail_banks** and it stores **filename_detailed.gdt** of those
+  moments for all the banks individually or specific banks.
 
-- Graphs are data obtained when we have a **LenderChange** algorithm
-  with a random graph, in which we can determine for each time it is
-  generated specific data.
+- Graphs are data obtained also in **filename.gdt** but only we have a
+  **LenderChange** algorithm with a random graph.
+
+::: {#table1}
+  ------------------------------- --------- -------------------- ---------------------- -------------- --------------
+  Name                              Type           Global           **stats_market**      Individual       Graphs
+  **active_borrowers**             integer      $\checkmark$          $\checkmark$                     
+  **active_lenders**               integer      $\checkmark$          $\checkmark$                     
+  **asset_i**                       float     $\overline{x}/0$      $\overline{x}/0$     $\checkmark$  
+  **asset_j**                       float     $\overline{x}/0$      $\overline{x}/0$     $\checkmark$  
+  **bad_debt**                      float          $\sum$                $\sum$          $\checkmark$  
+  **bankruptcies**                 integer         $\sum$                $\sum$          $\checkmark$  
+  **bankrupcty_rationed**          integer         $\sum$                $\sum$                        
+  **best_lender**                  integer      $\checkmark$          $\checkmark$                     
+  **best_lender_clients**          integer      $\checkmark$          $\checkmark$                     
+  **c**                             float    $\overline{x}/nan$    $\overline{x}/nan$                  
+  **communities**                  integer                                                              $\checkmark$
+  **communities_not_alone**        integer                                                              $\checkmark$
+  **deposits**                      float          $\sum$                $\sum$          $\checkmark$  
+  **equity**                        float          $\sum$                $\sum$                        
+  **fitness**                       float      $\overline{x}$      $\overline{x}/nan$    $\checkmark$  
+  **gcs**                          integer                                                              $\checkmark$
+  **grade_avg**                    integer                                                              $\checkmark$
+  **incrementD**                    float          $\sum$                $\sum$                         $\checkmark$
+  **interest_rate**                 float     $\overline{x}/0$    $\overline{x} / nan$   $\checkmark$  
+  **l_equity**                      float          $\sum$                $\sum$                        
+  **leverage** / **leverage\_**     float      $\overline{x}$      $\overline{x}/nan$    $\checkmark$  
+  **liquidity**                     float          $\sum$                $\sum$          $\checkmark$  
+  **loans**                         float          $\sum$                $\sum$          $\checkmark$  
+  **num_banks**                    integer      $\checkmark$          $\checkmark$                     
+  **num_loans**                    integer      $\checkmark$          $\checkmark$       $\checkmark$  
+  **num_of_rationed**              integer      $\checkmark$          $\checkmark$                     
+  **policy**                        float       $\checkmark$          $\checkmark$                     
+  **potential_credit_channels**    integer      $\checkmark$          $\checkmark$                     
+  **potential_lenders**            integer      $\checkmark$          $\checkmark$                     
+  **prob_bankruptcy**               float       $\checkmark$          $\checkmark$       $\checkmark$  
+  **profits**                       float          $\sum$                $\sum$                         $\checkmark$
+  **psi**                           float      $\checkmark/0$       $\checkmark/nan$                    $\checkmark$
+  **rationing**                     float          $\sum$                $\sum$                         $\checkmark$
+  **real_t**                       integer                            $\checkmark$                     
+  **reserves**                      float          $\sum$                $\sum$                         $\checkmark$
+  **systemic_leverage**             float      $\overline{x}$        $\overline{x}$                    
+  ------------------------------- --------- -------------------- ---------------------- -------------- --------------
+
+  :  Legend for the different columns are: $\checkmark$=value without
+  any modification. $\sum$=sum of the value for all banks.
+  $\overline{x}$ = average of the value for all banks. $0$ = No banks in
+  this statistic. $nan$=Instead of zero, the value of \"not a number\"
+  is used
+:::

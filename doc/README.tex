@@ -97,7 +97,7 @@ run_ppo.py --load ppo_10000 --save results_ppo.txt
 
 \begin{figure}[htb]
   \centering
-  \includegraphics[width=\textwidth,keepaspectratio]{algorithm}
+  \includegraphics[width=\textwidth,keepaspectratio]{algorithm.png}
   \caption{Sequence of steps: grey boxes indicates moments in which that statistic is obtained}
   \label{fig:algorithm}
 \end{figure}
@@ -153,9 +153,20 @@ This statistics collect data in each time for the average or individually, depen
     \item \textbf{systemic\_leverage}: Financial leverage but considering in the mean the total banks of the model $N$
 \end{itemize}
 
+
+The different statistics of information obtained in table \ref{table1} are classified as:
+\begin{itemize}
+        \item Global: using \textbf{--save filename}: each data column in \textbf{filename.gdt}  will be obtained for all the $N$ banks in the model for all instants time $T$ (rows)
+        \item With \textbf{--stats\_market} what we obtain will be a file as \textbf{filenameb.gdt} for the subsets of banks that in each time are engaged in a real loan. So if in the time $t$ there are no loans, it is removed from this statistics. The special value \texttt{real\_t} indicates which was the original time.
+        \item Individual is data obtained when we use \textbf{--detail\_times} or \textbf{--detail\_banks} and it stores  \textbf{filename\_detailed.gdt}  of those moments for all the banks individually or specific banks.
+        \item Graphs are data obtained also in \textbf{filename.gdt} but only we have a \textbf{LenderChange} algorithm with a random graph.
+    \end{itemize}
+
+
+
 \begin{table}[h]
 \centering
-\begin{tabular}{|l|c|c|c|c|c}
+\begin{tabular}{|l|c|c|c|c|c|}
 \hline
 Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{active\_borrowers} & integer & $\checkmark$ &  $\checkmark$  &  & \\
@@ -171,14 +182,13 @@ Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{communities} & integer &  &   &  & $\checkmark$\\
 \textbf{communities\_not\_alone} & integer &  &   &  & $\checkmark$ \\
 \textbf{deposits}          & float & $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
-\textbf{equity}            & float &  $ \sum$ &  $ \sum$ &  \\
-\textbf{eta}            & float &  $ $\checkmark$ & $\checkmark$  &  \\
+\textbf{equity}            & float &  $ \sum$ &  $ \sum$ &  & \\
 \textbf{fitness}           & float & $\overline{x}$ & $\overline{x}/nan $ &  $\checkmark$  & \\
 \textbf{gcs}               & integer &  &   &  & $\checkmark$ \\
 \textbf{grade\_avg}        & integer &  &   &  & $\checkmark$\\
 \textbf{incrementD}        &  float &   $\sum$  &  $\sum$  &  &  $\checkmark$  \\
-\textbf{interest\_rate}    &  float &  $\overline{x}/0$ & $\overline{x}/nan $  & $\checkmark & $ \\
-\textbf{l\_equity}         & float &  $ \sum$ &  $ \sum$ &  \\
+\textbf{interest\_rate}    &  float &  $\overline{x}/0$ & $\overline{x} / nan $  & $\checkmark$ &  \\
+\textbf{l\_equity}         & float &  $ \sum$ &  $ \sum $ & & \\
 \textbf{leverage} / \textbf{leverage\_}         & float  &  $\overline{x}$ & $\overline{x}/nan $  & $\checkmark$  &  \\
 \textbf{liquidity}         &  float &  $\sum$ &  $\sum$ &  $\checkmark$ &    \\
 \textbf{loans}             & float &  $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
@@ -197,13 +207,7 @@ Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{systemic\_leverage} & float &  $\overline{x}$ & $ \overline{x} $  &  &  \\
 \hline
 \end{tabular}
-\caption{$\checkmark$=value without any modification. $\sum$=sum of the value for all banks. $ \overline{x}$ = average of the value for all banks. $0$ = No banks in this statistic. $nan$=Instead of zero, the value of "not a number" is used}
+\caption{ Legend for the different columns are: $\checkmark$=value without any modification. $\sum$=sum of the value for all banks. $ \overline{x}$ = average of the value for all banks. $0$ = No banks in this statistic. $nan$=Instead of zero, the value of "not a number" is used}
+\label{table1}
 \end{table}
-
-\begin{itemize}
-        \item Global: using \texttt{--save}: each data column marked in the table with "Global" column will be obtained for all the $N$ banks in the model for all instants time $T$ (rows)
-        \item With \textbf{--stats\_market} what we obtain will be statistics for the subsets of banks that in each time are engaged in a real loan. So if in the time $t$ there are no loans, it is removed from this statistics. The special value \texttt{real\_t} indicates which was the original time.
-        \item Individual is data obtained when we use \textbf{--detail\_times} or \textbf{--detail\_banks} and it stores statistics of those moments for all the banks individually or specific banks.
-        \item Graphs are data obtained when we have a \textbf{LenderChange} algorithm with a random graph, in which we can determine for each time it is generated specific data.
-    \end{itemize}
 \end{document}

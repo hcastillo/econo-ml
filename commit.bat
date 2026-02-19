@@ -18,6 +18,6 @@ if %errorlevel%==0 (
 )
 
 pandoc doc\README.tex -o README.md
-powershell -command "(Get-Content readme.md) -replace '\.\/algorithm','doc\.\/algorithm' | Out-File -encoding Default README.md"
+powershell -command "(Get-Content readme.md) -replace 'algorithm.png','doc/algorithm.png' | Out-File -encoding Default README.md"
 pandoc doc\README.tex -o README.pdf
 
