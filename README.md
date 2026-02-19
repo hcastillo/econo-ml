@@ -260,49 +260,48 @@ The different statistics of information obtained in table
   **LenderChange** algorithm with a random graph.
 
 ::: {#table1}
-  ------------------------------- --------- -------------------- ---------------------- -------------- --------------
-  Name                              Type           Global           **stats_market**      Individual       Graphs
-  **active_borrowers**             integer      $\checkmark$          $\checkmark$                     
-  **active_lenders**               integer      $\checkmark$          $\checkmark$                     
-  **asset_i**                       float     $\overline{x}/0$      $\overline{x}/0$     $\checkmark$  
-  **asset_j**                       float     $\overline{x}/0$      $\overline{x}/0$     $\checkmark$  
-  **bad_debt**                      float          $\sum$                $\sum$          $\checkmark$  
-  **bankruptcies**                 integer         $\sum$                $\sum$          $\checkmark$  
-  **bankrupcty_rationed**          integer         $\sum$                $\sum$                        
-  **best_lender**                  integer      $\checkmark$          $\checkmark$                     
-  **best_lender_clients**          integer      $\checkmark$          $\checkmark$                     
-  **c**                             float    $\overline{x}/nan$    $\overline{x}/nan$                  
-  **communities**                  integer                                                              $\checkmark$
-  **communities_not_alone**        integer                                                              $\checkmark$
-  **deposits**                      float          $\sum$                $\sum$          $\checkmark$  
-  **equity**                        float          $\sum$                $\sum$                        
-  **fitness**                       float      $\overline{x}$      $\overline{x}/nan$    $\checkmark$  
-  **gcs**                          integer                                                              $\checkmark$
-  **grade_avg**                    integer                                                              $\checkmark$
-  **incrementD**                    float          $\sum$                $\sum$                         $\checkmark$
-  **interest_rate**                 float     $\overline{x}/0$    $\overline{x} / nan$   $\checkmark$  
-  **l_equity**                      float          $\sum$                $\sum$                        
-  **leverage** / **leverage\_**     float      $\overline{x}$      $\overline{x}/nan$    $\checkmark$  
-  **liquidity**                     float          $\sum$                $\sum$          $\checkmark$  
-  **loans**                         float          $\sum$                $\sum$          $\checkmark$  
-  **num_banks**                    integer      $\checkmark$          $\checkmark$                     
-  **num_loans**                    integer      $\checkmark$          $\checkmark$       $\checkmark$  
-  **num_of_rationed**              integer      $\checkmark$          $\checkmark$                     
-  **policy**                        float       $\checkmark$          $\checkmark$                     
-  **potential_credit_channels**    integer      $\checkmark$          $\checkmark$                     
-  **potential_lenders**            integer      $\checkmark$          $\checkmark$                     
-  **prob_bankruptcy**               float       $\checkmark$          $\checkmark$       $\checkmark$  
-  **profits**                       float          $\sum$                $\sum$                         $\checkmark$
-  **psi**                           float      $\checkmark/0$       $\checkmark/nan$                    $\checkmark$
-  **rationing**                     float          $\sum$                $\sum$                         $\checkmark$
-  **real_t**                       integer                            $\checkmark$                     
-  **reserves**                      float          $\sum$                $\sum$                         $\checkmark$
-  **systemic_leverage**             float      $\overline{x}$        $\overline{x}$                    
-  ------------------------------- --------- -------------------- ---------------------- -------------- --------------
+|  |  |  |  |  |  |
+|:---|:--:|:--:|:--:|:--:|:--:|
+| Name | Type | Global | **stats_market** | Individual | Graphs |
+| **active_borrowers** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **active_lenders** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **asset_i** | float | $\overline{x}/0$ | $\overline{x}/0$ | $\checkmark$ |  |
+| **asset_j** | float | $\overline{x}/0$ | $\overline{x}/0$ | $\checkmark$ |  |
+| **bad_debt** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
+| **bankruptcies** | integer | $\sum$ | $\sum$ | $\checkmark$ |  |
+| **bankrupcty_rationed** | integer | $\sum$ | $\sum$ |  |  |
+| **best_lender** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **best_lender_clients** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **c** | float | $\overline{x}/nan$ | $\overline{x}/nan$ |  |  |
+| **communities** | integer |  |  |  | $\checkmark$ |
+| **communities_not_alone** | integer |  |  |  | $\checkmark$ |
+| **deposits** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
+| **equity** | float | $\sum$ | $\sum$ |  |  |
+| **fitness** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
+| **gcs** | integer |  |  |  | $\checkmark$ |
+| **grade_avg** | integer |  |  |  | $\checkmark$ |
+| **incrementD** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
+| **interest_rate** | float | $\overline{x}/0$ | $\overline{x} / nan$ | $\checkmark$ |  |
+| **l_equity** | float | $\sum$ | $\sum$ |  |  |
+| **leverage** / **leverage\_** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
+| **liquidity** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
+| **loans** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
+| **num_banks** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **num_loans** | integer | $\checkmark$ | $\checkmark$ | $\checkmark$ |  |
+| **num_of_rationed** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **policy** | float | $\checkmark$ | $\checkmark$ |  |  |
+| **potential_credit_channels** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **potential_lenders** | integer | $\checkmark$ | $\checkmark$ |  |  |
+| **prob_bankruptcy** | float | $\checkmark$ | $\checkmark$ | $\checkmark$ |  |
+| **profits** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
+| **psi** | float | $\checkmark/0$ | $\checkmark/nan$ |  | $\checkmark$ |
+| **rationing** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
+| **real_t** | integer |  | $\checkmark$ |  |  |
+| **reserves** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
+| **systemic_leverage** | float | $\overline{x}$ | $\overline{x}$ |  |  |
 
-  :  Legend for the different columns are: $\checkmark$=value without
-  any modification. $\sum$=sum of the value for all banks.
-  $\overline{x}$ = average of the value for all banks. $0$ = No banks in
-  this statistic. $nan$=Instead of zero, the value of \"not a number\"
-  is used
+:  Legend for the different columns are: $\checkmark$=value without any
+modification. $\sum$=sum of the value for all banks. $\overline{x}$ =
+average of the value for all banks. $0$ = No banks in this statistic.
+$nan$=Instead of zero, the value of \"not a number\" is used
 :::
