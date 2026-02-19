@@ -116,7 +116,7 @@ class Config:
     ELEMENTS_STATISTICS_NO_PLOT = ['best_lender_clients', 'fitness', 'policy', 'leverage', 'systemic_leverage',
                                    'loans', 'potential_lenders', 'active_lenders', 'active_borrowers',
                                    'prob_bankruptcy']
-    ELEMENTS_STATISTICS_NO_SHOW = ['P_max', 'P_min', 'gcs', 'grade_avg', 'communities', 'communities_not_alone']
+    ELEMENTS_STATISTICS_NO_SHOW = ['gcs', 'grade_avg', 'communities', 'communities_not_alone']
 
     # only if we have a graph for lender_change:
     ELEMENTS_STATISTICS_GRAPHS = {
@@ -124,7 +124,9 @@ class Config:
     }
     ELEMENTS_STATISTICS_LOG = {'equity'}
 
-    ELEMENTS_TRANSLATIONS = {'bankruptcy': 'bankruptcies', 'P': 'prob_change_lender', 'B': 'bad_debt'}
+    ELEMENTS_TRANSLATIONS = {'bankruptcy': 'bankruptcies',
+                             'P': 'prob_change_lender',
+                             'B': 'bad_debt'}
 
     def __str__(self, separator=''):
         description = sys.argv[0] if __name__ == '__main__' else ''
@@ -270,8 +272,14 @@ class Statistics:
         self.systemic_leverage = np.zeros(self.model.config.T, dtype=float)
         self.policy = np.zeros(self.model.config.T, dtype=float)
         self.profits = np.zeros(self.model.config.T, dtype=float)
-        self.P_max = np.zeros(self.model.config.T, dtype=float)
-        self.P_min = np.zeros(self.model.config.T, dtype=float)
+        if isinstance(self.model.config.lender_change, interbank_lenderchange.Boltzmann):
+            self.P = np.zeros(self.model.config.T, dtype=float)
+            self.P_max = np.zeros(self.model.config.T, dtype=float)
+            self.P_min = np.zeros(self.model.config.T, dtype=float)
+        else:
+            self.P = None
+            self.P_max = None
+            self.P_min = None
         self.B = np.zeros(self.model.config.T, dtype=float)
         self.loans = np.zeros(self.model.config.T, dtype=float)
         self.num_loans = np.zeros(self.model.config.T, dtype=int)
@@ -489,22 +497,27 @@ class Statistics:
                 continue
             if bank.E > maxE:
                 maxE = bank.E
-        probabilities = []
+        probabilities_bankruptcy = []
+        probabilities_lc = []
         lender_capacities = []
         for bank in self.model.banks:
             if self.stats_market and not bank.is_real_lender_or_borrower():
                 continue
             if not bank.failed:
-                probabilities.append(1 - bank.E / maxE)
+                probabilities_bankruptcy.append(1 - bank.E / maxE)
                 lender_capacities.append(np.mean(bank.c_avg_ir))
+            if self.P is not None:
+                probabilities_lc.append(bank.P)
         if type(self) is not StatisticsOnlyMarket:
             self.model.maxE = maxE
-        self.prob_bankruptcy[self.model.t] = np.mean(probabilities)
-        self.P_max[self.model.t] = max(probabilities) if probabilities else np.nan
-        self.P_min[self.model.t] = min(probabilities) if probabilities else np.nan
+        self.prob_bankruptcy[self.model.t] = np.mean(probabilities_bankruptcy)
+        if probabilities_lc:
+            self.P[self.model.t] = np.mean(probabilities_lc)
+            self.P_max[self.model.t] = max(probabilities_lc)
+            self.P_min[self.model.t] = min(probabilities_lc)
         self.c[self.model.t] = np.mean(lender_capacities) if lender_capacities else np.nan
         # probabilities have banks that are not failed:
-        self.num_banks[self.model.t] = len(probabilities)
+        self.num_banks[self.model.t] = len(probabilities_bankruptcy)
         if self.statistics_stats_market:
             self.statistics_stats_market.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
 
@@ -516,7 +529,7 @@ class Statistics:
         self.bankruptcy[self.model.t] += 1
         if self.statistics_stats_market:
             self.statistics_stats_market.compute_another_bankruptcy(bank, reason)
-            self.compute_individual_banks_statistics(bank, 'bankrupted', 1)
+            self.compute_individual_banks_statistics(bank, 'bankruptcies', 1)
 
     def compute_increment_d(self, bank_incr_d):
         self.incrementD[self.model.t] += bank_incr_d
@@ -956,21 +969,22 @@ class Statistics:
                         self.plot_result(variable, self.get_name(variable), export_datafile)
 
     def plot_p(self, export_datafile=None):
-        xx = []
-        yy = []
-        yy_min = []
-        yy_max = []
-        yy_std = []
-        for i in range(self.model.config.T):
-            xx.append(i)
-            yy.append(self.prob_bankruptcy[i])
-            yy_min.append(self.P_min[i])
-            yy_max.append(self.P_max[i])
-        self.plot_pyplot(xx, [(yy, 'blue', '-', 'Avg prob with $\\gamma$'),
-                              (yy_min, 'cyan', ':', 'Max and min prob'), (yy_max, 'cyan', ':', '')],
-                         'prob_change_lender',
-                         'Prob of change lender ' + self.model.config.lender_change.describe(),
-                         export_datafile, 'Time', '')
+        if self.P:
+            xx = []
+            yy = []
+            yy_min = []
+            yy_max = []
+            yy_std = []
+            for i in range(self.model.config.T):
+                xx.append(i)
+                yy.append(self.P[i])
+                yy_min.append(self.P_min[i])
+                yy_max.append(self.P_max[i])
+            self.plot_pyplot(xx, [(yy, 'blue', '-', 'Avg prob with $\\gamma$'),
+                                  (yy_min, 'cyan', ':', 'Max and min prob'), (yy_max, 'cyan', ':', '')],
+                             'prob_change_lender',
+                             'Prob of change lender ' + self.model.config.lender_change.describe(),
+                             export_datafile, 'Time', '')
 
     def plot_num_banks(self, export_datafile=None):
         if not self.model.config.allow_replacement_of_bankrupted:

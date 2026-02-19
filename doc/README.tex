@@ -27,38 +27,38 @@
     \item \texttt{interbank.py}: use to execute standalone the Interbank simulation.
     \begin{itemize}
         \item It accepts command line options. For instance:
-\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+            \begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
 interbank.py --log DEBUG --n 150 --t 2000
 interbank.py --save results.gdt --p 0.5 eta=0.35 param=X
-\end{lstlisting}
+            \end{lstlisting}
         \item When it is used as a package, the sequence should be:
-\begin{lstlisting}[language=Python, basicstyle=\ttfamily\small]
+            \begin{lstlisting}[language=Python, basicstyle=\ttfamily\small]
 import interbank
 model = interbank.Model()
-model.config.configure( param=x )
+model.config.configure(param=x)
 model.forward()
-μ = model.get_current_fitness()
-model.set_policy_recommendation( ŋ=0.5 )
-\end{lstlisting}
+eta = model.get_current_fitness()
+model.set_policy_recommendation(eta=0.5)
+            \end{lstlisting}
     \end{itemize}
-
     \item Basic options:
-\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
-# To list all options:
-interbank.py --help
+        \begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+        # To list all options:
+        interbank.py --help
 
-# Using lender's change mechanism ShockedMarket3 with probability of attachment 0.3:
-interbank.py --lc ShockedMarket3 --p 0.3
+        # Using lender's change mechanism ShockedMarket3
+        # with probability of attachment 0.3:
+        interbank.py --lc ShockedMarket3 --p 0.3
 
-# Same for Preferential with m nodes:
-interbank.py --lc Preferential --m 0.3
+        # Same for Preferential with m nodes:
+        interbank.py --lc Preferential --m 0.3
 
-# To use a fastest algorithm to run in big simulations:
-interbank.py --fast
+        # To use a fastest algorithm to run in big simulations:
+        interbank.py --fast
 
-# To run a simulation based on exp_runner:
-python -m experiments.exp_shockedmarket --do
-\end{lstlisting}
+        # To run a simulation based on exp_runner:
+        python -m experiments.exp_shockedmarket --do
+        \end{lstlisting}
 
     \item \texttt{colab\_interbank.ipynb}: Notebook version of the standalone \texttt{interbank.py} with the same results but plotted using Bokeh.
     \item \texttt{interbank\_lenderchange.py}: It contains the different algorithms that control the change of lender in the model.
@@ -86,7 +86,8 @@ python -m experiments.exp_shockedmarket --do
 # train first and save the model env:
 run_ppo.py --train ppo_10000 --t 10000 --verbose
 
-# use the trained env and generate a simulation of T=1000 with Interbank model
+# use the trained env and generate a simulation of T=1000
+# with Interbank model
 run_ppo.py --load ppo_10000 --save results_ppo.txt
 \end{lstlisting}
 \end{itemize}
@@ -94,35 +95,115 @@ run_ppo.py --load ppo_10000 --save results_ppo.txt
 \section{Basic usage of the model}
 
 
-
 \begin{figure}[htb]
   \centering
   \includegraphics[width=\textwidth,keepaspectratio]{algorithm}
-  \caption{Flujo del modelo interbancario: shocks, préstamos, repagos y ventas forzosas}
+  \caption{Sequence of steps: grey boxes indicates moments in which that statistic is obtained}
   \label{fig:algorithm}
 \end{figure}
 
 
 \begin{itemize}
-    \item \texttt{interbank\_agent.py}: agent to test using PPO
-    \item Usage:
+    \item \texttt{interbank.py --seed 1234 --t 500 --p 0.2}: Execute the model with $T=500$ and $LenderChange$ algorithm of $ShockedMarket3$ with an Erdös-Réni with probability of attachment of $0.2$ and using a seed for generating random values of $1234$ (same results if you generate again with other equal parameters and repeat this integer number for seed).
+    \item \texttt{interbank.py --save file.gdt --log DEBUG --logfile file.txt}: Save the results in \texttt{file.gdt} in $CSV$ and the detailed log in \texttt{file.txt}.
+    \item \texttt{interbank.py --save file.gdt --stats\_market --detail\_banks 5,7}: Save the results in \texttt{file.gdt}, a second file \texttt{fileb.gdt} with the results for only banks and times participating really in the loans market is generated, and also a third file \texttt{file\_detailed.gdt} with the concrete statistics for banks 5 and 7. With \texttt{--detail\_times 10,12} all specific details for all banks in times 10 and 12 are present in this third file.
 \end{itemize}
 
+\section{Statistics}
+
+Different statistics can be obtained after running the model, either in \textbf{csv} output, or in \textbf{gdt} (Gretl format).
+This statistics collect data in each time for the average or individually, depending on the usage. Possible statistics obtained from the model are:
+
+\begin{itemize}
+    \item \textbf{active\_borrowers}: Number of banks that are involved in a loan as borrowers. Both values in global and \textbf{stats\_market} will be the same.
+    \item \textbf{active\_lenders}: Number of banks that are involved in a loan as borrowers. Both values in global and \textbf{stats\_market} will be the same.
+    \item \textbf{asset\_i}: Assets of the lender of this bank ($D + E$)
+    \item \textbf{asset\_j}: Assets of the borrowers of this bank ($D + E$)
+    \item \textbf{bad\_debt}: Sum of the bad debt
+    \item \textbf{bankruptcies}: Number of banks that failed in this step
+    \item \textbf{bankrupcty\_rationed}: Number of banks that failed in this step due to rationing
+    \item \textbf{best\_lender}: ID of the bank which more connections in the graph
+    \item \textbf{best\_lender\_clients}: Number of banks connected with the best lender
+    \item \textbf{c}: Lender capacity ($1 - \frac{E}{maxE}$) of the bank
+    \item \textbf{communities}: Subsets of nodes with higher internal edge density than connections to the rest of the graph
+    \item \textbf{communities\_not\_alone}:  Number of \textbf{communities} that are not formed by only one node
+    \item \textbf{deposits}: Deposits $D$ in the balance $L + C + R = D + E$
+    \item \textbf{equity}: Equity $E$ of the bank: $L + C + R = D + E$
+    \item \textbf{fitness}: Fitness ($\mu$) of the bank
+    \item \textbf{gcs}: When we use an Erdös–Rényi graph, the Giant Component Size is the largest number of nodes that are interconnected.
+    \item \textbf{grade\_avg}: Average number of edges (connections) for the total banks
+    \item \textbf{incrementD}: Amount of ($ \Delta D$) for the bank
+    \item \textbf{interest\_rate}: Interest rate $r$ of the bank
+    \item \textbf{l\_equity}: Log of equity ($log(E)$)
+    \item \textbf{leverage}: Financial leverage ($l/E$) of the bank considering only the banks that are inside a loan, named \textbf{leverage\_} in Gretl due to name restrictions of the environment.
+    \item \textbf{liquidity}: Total liquidity $L$ of the Banks  $L + C + R = D + E$
+    \item \textbf{loans}: Amount borrowed by the bank
+    \item \textbf{num\_banks}: Number of banks currently surviving in the model (interesting when  \textbf{allow\_replacement\_of\_bankrupted=False})
+    \item \textbf{num\_loans}:  Num of loans in this step. Both global and \textbf{stats values \_market} will be the same
+    \item \textbf{num\_of\_rationed}: Number of banks that were rationed in this step (needed money and were without any possible lender)
+    \item \textbf{policy}: Policy recommendation $\eta$ of the system in the range $[0..1]$. As $\eta$ is a global value, the same number applies for all banks.
+    \item \textbf{potential\_credit\_channels}:  Considering there is a graph of connections between banks, then \textbf{number\_of\_edges()} in the graph
+    \item \textbf{potential\_lenders}: Number of banks in the first shock having a possitive shock ($ \Delta D$)
+    \item \textbf{prob\_bankruptcy}: Probability of bankruptcy $p=\frac{E}{E_{max}}$, between $[0..1]$
+    \item \textbf{profits}: Profits obtained in that step
+    \item \textbf{psi}: Power market ($psi$) value $[0..1]$
+    \item \textbf{rationing}: Total amounf of the loans $l$ of the banks
+    \item \textbf{real\_t}: Times in which are no loans are removed in the extra statistics generated when we use \textbf{--stats\_market}. Real $t$ instants of time are stored in this variable to track when were really those values are obtained in the original statistics.
+    \item \textbf{reserves}: Reserves $R$ in the balance $L + C + R = D + E$
+    \item \textbf{systemic\_leverage}: Financial leverage but considering in the mean the total banks of the model $N$
+\end{itemize}
 
 \begin{table}[h]
 \centering
-\begin{tabular}{|l|c|r|}
+\begin{tabular}{|l|c|c|c|c|c}
 \hline
-Name & Explanation & Global & \textbf{stats\_market} & Individual & Graphs \\
-\hline
-\textbf{gcs} & bla bla &  &  &  & $\checkmark$ \\
-\hline
-\textbf{gcs} & bla bla &  &  &  & $\checkmark$ \\
+Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
+\textbf{active\_borrowers} & integer & $\checkmark$ &  $\checkmark$  &  & \\
+\textbf{active\_lenders}   & integer & $\checkmark$ & $\checkmark$  &  & \\
+\textbf{asset\_i}          & float & $\overline{x}/0 $ & $\overline{x}/0$ & $\checkmark$ &  \\
+\textbf{asset\_j}          & float & $\overline{x}/0 $ & $\overline{x}/0$ & $\checkmark$ &  \\
+\textbf{bad\_debt}         & float & $ \sum$ &  $ \sum$ & $\checkmark$ & \\
+\textbf{bankruptcies}      & integer & $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
+\textbf{bankrupcty\_rationed} & integer & $ \sum$ &  $ \sum$ &  &  \\
+\textbf{best\_lender}      &  integer &  $\checkmark$ & $\checkmark$  &  & \\
+\textbf{best\_lender\_clients}  & integer &  $\checkmark$ &  $\checkmark$ &  & \\
+\textbf{c}                 & float &  $\overline{x}/nan $ & $\overline{x}/nan $ &  &  \\
+\textbf{communities} & integer &  &   &  & $\checkmark$\\
+\textbf{communities\_not\_alone} & integer &  &   &  & $\checkmark$ \\
+\textbf{deposits}          & float & $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
+\textbf{equity}            & float &  $ \sum$ &  $ \sum$ &  \\
+\textbf{eta}            & float &  $ $\checkmark$ & $\checkmark$  &  \\
+\textbf{fitness}           & float & $\overline{x}$ & $\overline{x}/nan $ &  $\checkmark$  & \\
+\textbf{gcs}               & integer &  &   &  & $\checkmark$ \\
+\textbf{grade\_avg}        & integer &  &   &  & $\checkmark$\\
+\textbf{incrementD}        &  float &   $\sum$  &  $\sum$  &  &  $\checkmark$  \\
+\textbf{interest\_rate}    &  float &  $\overline{x}/0$ & $\overline{x}/nan $  & $\checkmark & $ \\
+\textbf{l\_equity}         & float &  $ \sum$ &  $ \sum$ &  \\
+\textbf{leverage} / \textbf{leverage\_}         & float  &  $\overline{x}$ & $\overline{x}/nan $  & $\checkmark$  &  \\
+\textbf{liquidity}         &  float &  $\sum$ &  $\sum$ &  $\checkmark$ &    \\
+\textbf{loans}             & float &  $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
+\textbf{num\_banks}        &  integer &  $\checkmark$ & $\checkmark$ &  & \\
+\textbf{num\_loans}        &  integer &  $ \checkmark$ &  $\checkmark$ & $\checkmark$ &  \\
+\textbf{num\_of\_rationed} & integer &  $\checkmark$ & $\checkmark$ &  & \\
+\textbf{policy}            & float &  $\checkmark$ & $\checkmark$ &  & \\
+\textbf{potential\_credit\_channels} & integer &  $\checkmark$ & $\checkmark$ &  & \\
+\textbf{potential\_lenders} & integer &  $\checkmark$ & $\checkmark$ &  & \\
+\textbf{prob\_bankruptcy}  &  float &  $\checkmark$ & $\checkmark$  &  $\checkmark$  & \\
+\textbf{profits}           & float &  $ \sum$ &  $ \sum$ &  & $\checkmark$ \\
+\textbf{psi}               &  float &  $\checkmark/0 $ & $\checkmark/nan $ &  & $\checkmark$ \\
+\textbf{rationing}         &  float &  $\sum$ &  $\sum$ &  & $\checkmark$  \\
+\textbf{real\_t}         &  integer &  &  $\checkmark$ &  &   \\
+\textbf{reserves}          & float & $ \sum$ &  $ \sum$ &  & $\checkmark$ \\
+\textbf{systemic\_leverage} & float &  $\overline{x}$ & $ \overline{x} $  &  &  \\
 \hline
 \end{tabular}
-\caption{Simple table example.}
+\caption{$\checkmark$=value without any modification. $\sum$=sum of the value for all banks. $ \overline{x}$ = average of the value for all banks. $0$ = No banks in this statistic. $nan$=Instead of zero, the value of "not a number" is used}
 \end{table}
 
-
-
+\begin{itemize}
+        \item Global: using \texttt{--save}: each data column marked in the table with "Global" column will be obtained for all the $N$ banks in the model for all instants time $T$ (rows)
+        \item With \textbf{--stats\_market} what we obtain will be statistics for the subsets of banks that in each time are engaged in a real loan. So if in the time $t$ there are no loans, it is removed from this statistics. The special value \texttt{real\_t} indicates which was the original time.
+        \item Individual is data obtained when we use \textbf{--detail\_times} or \textbf{--detail\_banks} and it stores statistics of those moments for all the banks individually or specific banks.
+        \item Graphs are data obtained when we have a \textbf{LenderChange} algorithm with a random graph, in which we can determine for each time it is generated specific data.
+    \end{itemize}
 \end{document}

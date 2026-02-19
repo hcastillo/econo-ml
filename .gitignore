@@ -16,3 +16,11 @@ Econometrics-With-Python/
 graph_tests/*
 gab.py
 gab.c
+doc/README.aux
+doc/README.out 
+doc/README.log
+doc/README.md
+tests/*.gdt
+tests/tests/
+tests/output/
+

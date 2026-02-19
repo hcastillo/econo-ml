@@ -17,4 +17,7 @@ if %errorlevel%==0 (
  git push
 )
 
-pandoc README.tex -o README.md
+pandoc doc\README.tex -o README.md
+powershell -command "(Get-Content readme.md) -replace '\.\/algorithm','doc\.\/algorithm' | Out-File -encoding Default README.md"
+pandoc doc\README.tex -o README.pdf
+
