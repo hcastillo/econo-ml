@@ -1609,13 +1609,15 @@ class Model:
         if self.t == 0:
             self.log.debug_banks()
 
-    def setup_links(self):
+    def setup_links_common_part(self):
         if len(self.banks) <= 1:
-            return
+            return None
         self.maxE = max(self.banks, key=lambda k: k.E).E
-        max_c = max(self.banks, key=lambda k: k.C).C
         for bank in self.banks:
-            bank.prob_bankruptcy = bank.E / self.maxE
+            if self.config.p_avg_ir:
+                bank.prob_bankruptcy = self.config.p_avg_ir
+            else:
+                bank.prob_bankruptcy = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
@@ -1632,7 +1634,12 @@ class Model:
                 bank.c_avg_ir.append(c)
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE
-                # bank.psi = 0 if self.t < (self.config.T/2) else 1
+        return max(self.banks, key=lambda k: k.C).C
+
+    def setup_links(self):
+        max_c = self.setup_links_common_part()
+        if max_c is None:
+            return
         min_r = sys.maxsize
         for bank_i in self.banks:
             bank_i.asset_i_avg_ir = 0
@@ -1888,34 +1895,9 @@ class ModelOptimized(Model):
         return rij if rij >= 0 else self.config.r_i0
 
     def setup_links(self):
-        if len(self.banks) <= 1:
+        max_c = super().setup_links_common_part()
+        if max_c is None:
             return
-        self.maxE = max(self.banks, key=lambda k: k.E).E
-        max_c = max(self.banks, key=lambda k: k.C).C
-        for bank in self.banks:
-            if self.config.p_avg_ir:
-                bank.prob_bankruptcy = self.config.p_avg_ir
-            else:
-                bank.prob_bankruptcy = bank.E / self.maxE
-            if bank.get_lender() is not None and bank.get_lender().l > 0:
-                bank.lambda_ = bank.get_lender().l / bank.E
-            else:
-                bank.lambda_ = 0
-            # bank.lambda_ = bank.l / bank.E
-            bank.incrD = 0
-        max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
-        for bank in self.banks:
-            bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
-            bank.A = bank.C + bank.L + bank.R
-        for bank in self.banks:
-            bank.c_avg_ir = []
-            for i in range(self.config.N):
-                c = 0 if i == bank.id else (1 - self.banks[i].h) * self.banks[i].A
-                bank.c_avg_ir.append(c)
-            if self.config.psi_endogenous:
-                bank.psi = bank.E / self.maxE
-
-        # optimized part ----------
         min_r = float('inf')
         for bank_i in self.banks:
             bank_i.asset_i_avg_ir = 0

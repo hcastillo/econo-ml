@@ -105,8 +105,10 @@ run_ppo.py --load ppo_10000 --save results_ppo.txt
 
 \begin{itemize}
     \item \texttt{interbank.py --seed 1234 --t 500 --p 0.2}: Execute the model with $T=500$ and $LenderChange$ algorithm of $ShockedMarket3$ with an Erdös-Réni with probability of attachment of $0.2$ and using a seed for generating random values of $1234$ (same results if you generate again with other equal parameters and repeat this integer number for seed).
-    \item \texttt{interbank.py --save file.gdt --log DEBUG --logfile file.txt}: Save the results in \texttt{file.gdt} in $CSV$ and the detailed log in \texttt{file.txt}.
-    \item \texttt{interbank.py --save file.gdt --stats\_market --detail\_banks 5,7}: Save the results in \texttt{file.gdt}, a second file \texttt{fileb.gdt} with the results for only banks and times participating really in the loans market is generated, and also a third file \texttt{file\_detailed.gdt} with the concrete statistics for banks 5 and 7. With \texttt{--detail\_times 10,12} all specific details for all banks in times 10 and 12 are present in this third file.
+    \item \texttt{interbank.py --save result --output_format csv --log DEBUG --logfile result.txt}: Save the results in \texttt{result.csv} in $CSV$ and the detailed log in \texttt{result.txt}.
+    \item \texttt{interbank.py --save result.gdt --stats\_market --detail\_banks 5,7}: Save the results in \texttt{result.gdt}, a second file \texttt{resultb.gdt} with the results for only banks and times participating really in the loans market is generated, and also a third file \texttt{result\_detailed.gdt} with the concrete statistics for banks 5 and 7.
+    With \texttt{--detail\_times 10,12} all specific details for all banks in times 10 and 12 are present in this third file.
+    \item \texttt{interbank.py --fast}: Use a fast mechanism to execute the model (useful when running big models or repetitions).
 \end{itemize}
 
 \section{Statistics}
