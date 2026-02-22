@@ -64,9 +64,9 @@
   use of parallelism.
 
 - `exp_runner_comparer.py`: A derivation of the former prototype though
-  to compare the evolution with `p` (probability of attachment in an
-  Erdos-Renyi graph) in the `x` axis and other parameters accross the
-  `y` axis.
+  to compare the evolution with $p_a$ (probability of attachment in an
+  Erdos-Renyi graph) in the $x$ axis and other parameters across the $y$
+  axis.
 
 - `exp_runner_surviving.py`: A derivation of the former prototype using
   ray library to execute in a cluster.
@@ -120,21 +120,25 @@ that statistic is obtained</figcaption>
 
 - `interbank.py --seed 1234 --t 500 --p 0.2`: Execute the model with
   $T=500$ and $LenderChange$ algorithm of $ShockedMarket3$ with an
-  Erdös-Réni with probability of attachment of $0.2$ and using a seed
+  Erdös-Réni with probability of attachment $p_a=0.2$ and using a seed
   for generating random values of $1234$ (same results if you generate
   again with other equal parameters and repeat this integer number for
   seed).
 
-- `interbank.py --save file.gdt --log DEBUG --logfile file.txt`: Save
-  the results in `file.gdt` in $CSV$ and the detailed log in `file.txt`.
+- `interbank.py --save result --output_format csv --log DEBUG --logfile result.txt`:
+  Save the results in `result.csv` in $CSV$ and the detailed log in
+  `result.txt`.
 
-- `interbank.py --save file.gdt --stats_market --detail_banks 5,7`: Save
-  the results in `file.gdt`, a second file `fileb.gdt` with the results
-  for only banks and times participating really in the loans market is
-  generated, and also a third file `file_detailed.gdt` with the concrete
-  statistics for banks 5 and 7. With `--detail_times 10,12` all specific
-  details for all banks in times 10 and 12 are present in this third
-  file.
+- `interbank.py --save result.gdt --stats_market --detail_banks 5,7`:
+  Save the results in `result.gdt`, a second file `resultb.gdt` with the
+  results for only banks and times participating really in the loans
+  market is generated, and also a third file `result_detailed.gdt` with
+  the concrete statistics for banks 5 and 7. With `--detail_times 10,12`
+  all specific details for all banks in times 10 and 12 are present in
+  this third file.
+
+- `interbank.py --fast`: Use a fast mechanism to execute the model
+  (useful when running big models or repetitions).
 
 # Statistics
 
@@ -204,8 +208,8 @@ usage. Possible statistics obtained from the model are:
 - **num_banks**: Number of banks currently surviving in the model
   (interesting when **allow_replacement_of_bankrupted=False**)
 
-- **num_loans**: Num of loans in this step. Both global and **stats
-  values \_market** will be the same
+- **num_loans**: Num of loans in this step. Both global and
+  **stats_market** will be the same
 
 - **num_of_rationed**: Number of banks that were rationed in this step
   (needed money and were without any possible lender)
@@ -218,16 +222,16 @@ usage. Possible statistics obtained from the model are:
   connections between banks, then **number_of_edges()** in the graph
 
 - **potential_lenders**: Number of banks in the first shock having a
-  possitive shock ($\Delta D$)
+  positive shock ($\Delta D$)
 
-- **prob_bankruptcy**: Probability of bankruptcy $p=\frac{E}{E_{max}}$,
-  between $[0..1]$
+- **prob_bankruptcy**: Probability of bankruptcy
+  $p_b=1-\frac{E}{E_{max}}$, between $[0..1]$
 
 - **profits**: Profits obtained in that step
 
 - **psi**: Power market ($psi$) value $[0..1]$
 
-- **rationing**: Total amounf of the loans $l$ of the banks
+- **rationing**: Total amount of the loans $l$ of the banks
 
 - **real_t**: Times in which are no loans are removed in the extra
   statistics generated when we use **--stats_market**. Real $t$ instants
@@ -239,8 +243,9 @@ usage. Possible statistics obtained from the model are:
 - **systemic_leverage**: Financial leverage but considering in the mean
   the total banks of the model $N$
 
-The different statistics of information obtained in table
-[1](#table1){reference-type="ref" reference="table1"} are classified as:
+The different statistics of information obtained in
+table [1](#table1){reference-type="ref" reference="table1"} are
+classified as:
 
 - Global: using **--save filename**: each data column in
   **filename.gdt** will be obtained for all the $N$ banks in the model
@@ -253,55 +258,56 @@ The different statistics of information obtained in table
   which was the original time.
 
 - Individual is data obtained when we use **--detail_times** or
-  **--detail_banks** and it stores **filename_detailed.gdt** of those
+  **--detail_banks**, and it stores **filename_detailed.gdt** of those
   moments for all the banks individually or specific banks.
 
-- Graphs are data obtained also in **filename.gdt** but only we have a
+- Graphs are data obtained also in **filename.gdt**, but only we have a
   **LenderChange** algorithm with a random graph.
 
 ::: {#table1}
-|  |  |  |  |  |  |
-|:---|:--:|:--:|:--:|:--:|:--:|
-| Name | Type | Global | **stats_market** | Individual | Graphs |
-| **active_borrowers** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **active_lenders** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **asset_i** | float | $\overline{x}/0$ | $\overline{x}/0$ | $\checkmark$ |  |
-| **asset_j** | float | $\overline{x}/0$ | $\overline{x}/0$ | $\checkmark$ |  |
-| **bad_debt** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
-| **bankruptcies** | integer | $\sum$ | $\sum$ | $\checkmark$ |  |
-| **bankrupcty_rationed** | integer | $\sum$ | $\sum$ |  |  |
-| **best_lender** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **best_lender_clients** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **c** | float | $\overline{x}/nan$ | $\overline{x}/nan$ |  |  |
-| **communities** | integer |  |  |  | $\checkmark$ |
-| **communities_not_alone** | integer |  |  |  | $\checkmark$ |
-| **deposits** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
-| **equity** | float | $\sum$ | $\sum$ |  |  |
-| **fitness** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
-| **gcs** | integer |  |  |  | $\checkmark$ |
-| **grade_avg** | integer |  |  |  | $\checkmark$ |
-| **incrementD** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
-| **interest_rate** | float | $\overline{x}/0$ | $\overline{x} / nan$ | $\checkmark$ |  |
-| **l_equity** | float | $\sum$ | $\sum$ |  |  |
-| **leverage** / **leverage\_** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
-| **liquidity** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
-| **loans** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
-| **num_banks** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **num_loans** | integer | $\checkmark$ | $\checkmark$ | $\checkmark$ |  |
-| **num_of_rationed** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **policy** | float | $\checkmark$ | $\checkmark$ |  |  |
-| **potential_credit_channels** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **potential_lenders** | integer | $\checkmark$ | $\checkmark$ |  |  |
-| **prob_bankruptcy** | float | $\checkmark$ | $\checkmark$ | $\checkmark$ |  |
-| **profits** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
-| **psi** | float | $\checkmark/0$ | $\checkmark/nan$ |  | $\checkmark$ |
-| **rationing** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
-| **real_t** | integer |  | $\checkmark$ |  |  |
-| **reserves** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
-| **systemic_leverage** | float | $\overline{x}$ | $\overline{x}$ |  |  |
+  ------------------------------- --------- -------------------- ---------------------- -------------- --------------
+  Name                              Type           Global           **stats_market**      Individual       Graphs
+  **active_borrowers**             integer      $\checkmark$          $\checkmark$                     
+  **active_lenders**               integer      $\checkmark$          $\checkmark$                     
+  **asset_i**                       float     $\overline{x}/0$      $\overline{x}/0$     $\checkmark$  
+  **asset_j**                       float     $\overline{x}/0$      $\overline{x}/0$     $\checkmark$  
+  **bad_debt**                      float          $\sum$                $\sum$          $\checkmark$  
+  **bankruptcies**                 integer         $\sum$                $\sum$          $\checkmark$  
+  **bankrupcty_rationed**          integer         $\sum$                $\sum$                        
+  **best_lender**                  integer      $\checkmark$          $\checkmark$                     
+  **best_lender_clients**          integer      $\checkmark$          $\checkmark$                     
+  **c**                             float    $\overline{x}/nan$    $\overline{x}/nan$                  
+  **communities**                  integer                                                              $\checkmark$
+  **communities_not_alone**        integer                                                              $\checkmark$
+  **deposits**                      float          $\sum$                $\sum$          $\checkmark$  
+  **equity**                        float          $\sum$                $\sum$                        
+  **fitness**                       float      $\overline{x}$      $\overline{x}/nan$    $\checkmark$  
+  **gcs**                          integer                                                              $\checkmark$
+  **grade_avg**                    integer                                                              $\checkmark$
+  **incrementD**                    float          $\sum$                $\sum$                         $\checkmark$
+  **interest_rate**                 float     $\overline{x}/0$    $\overline{x} / nan$   $\checkmark$  
+  **l_equity**                      float          $\sum$                $\sum$                        
+  **leverage** / **leverage\_**     float      $\overline{x}$      $\overline{x}/nan$    $\checkmark$  
+  **liquidity**                     float          $\sum$                $\sum$          $\checkmark$  
+  **loans**                         float          $\sum$                $\sum$          $\checkmark$  
+  **num_banks**                    integer      $\checkmark$          $\checkmark$                     
+  **num_loans**                    integer      $\checkmark$          $\checkmark$       $\checkmark$  
+  **num_of_rationed**              integer      $\checkmark$          $\checkmark$                     
+  **policy**                        float       $\checkmark$          $\checkmark$                     
+  **potential_credit_channels**    integer      $\checkmark$          $\checkmark$                     
+  **potential_lenders**            integer      $\checkmark$          $\checkmark$                     
+  **prob_bankruptcy**               float       $\checkmark$          $\checkmark$       $\checkmark$  
+  **profits**                       float          $\sum$                $\sum$                         $\checkmark$
+  **psi**                           float      $\checkmark/0$       $\checkmark/nan$                    $\checkmark$
+  **rationing**                     float          $\sum$                $\sum$                         $\checkmark$
+  **real_t**                       integer                            $\checkmark$                     
+  **reserves**                      float          $\sum$                $\sum$                         $\checkmark$
+  **systemic_leverage**             float      $\overline{x}$        $\overline{x}$                    
+  ------------------------------- --------- -------------------- ---------------------- -------------- --------------
 
-:  Legend for the different columns are: $\checkmark$=value without any
-modification. $\sum$=sum of the value for all banks. $\overline{x}$ =
-average of the value for all banks. $0$ = No banks in this statistic.
-$nan$=Instead of zero, the value of \"not a number\" is used
+  :  Legend for the different columns are: $\checkmark$=value without
+  any modification. $\sum$=sum of the value for all banks.
+  $\overline{x}$ = average of the value for all banks. $0$ = No banks in
+  this statistic. $nan$=Instead of zero, the value of \"not a number\"
+  is used
 :::

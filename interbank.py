@@ -504,7 +504,7 @@ class Statistics:
             if self.stats_market and not bank.is_real_lender_or_borrower():
                 continue
             if not bank.failed:
-                probabilities_bankruptcy.append(1 - bank.E / maxE)
+                probabilities_bankruptcy.append(1 - bank.prob_surviving)
                 lender_capacities.append(np.mean(bank.c_avg_ir))
             if self.P is not None:
                 probabilities_lc.append(bank.P)
@@ -1615,9 +1615,9 @@ class Model:
         self.maxE = max(self.banks, key=lambda k: k.E).E
         for bank in self.banks:
             if self.config.p_avg_ir:
-                bank.prob_bankruptcy = self.config.p_avg_ir
+                bank.prob_surviving = self.config.p_avg_ir
             else:
-                bank.prob_bankruptcy = bank.E / self.maxE
+                bank.prob_surviving = bank.E / self.maxE
             if bank.get_lender() is not None and bank.get_lender().l > 0:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
@@ -1649,7 +1649,7 @@ class Model:
                     if j == bank_i.id:
                         bank_i.rij[j] = 0
                     else:
-                        if self.banks[j].prob_bankruptcy == 0 or bank_i.c_avg_ir[j] == 0:
+                        if self.banks[j].prob_surviving == 0 or bank_i.c_avg_ir[j] == 0:
                             bank_i.rij[j] = self.config.r_i0
                         else:
                             psi = bank_i.psi if self.config.psi_endogenous else self.config.psi
@@ -1657,7 +1657,7 @@ class Model:
                             asset_j = self.banks[j].A if not self.config.asset_j_avg_ir else self.config.asset_j_avg_ir
                             c = bank_i.c_avg_ir[j] if not self.config.c_avg_ir else self.config.c_avg_ir
                             p = self.banks[
-                                j].prob_bankruptcy  # if not self.config.prob_bankruptcy else self.config.prob_bankruptcy
+                                j].prob_surviving  # if not self.config.prob_surviving else self.config.prob_surviving
                             bank_i.rij[j] = ((self.config.chi * asset_i - self.config.phi * asset_j
                                               - (1 - p) * (
                                                       self.config.xi * asset_j - c)) * (1 + psi)
@@ -1746,7 +1746,7 @@ class Bank:
         self.p = 0
         self.R = self.model.config.reserves * self.D
         self.C = self.D + self.E - self.L - self.R
-        self.prob_bankruptcy = 0
+        self.prob_surviving = 0
         self.mu = 0
         self.l = 0
         self.s = 0
@@ -1881,12 +1881,12 @@ class ModelOptimized(Model):
     """
 
     def _calculate_rij(self, bank_i, bank_j, c_ij, psi):
-        if bank_j.prob_bankruptcy == 0 or c_ij == 0:
+        if bank_j.prob_surviving == 0 or c_ij == 0:
             return self.config.r_i0
 
         numerator = ((self.config.chi * bank_i.A - self.config.phi * bank_j.A -
-                      (1 - bank_j.prob_bankruptcy) * (self.config.xi * bank_j.A - c_ij))) * (1 + psi)
-        denominator = bank_j.prob_bankruptcy * c_ij
+                      (1 - bank_j.prob_surviving) * (self.config.xi * bank_j.A - c_ij))) * (1 + psi)
+        denominator = bank_j.prob_surviving * c_ij
 
         if denominator == 0:
             return self.config.r_i0
@@ -1910,7 +1910,7 @@ class ModelOptimized(Model):
                     continue
 
                 bank_j = self.banks[j]
-                p_j = bank_j.prob_bankruptcy
+                p_j = bank_j.prob_surviving
                 c_ij = bank_i.c_avg_ir[j]
                 A_j = bank_j.A
                 bank_i.rij[j] = self._calculate_rij(bank_i, bank_j, c_ij, psi)
