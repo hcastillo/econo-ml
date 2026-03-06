@@ -6,6 +6,7 @@
 \usepackage{xcolor}
 \usepackage{amssymb}
 \usepackage{graphicx}
+\usepackage{pdfpages}
 
 
 \title{econo-ml: Reinforce Learning Policy Recommendation for Interbank Network Stability}
@@ -94,10 +95,9 @@ run_ppo.py --load ppo_10000 --save results_ppo.txt
 
 \section{Basic usage of the model}
 
-
 \begin{figure}[htb]
   \centering
-  \includegraphics[width=\textwidth,keepaspectratio]{algorithm.png}
+  \includegraphics[width=\textwidth,keepaspectratio]{doc/alg-000001}
   \caption{Sequence of steps: grey boxes indicates moments in which that statistic is obtained}
   \label{fig:algorithm}
 \end{figure}
@@ -129,8 +129,9 @@ This statistics collect data in each time for the average or individually, depen
     \item \textbf{c}: Lender capacity ($1 - \frac{E}{maxE}$) of the bank
     \item \textbf{communities}: Subsets of nodes with higher internal edge density than connections to the rest of the graph
     \item \textbf{communities\_not\_alone}:  Number of \textbf{communities} that are not formed by only one node
-    \item \textbf{deposits}: Deposits $D$ in the balance $L + C + R = D + E$
-    \item \textbf{equity}: Equity $E$ of the bank: $L + C + R = D + E$
+    \item \textbf{deposits}: Sum of deposits $D$ of banks (of their balance $L + C + R = D + E$)
+    \item \textbf{equity}: Sum of equity $E$ of all banks: $L + C + R = D + E$
+    \item \textbf{equity\_lenders}: Average $E$ of banks who are lenders
     \item \textbf{fitness}: Fitness ($\mu$) of the bank
     \item \textbf{gcs}: When we use an Erdös–Rényi graph, the Giant Component Size is the largest number of nodes that are interconnected.
     \item \textbf{grade\_avg}: Average number of edges (connections) for the total banks
@@ -140,6 +141,7 @@ This statistics collect data in each time for the average or individually, depen
     \item \textbf{leverage}: Financial leverage ($l/E$) of the bank considering only the banks that are inside a loan, named \textbf{leverage\_} in Gretl due to name restrictions of the environment.
     \item \textbf{liquidity}: Total liquidity $L$ of the Banks  $L + C + R = D + E$
     \item \textbf{loans}: Amount borrowed by the bank
+    \item \textbf{maxE}: $E_{max}$ of the system
     \item \textbf{num\_banks}: Number of banks currently surviving in the model (interesting when \textbf{allow\_replacement\_of\_bankrupted=False})
     \item \textbf{num\_loans}:  Num of loans in this step. Both global and \textbf{stats\_market} will be the same
     \item \textbf{num\_of\_rationed}: Number of banks that were rationed in this step (needed money and were without any possible lender)
@@ -148,7 +150,7 @@ This statistics collect data in each time for the average or individually, depen
     \item \textbf{potential\_lenders}: Number of banks in the first shock having a positive shock ($ \Delta D$)
     \item \textbf{prob\_bankruptcy}: Probability of bankruptcy $p_b=1-\frac{E}{E_{max}}$, between $[0..1]$
     \item \textbf{profits}: Profits obtained in that step
-    \item \textbf{psi}: Power market ($psi$) value $[0..1]$
+    \item \textbf{psi}: Power market ($psi$) of the banks who are lenders, value $[0..1]$
     \item \textbf{rationing}: Total amount of the loans $l$ of the banks
     \item \textbf{real\_t}: Times in which are no loans are removed in the extra statistics generated when we use \textbf{--stats\_market}. Real $t$ instants of time are stored in this variable to track when were really those values are obtained in the original statistics.
     \item \textbf{reserves}: Reserves $R$ in the balance $L + C + R = D + E$
@@ -185,6 +187,7 @@ Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{communities\_not\_alone} & integer &  &   &  & $\checkmark$ \\
 \textbf{deposits}          & float & $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
 \textbf{equity}            & float &  $ \sum$ &  $ \sum$ &  & \\
+\textbf{equity\_lenders}            & float &  $\overline{x}$ &  &  & \\
 \textbf{fitness}           & float & $\overline{x}$ & $\overline{x}/nan $ &  $\checkmark$  & \\
 \textbf{gcs}               & integer &  &   &  & $\checkmark$ \\
 \textbf{grade\_avg}        & integer &  &   &  & $\checkmark$\\
@@ -194,6 +197,7 @@ Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{leverage} / \textbf{leverage\_}         & float  &  $\overline{x}$ & $\overline{x}/nan $  & $\checkmark$  &  \\
 \textbf{liquidity}         &  float &  $\sum$ &  $\sum$ &  $\checkmark$ &    \\
 \textbf{loans}             & float &  $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
+\textbf{maxE}        &  float &  $\checkmark$ & $\checkmark$ &  & \\
 \textbf{num\_banks}        &  integer &  $\checkmark$ & $\checkmark$ &  & \\
 \textbf{num\_loans}        &  integer &  $ \checkmark$ &  $\checkmark$ & $\checkmark$ &  \\
 \textbf{num\_of\_rationed} & integer &  $\checkmark$ & $\checkmark$ &  & \\

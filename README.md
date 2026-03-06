@@ -113,7 +113,7 @@
 # Basic usage of the model
 
 <figure id="fig:algorithm" data-latex-placement="htb">
-<img src="algorithm.png" />
+<img src="doc/alg-000001.png" />
 <figcaption>Sequence of steps: grey boxes indicates moments in which
 that statistic is obtained</figcaption>
 </figure>
@@ -179,9 +179,12 @@ usage. Possible statistics obtained from the model are:
 - **communities_not_alone**: Number of **communities** that are not
   formed by only one node
 
-- **deposits**: Deposits $D$ in the balance $L + C + R = D + E$
+- **deposits**: Sum of deposits $D$ of banks (of their balance
+  $L + C + R = D + E$)
 
-- **equity**: Equity $E$ of the bank: $L + C + R = D + E$
+- **equity**: Sum of equity $E$ of all banks: $L + C + R = D + E$
+
+- **equity_lenders**: Average $E$ of banks who are lenders
 
 - **fitness**: Fitness ($\mu$) of the bank
 
@@ -204,6 +207,8 @@ usage. Possible statistics obtained from the model are:
 - **liquidity**: Total liquidity $L$ of the Banks $L + C + R = D + E$
 
 - **loans**: Amount borrowed by the bank
+
+- **maxE**: $E_{max}$ of the system
 
 - **num_banks**: Number of banks currently surviving in the model
   (interesting when **allow_replacement_of_bankrupted=False**)
@@ -229,7 +234,8 @@ usage. Possible statistics obtained from the model are:
 
 - **profits**: Profits obtained in that step
 
-- **psi**: Power market ($psi$) value $[0..1]$
+- **psi**: Power market ($psi$) of the banks who are lenders, value
+  $[0..1]$
 
 - **rationing**: Total amount of the loans $l$ of the banks
 
@@ -282,6 +288,7 @@ classified as:
 | **communities_not_alone** | integer |  |  |  | $\checkmark$ |
 | **deposits** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
 | **equity** | float | $\sum$ | $\sum$ |  |  |
+| **equity_lenders** | float | $\overline{x}$ |  |  |  |
 | **fitness** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
 | **gcs** | integer |  |  |  | $\checkmark$ |
 | **grade_avg** | integer |  |  |  | $\checkmark$ |
@@ -291,6 +298,7 @@ classified as:
 | **leverage** / **leverage\_** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
 | **liquidity** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
 | **loans** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
+| **maxE** | float | $\checkmark$ | $\checkmark$ |  |  |
 | **num_banks** | integer | $\checkmark$ | $\checkmark$ |  |  |
 | **num_loans** | integer | $\checkmark$ | $\checkmark$ | $\checkmark$ |  |
 | **num_of_rationed** | integer | $\checkmark$ | $\checkmark$ |  |  |

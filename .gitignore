@@ -24,4 +24,5 @@ texput.log
 tests/*.gdt
 tests/tests/
 tests/output/
-
+doc/*.log
+doc/*.aux

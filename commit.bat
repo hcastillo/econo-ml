@@ -12,11 +12,13 @@ if %errorlevel%==0 (
  jupytext interbank_lenderchange.py -o lc.ipynb
  nbmerge lc.ipynb inter.ipynb --out colab_interbank.ipynb
  del inter.ipynb lc.ipynb inter.py
- pandoc doc\README.tex -t markdown+pipe_tables-simple_tables-multiline_tables -o README.md
- powershell -command "(Get-Content readme.md) -replace 'algorithm.png','doc/algorithm.png' | Out-File -encoding Default README.md"
+ rem powershell -command "(Get-Content readme.md) -replace 'algorithm.png','doc/algorithm.png' | Out-File -encoding Default README.md"
  cd doc
- pdflatex README.tex
+ pdflatex algorithm.tex
+ del alg-000001.png
+ pdftopng -r 300 algorithm.pdf alg
  cd ..
+ pandoc doc\README.tex -t markdown+pipe_tables-simple_tables-multiline_tables -o README.md
  git add .
  git commit -a
  git push

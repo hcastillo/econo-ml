@@ -265,6 +265,8 @@ class Statistics:
         self.asset_i = np.zeros(self.model.config.T, dtype=float)
         self.asset_j = np.zeros(self.model.config.T, dtype=float)
         self.equity = np.zeros(self.model.config.T, dtype=float)
+        self.equity_lenders = np.zeros(self.model.config.T, dtype=float)
+        self.maxE = np.zeros(self.model.config.T, dtype=float)
         self.incrementD = np.zeros(self.model.config.T, dtype=float)
         self.liquidity = np.zeros(self.model.config.T, dtype=float)
         self.rationing = np.zeros(self.model.config.T, dtype=float)
@@ -342,7 +344,7 @@ class Statistics:
         if self.statistics_stats_market:
             self.statistics_stats_market.compute_potential_lenders()
 
-    def compute_interest_rates_and_loans(self):
+    def compute_interest_rates_and_loans_equity_lenders(self):
         asset_i = []
         asset_j = []
         sum_of_loans = 0
@@ -351,14 +353,24 @@ class Statistics:
         num_of_banks_that_are_lenders = 0
         num_of_banks_that_are_borrowers = 0
         psi = []
+        equity_lenders = []
+
+        if self.model.config.psi_endogenous:
+            self.model.maxE = 0
+            for bank in self.model.banks:
+                if self.model.maxE<bank.E:
+                    self.model.maxE = bank.E
+            for bank in self.model.banks:
+                bank.psi = bank.E / self.model.maxE
+
         for bank in self.model.banks:
             if self.stats_market and not bank.is_real_lender_or_borrower():
                 continue
-            if self.model.config.psi_endogenous:
-                self.compute_individual_banks_statistics(bank, 'psi', bank.psi)
-                psi.append(bank.psi)
             if bank.incrD >= 0:
                 if bank.active_borrowers:
+                    if self.model.config.psi_endogenous:
+                        self.compute_individual_banks_statistics(bank, 'psi', bank.psi)
+                        psi.append(bank.psi)
                     asset_i.append(bank.asset_i_avg_ir)
                     self.compute_individual_banks_statistics(bank, 'asset_i', bank.asset_i_avg_ir)
             elif bank.d > 0:
@@ -374,11 +386,13 @@ class Statistics:
                 self.compute_individual_banks_statistics(bank, 'loans', this_bank_loans)
                 self.compute_individual_banks_statistics(bank, 'num_loans', this_bank_loans)
                 sum_of_loans += this_bank_loans
+                if sum_of_loans > 0:
+                    equity_lenders.append(bank.E)
                 num_loans += this_bank_num_loans
             elif bank.l > 0:
                 self.compute_individual_banks_statistics(bank, 'l', bank.l)
                 num_of_banks_that_are_borrowers += 1
-            if bank.get_loan_interest():
+            if bank.get_loan_interest() and bank.s>0:
                 self.compute_individual_banks_statistics(bank, 'interest_rate', bank.get_loan_interest())
                 interest_rates.append(bank.get_loan_interest())
         self.interest_rate[self.model.t] = np.mean(interest_rates) if interest_rates else \
@@ -391,10 +405,12 @@ class Statistics:
             self.psi[self.model.t] = self.model.config.psi
         self.loans[self.model.t] = sum_of_loans
         self.num_loans[self.model.t] = num_loans
+        self.equity_lenders[self.model.t] = np.mean(equity_lenders) if equity_lenders \
+            else (np.nan if self.stats_market else 0.0)
         self.active_lenders[self.model.t] = num_of_banks_that_are_lenders
         self.active_borrowers[self.model.t] = num_of_banks_that_are_borrowers
         if self.statistics_stats_market:
-            self.statistics_stats_market.compute_interest_rates_and_loans()
+            self.statistics_stats_market.compute_interest_rates_and_loans_equity_lenders()
 
     def compute_leverage(self):
         leverage_of_lenders = []
@@ -497,6 +513,7 @@ class Statistics:
                 continue
             if bank.E > maxE:
                 maxE = bank.E
+
         probabilities_bankruptcy = []
         probabilities_lc = []
         lender_capacities = []
@@ -504,8 +521,10 @@ class Statistics:
             if self.stats_market and not bank.is_real_lender_or_borrower():
                 continue
             if not bank.failed:
-                probabilities_bankruptcy.append(1 - bank.prob_surviving)
-                lender_capacities.append(np.mean(bank.c_avg_ir))
+                if bank.s > 0:
+                    lender_capacities.append(np.mean(bank.c_avg_ir))
+                else:
+                    probabilities_bankruptcy.append(1 - bank.prob_surviving)
             if self.P is not None:
                 probabilities_lc.append(bank.P)
         if type(self) is not StatisticsOnlyMarket:
@@ -516,8 +535,13 @@ class Statistics:
             self.P_max[self.model.t] = max(probabilities_lc)
             self.P_min[self.model.t] = min(probabilities_lc)
         self.c[self.model.t] = np.mean(lender_capacities) if lender_capacities else np.nan
-        # probabilities have banks that are not failed:
         self.num_banks[self.model.t] = len(probabilities_bankruptcy)
+        self.maxE[self.model.t] = maxE
+        #TODO
+        #cadena = f"t={self.model.t} > "
+        #for bank in self.model.banks:
+        #    cadena += f" #{bank.id} E={bank.E},psi={bank.psi},incrD={bank.incrD}"
+        #print(cadena)
         if self.statistics_stats_market:
             self.statistics_stats_market.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
 
@@ -540,6 +564,11 @@ class Statistics:
         self.profits[self.model.t] = total_profits
         if self.statistics_stats_market:
             self.statistics_stats_market.compute_profits(total_profits)
+
+    def compute_equity_lenders(self, avg_equity_lenders):
+        self.equity_lenders[self.model.t] = avg_equity_lenders
+        if self.statistics_stats_market:
+            self.statistics_stats_market.compute_equity_lenders(avg_equity_lenders)
 
     def compute_rationed_rationing(self, num_of_rationed, amount_rationed):
         self.num_of_rationed[self.model.t] = num_of_rationed
@@ -1219,8 +1248,8 @@ class Model:
         self.do_shock('shock1')
         self.statistics.compute_potential_lenders()
         self.do_loans()
+        self.statistics.compute_interest_rates_and_loans_equity_lenders()
         self.log.debug_banks()
-        self.statistics.compute_interest_rates_and_loans()
         self.statistics.compute_leverage()
         self.do_shock('shock2')
         self.do_repayments()
@@ -1388,7 +1417,7 @@ class Model:
                     bank.s = bank.C
                 bank.d = 0
                 if bank.incrD > 0:
-                    self.log.debug(which_shock, '{} wins ΔD={}'.format(bank.get_id(), bank.incrD))
+                    self.log.debug(which_shock, '{} wins ΔD={:.4f}'.format(bank.get_id(), bank.incrD))
                 else:
                     self.log.debug(which_shock, '{} has no shock'.format(bank.get_id()))
             else:
@@ -1397,13 +1426,14 @@ class Model:
                 if bank.incrD - bank.incrR + bank.C >= 0:
                     bank.d = 0
                     bank.C += bank.incrD - bank.incrR
-                    self.log.debug(which_shock, '{} loses ΔD={}, covered by capital'.format(bank.get_id(), bank.incrD))
+                    self.log.debug(which_shock, '{} loses ΔD={:.4f}, covered by capital'.
+                                   format(bank.get_id(), bank.incrD))
                 else:
                     bank.d = abs(bank.incrD - bank.incrR + bank.C)
-                    self.log.debug(which_shock, '{} loses ΔD={} has C={} and needs {}'.format(
+                    self.log.debug(which_shock, '{} loses ΔD={:.4f} has C={:.4f} and needs {:.4f}'.format(
                         bank.get_id(), bank.incrD, bank.C, bank.d))
                     if which_shock == 'shock2':
-                        bank.do_fire_sales(bank.d, 'ΔD={},C=0 and we need {}'.format(
+                        bank.do_fire_sales(bank.d, 'ΔD={:.4f},C=0 and we need {:.4f}'.format(
                             bank.incrD, bank.d), which_shock)
                     else:
                         bank.C = 0
@@ -1539,6 +1569,8 @@ class Model:
                     del bank_lender.active_borrowers[bank.id]
                 bank_lender.s += bank.paid_loan
                 bank.E -= loan_profits
+
+
                 # we remove from borrower equity the amount we have paid as loan_profits to the
                 # lender to balance the sheet
                 total_profits += bank.paid_profits
@@ -1558,6 +1590,7 @@ class Model:
                     bank.do_fire_sales(bank.d, 'fire sales due to not enough C'.format(), 'repay')
         self.statistics.compute_profits(total_profits)
 
+
     def replace_bankrupted_banks(self):
         self.estimate_average_values_for_replacement_of_banks()
         self.statistics.compute_bad_debt()
@@ -1573,7 +1606,7 @@ class Model:
                     if possible_removed_bank.rationing == 0 and possible_removed_bank.lender is not None:
                         num_banks_failed_rationed += 1
                     lists_to_remove_because_replacement_of_bankrupted_is_disabled.append(possible_removed_bank)
-        self.log.debug('repay', 'this step ΔD={} and '.format(
+        self.log.debug('repay', 'this step ΔD={:.4f} and '.format(
             self.statistics.incrementD[self.t]) + 'failures={}'.format(total_removed))
         if not self.config.allow_replacement_of_bankrupted:
             for bank_to_remove in lists_to_remove_because_replacement_of_bankrupted_is_disabled:
@@ -1657,7 +1690,7 @@ class Model:
                             asset_j = self.banks[j].A if not self.config.asset_j_avg_ir else self.config.asset_j_avg_ir
                             c = bank_i.c_avg_ir[j] if not self.config.c_avg_ir else self.config.c_avg_ir
                             p = self.banks[
-                                j].prob_surviving  # if not self.config.prob_surviving else self.config.prob_surviving
+                                j].prob_surviving if not self.config.p_avg_ir else self.config.p_avg_ir
                             bank_i.rij[j] = ((self.config.chi * asset_i - self.config.phi * asset_j
                                               - (1 - p) * (
                                                       self.config.xi * asset_j - c)) * (1 + psi)
@@ -1788,12 +1821,13 @@ class Bank:
                     self.model.statistics.compute_another_bankruptcy(
                         self.get_lender(),
                         f"borrower {self.get_id()} fails without returning loan and E={self.get_lender().E}")
-                    self.model.log.debug(phase,
-                                         '{} lender is bankrupted  borrower {} does not return loan and lender E<0: {}'.
+                    self.model.log.debug(phase, '{} lender is bankrupted borrower {} not return loan and E<0: {:.4f}'.
                                          format(self.get_lender().get_id(), self.get_id(), self.get_lender().E))
                     self.get_lender().failed = True
                 self.get_lender().C += recovered
-                self.model.log.debug(phase, '{} bankrupted (fire sale={},recovers={},paidD={})(lender{}.ΔB={},ΔC={})'.
+                self.model.log.debug(phase,
+                                     '{} bankrupted (fire sale={:.4f},recovers={:.4f},paidD={:.4f})'
+                                     '(lender{}.ΔB={:.4f},ΔC={:.4f})'.
                                      format(self.get_id(), recovered_in_fire_sales, recovered, self.D,
                                             self.get_lender().get_id(short=True), bad_debt, recovered))
                 self.model.statistics.compute_another_bankruptcy(
@@ -1813,25 +1847,25 @@ class Bank:
         cost_of_sell = (amount_to_sell / self.model.config.rho) if self.model.config.rho else np.inf
         extra_cost_of_selling = cost_of_sell * (1 - self.model.config.rho)
         if cost_of_sell > self.L:
-            self.model.log.debug(phase, '{} impossible fire sale to recover {}: cost_sell_L={} > L={}: {}'.format(
-                self.get_id(), amount_to_sell, cost_of_sell, self.L, reason))
+            self.model.log.debug(phase, '{} impossible fire sale to recover {:.4f}: cost_sell_L={:.4f} > L={:.4f}: {}'
+                                 .format(self.get_id(), amount_to_sell, cost_of_sell, self.L, reason))
             return self.do_bankruptcy(phase)
         else:
             self.L -= cost_of_sell
             self.E -= extra_cost_of_selling
-            self.model.log.debug(phase, '{} fire sales {} so L-={} and affects to E-={}'.format(
+            self.model.log.debug(phase, '{} fire sales {:.4f} so L-={:.4f} and affects to E-={:.4f}'.format(
                 self.get_id(), amount_to_sell, cost_of_sell, extra_cost_of_selling))
             if self.L <= self.model.config.alfa:
                 self.model.log.debug(phase,
-                                     '{} new L={} is under threshold {} and makes bankruptcy of bank: {}'.format(
-                                         self.get_id(), self.L, self.model.config.alfa, reason))
+                                     '{} new L={:.4f} is under threshold {} and makes bankruptcy of bank: {}'.
+                                     format(self.get_id(), self.L, self.model.config.alfa, reason))
                 self.do_bankruptcy(phase)
                 return amount_to_sell
             else:
                 if self.E <= self.model.config.alfa:
                     self.model.log.debug(phase,
-                                         '{} new E={} is under threshold {} and makes bankruptcy of bank: {}'.format(
-                                             self.get_id(), self.E, self.model.config.alfa, reason))
+                                         '{} new E={:.4f} is under threshold {:.4f} and makes bankruptcy of bank: {}'.
+                                         format(self.get_id(), self.E, self.model.config.alfa, reason))
                     self.do_bankruptcy(phase)
                 return amount_to_sell
 
@@ -1856,8 +1890,10 @@ class Bank:
             text += '        '
         if details and hasattr(self, 's') and self.s:
             text += ' s={}'.format(Log.__format_number__(self.s))
+            if self.model.config.psi_endogenous and self.psi:
+                text += ' psi={}'.format(Log.__format_number__(self.psi))
         elif details and hasattr(self, 'd') and self.d:
-            text += ' d={}'.format(Log.__format_number__(self.d))
+            text += ' d={} p={}'.format(Log.__format_number__(self.d),Log.__format_number__(1-self.prob_surviving))
         else:
             text += '        '
         if self.failed:
@@ -1866,12 +1902,11 @@ class Bank:
             if self.get_lender() is None:
                 text += ' no lender'.format()
             else:
-                text += ' lender{},r={}%'.format(self.get_lender().get_id(short=True), self.get_loan_interest())
+                text += ' lender{},r={:.4f}%'.format(self.get_lender().get_id(short=True), self.get_loan_interest())
         else:
             text += list_borrowers
         text += ' B={}'.format(Log.__format_number__(self.B)) if self.B else '        '
-        if self.model.config.psi_endogenous and self.psi:
-            text += ' psi={}'.format(Log.__format_number__(self.psi))
+
         return text
 
 
