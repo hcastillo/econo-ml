@@ -64,16 +64,18 @@ remember picture, overlay,
   \texttt{model.simulate\_full()} \\$\forall t=0..T$};
 \node[block, below=of sim] (init) {
   \texttt{initialize\_step()}  };
-\node[block, below=of init] (shock1) {
+\node[block, below=of init] (links) {
+  \texttt{setup\_links()} };
+\node[block, below=of links] (shock1) {
   \texttt{do\_shock("shock1")}  };
-\node[block, below=of shock1] (loans) {
+\node[block, below=of shock1] (ir) {
+  \texttt{do\_interest\_rate()} };
+\node[block, below=2cm of ir] (loans) {
   \texttt{do\_loans()} };
-\node[block, below=of loans] (shock2) {
+\node[block, below=3cm of loans] (shock2) {
   \texttt{do\_shock("shock2")} };
 \node[block, below=of shock2] (repayments) {
   \texttt{do\_repayments()} };
-\node[block, below=4cm of repayments] (links) {
-  \texttt{setup\_links()} };
 \node[terminator, right=of sim] (finish) {
   \texttt{model.finish()} };
 
@@ -82,11 +84,12 @@ remember picture, overlay,
   potential\_lenders };
 
 \node[statistics, anchor=north east, at=(loans.south)] (loans_stats1) {
-  asset\_i asset\_j \\ psi\_lenders psi\_loans \\
-  active\_lenders/borrowers};
+  psi\_lenders psi\_loans \\
+  active\_lenders \\
+  active\_borrowers};
 
 \node[statistics, right=0cm of loans_stats1] (loans_stats2) {
-  interest\_rate  leverage\\
+  leverage loans\\
   equity\_lenders\\
   systemic\_leverage
 };
@@ -96,21 +99,37 @@ remember picture, overlay,
   bankruptcies \\
   equity fitness};
 
-\node[statistics, below=0cm of repayments_stats1] (repayments_stats2) {
+\node[statistics, right=0cm of repayments_stats1] (repayments_stats2) {
   policy deposits \\
   potential\_credit\_channels \\
   reserves
 };
-\node[statistics, anchor=north east, at=(links.south)] (links_stats) {
+\node[statistics, anchor=north east, at=(ir.south)] (ir_stats) {
   P P\_max P\_min P\_std \\
-  prob\_bankruptcy };
+  prob\_bankruptcy \\
+  asset\_i asset\_j \\
+  interest\_rate };
 
 
 \node[textnode, right=of start] (start_text) {
-  Initial rate: $r^i_0$ };
+  Initial conditions for each bank $r^i_0=0.02$:
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        $C^i_0= 30-2.7 = 27.3$ &  $D^i_0= 135$\\
+        $L^i_0= 120$  & $E^i_0= 15$ \\
+        $R= 0.02 D^i_0 = 2.7$  &
+    \end{tabular}  };
 
 
-\node[textnode, right=of init] (init_text) { $bank.B=0$};
+\node[textnode, right=of init] (init_text) {
+    $bank.B=0$ \\
+    $bank.rationing=0$ \\
+    $bank.active\_borrowers=0 ... $
+    };
+
+\node[textnode, right=of links] (links_text) {
+    Using Barabási–Albert graph of $m$ edges or Erdös-Rényi graph with probability of attachment $p_a$.};
+
 
 \node[textnode, right=of shock1] (shock1_text) {
   $ D^i_t = D^i_{t-1} \left( \mu + \omega U(0,1) \right )$
@@ -121,8 +140,29 @@ remember picture, overlay,
  };
 
 
+
+\node[textnode, right=of shock1_text] (shock2_text) {
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        $C^i_t\uparrow$ if $\Delta D>0$ &  $D^i_t$\\
+        $L^i_t$  & $E^i_t$ \\
+        $R^i_t\uparrow$ if $\Delta D>0$  & $d$ (demand of loan $\Delta D<0$)
+    \end{tabular}  };
+
 \node[decision, right=of loans] (loans_text1) {
   $bank.d>0$? };
+
+
+
+\node[textnode, below=of loans_text1] (loans_text5) {
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        $C^i_t$ &  $D^i_t$\\
+        $L^i_t$  & $E^i_t$ \\
+        $R^i_t$  & $l$ (loan if borrower) \\
+        $s$ (loans if lender) &
+    \end{tabular}  };
+
 \node[decision, right=of loans_text1] (loans_text2) {
   $bank.d \le lender.s$? };
 \node[block, right=of loans_text2] (loans_text3) {
@@ -139,10 +179,18 @@ remember picture, overlay,
 \draw[->] (loans_text3) -- ++(0,-1.7) -- (loans_text4);
 % \draw[->] (loans_text4.west) -- ++(-1,0) |- ++(0,1.1) -- (loans);
 
-\node[textnode, right=of shock2] (shock2_text) {
+\node[textnode, right=of shock2] (shock2__text1) {
   $ D^i_t = D^i_{t-1} \left( \mu + \omega U(0,1) \right )$
  };
 
+
+\node[textnode, right=of shock2__text1] (shock2__text2) {
+   \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        $C^i_t \uparrow$ if $\Delta D>0$&  $D^i_t$\\
+        $L^i_t$  & $E^i_t$ \\
+        $R^i_t \uparrow$ if $\Delta D>0$  & $d$ (demand of loan if $\Delta D<0$)
+   \end{tabular}  };
 
 
 \node[decision, right=0.3cm of repayments] (repayments_text1) {
@@ -154,10 +202,23 @@ remember picture, overlay,
 \node[decision, below=0.4cm of repayments_text2] (repayments_text4) {
   $bank.d>0$?};
 
+
 \node[textnode, left=0.1cm of repayments_text4] (repayments_text7) { \\
 Equity updated: \\
 $E_t^i = E_{t-1}^i + \sum_{j} l_{t-1}^{i,j} r_{t-1}^{i,j} - \sum_{j \subseteq \theta_t^i} B_t^{i,j} - (1 - \rho) \tilde{L}_t^i$
     };
+
+
+\node[textnode, below=0.1cm of repayments_text7] (repayments_text8) { \\
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        $C^i_t \uparrow$ &  $D^i_t$\\
+        $L^i_t$  & $E^i_t$ \\
+        $R^i_t \uparrow$
+    \end{tabular}  };
+
+
+
 \node[decision, below=0.2cm of repayments_text4] (repayments_text5) {
   $bank.failed$?};
 \node[block, right=0.4cm of repayments_text5] (repayments_text6) {
@@ -173,24 +234,19 @@ $E_t^i = E_{t-1}^i + \sum_{j} l_{t-1}^{i,j} r_{t-1}^{i,j} - \sum_{j \subseteq \t
 \draw[->] (repayments_text5) -- node[below, font=\scriptsize] {Yes}  (repayments_text6);
 
 
-\node[textnode, right=0.3cm of links] (links_text1) {
+\node[textnode, right=0.3cm of ir] (ir_text1) {
   \quad \quad \quad \quad \quad \quad  $p_t^j=\frac{E^j_t}{E^{max}_t}$ \\
   $c^{i,j}_t=(1-h^i_j)A^j_t > 0$, if $(i,j) \in V_t$ \\
   $c^{i,j}_t=0$, otherwise \\
   $h^j_t=\frac{\lambda^j_t}{\lambda^{max}_t} $ \quad \quad \quad \quad
   $\lambda ^j_t=\frac{L^j_t}{E^j_t}$
  };
-\node[textnode, right=0.3cm of links_text1] (links_text2) {
+\node[textnode, right=0.3cm of ir_text1] (ir_text2) {
   Rate for next period of time: \\
   $r_t^{i,j} = \frac{\chi A_t^i - \phi A_t^j - (1 - p_t^j)(\xi A_t^j - c_t^{i,j})}{p_t^j c_t^{i,j}} (1 + \psi)$
  };
-\node[textnode, below=0.3cm of links_text2] (links_text3) {
-  Profits: \\
-  $\mu_t^i =  \eta_t \frac{C_t^i}{C^{max}_t}  + (1 - \eta_t) \frac{r^{min}_t}{r_t^i} $
- };
-\draw[->] (links) -- (links_text1);
-\draw[->, shorten >=1pt, shorten <=1pt] (links_text1) -- (links_text2);
-\draw[->] (links_text2) -- (links_text3);
+\draw[->] (ir) -- (ir_text1);
+\draw[->, shorten >=1pt, shorten <=1pt] (ir_text1) -- (ir_text2);
 
 
 
@@ -198,13 +254,14 @@ $E_t^i = E_{t-1}^i + \sum_{j} l_{t-1}^{i,j} r_{t-1}^{i,j} - \sum_{j \subseteq \t
 
 \draw[->] (start) -- (sim);
 \draw[->] (sim) -- (init);
-\draw[->] (init) -- (shock1);
-\draw[->] (shock1) -- (loans);
+\draw[->] (init) -- (links);
+\draw[->] (links) -- (shock1);
+\draw[->] (shock1) -- (ir);
+\draw[->] (ir) -- (loans);
 \draw[->] (loans) -- (shock2);
 \draw[->] (shock2) -- (repayments);
-\draw[->] (repayments) -- (links);
 \draw[->] (sim.east) -- (finish);
-\draw[->] (links.south) |- ++(0,-1) -- ++(-3,0) |- (sim.west);
+\draw[->] (repayments.south) |- ++(0,-1) -- ++(-3,0) |- (sim.west);
 
 \end{scope}
 \end{tikzpicture}

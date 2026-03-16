@@ -9,7 +9,7 @@ class InterbankTest(unittest.TestCase):
     shocks = []
     model = None
 
-    def configureTest(self, shocks: list, N: int = None, T: int = None, lc : str = None):
+    def configureTest(self, shocks: list, N: int = None, T: int = None, lc: str = None, seed=None):
         self.model = interbank.Model()
         if lc:
             self.model.config.lender_change = interbank_lenderchange.determine_algorithm(lc)
@@ -20,7 +20,7 @@ class InterbankTest(unittest.TestCase):
         if T:
             self.model.configure(T=T)
         self.model.log.define_log(log='DEBUG')
-        self.model.initialize()
+        self.model.initialize(seed=seed)
 
     def doTest(self):
         self.model.simulate_full()

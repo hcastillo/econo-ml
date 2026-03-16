@@ -355,14 +355,6 @@ class Statistics:
         psi = []
         equity_lenders = []
 
-        if self.model.config.psi_endogenous:
-            self.model.maxE = 0
-            for bank in self.model.banks:
-                if self.model.maxE<bank.E:
-                    self.model.maxE = bank.E
-            for bank in self.model.banks:
-                bank.psi = bank.E / self.model.maxE
-
         for bank in self.model.banks:
             if self.stats_market and not bank.is_real_lender_or_borrower():
                 continue
@@ -600,6 +592,7 @@ class Statistics:
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", scipy.stats.ConstantInputWarning)
+                    warnings.simplefilter("ignore", scipy.stats.NearConstantInputWarning)
                     self.correlation = [
                         # correlation_coefficient = [-1..1] and p_value < 0.10
                         scipy.stats.pearsonr(self.psi, self.interest_rate),
@@ -1243,10 +1236,13 @@ class Model:
 
     def forward(self):
         self.initialize_step()
+        self.setup_links()
         if self.backward_enabled:
             self.banks_backward_copy = copy.deepcopy(self.banks)
         self.do_shock('shock1')
         self.statistics.compute_potential_lenders()
+        if not isinstance(self.config.lender_change, lc.Boltzmann):
+            self.do_interest_rate()
         self.do_loans()
         self.statistics.compute_interest_rates_and_loans_equity_lenders()
         self.log.debug_banks()
@@ -1263,7 +1259,8 @@ class Model:
         self.statistics.compute_policy()
         self.statistics.compute_deposits_and_reserves()
         self.statistics.compute_replaced_banks(self.replace_bankrupted_banks())
-        self.setup_links()
+        if isinstance(self.config.lender_change, lc.Boltzmann):
+            self.do_interest_rate()
         self.statistics.compute_statistics_of_graph()
         self.statistics.compute_probability_of_lender_change_num_banks_prob_bankruptcy()
         self.log.debug_banks()
@@ -1441,7 +1438,6 @@ class Model:
 
     def do_loans(self):
         self.config.lender_change.extra_relationships_change(self)
-
         # first we normalize the banks interest rate if it is necessary:
         if self.config.normalize_interest_rate_max and self.config.normalize_interest_rate_max > 0:
             max_r = 0
@@ -1519,6 +1515,7 @@ class Model:
                 if bank.active_borrowers:
                     pass  # can skip string building/logging
             bank.rationing = rationing_of_bank
+            bank.d = 0
         self.statistics.compute_rationed_rationing(num_of_rationed, total_rationed)
 
     def do_repayments(self):
@@ -1588,6 +1585,8 @@ class Model:
                     bank.d = 0
                 if bank.d > 0:
                     bank.do_fire_sales(bank.d, 'fire sales due to not enough C'.format(), 'repay')
+            # all loans are revised and cancelled, or banks have failed:
+            bank.l = 0
         self.statistics.compute_profits(total_profits)
 
 
@@ -1639,10 +1638,12 @@ class Model:
             bank.paid_profits = 0
             bank.paid_loan = 0
             bank.active_borrowers = {}
+            bank.asset_j_avg_ir = 0
+            bank.asset_i_avg_ir = 0
         if self.t == 0:
             self.log.debug_banks()
 
-    def setup_links_common_part(self):
+    def do_interest_rate_common_part(self):
         if len(self.banks) <= 1:
             return None
         self.maxE = max(self.banks, key=lambda k: k.E).E
@@ -1655,7 +1656,6 @@ class Model:
                 bank.lambda_ = bank.get_lender().l / bank.E
             else:
                 bank.lambda_ = 0
-            bank.incrD = 0
         max_lambda = max(self.banks, key=lambda k: k.lambda_).lambda_
         for bank in self.banks:
             bank.h = bank.lambda_ / max_lambda if max_lambda > 0 else 0
@@ -1667,16 +1667,10 @@ class Model:
                 bank.c_avg_ir.append(c)
             if self.config.psi_endogenous:
                 bank.psi = bank.E / self.maxE
-        return max(self.banks, key=lambda k: k.C).C
 
-    def setup_links(self):
-        max_c = self.setup_links_common_part()
-        if max_c is None:
-            return
-        min_r = sys.maxsize
+    def do_interest_rate(self):
+        self.do_interest_rate_common_part()
         for bank_i in self.banks:
-            bank_i.asset_i_avg_ir = 0
-            bank_i.asset_j_avg_ir = 0
             for j in range(self.config.N):
                 try:
                     if j == bank_i.id:
@@ -1696,7 +1690,6 @@ class Model:
                                                       self.config.xi * asset_j - c)) * (1 + psi)
                                              /
                                              (p * c))
-                            # print(j,bank_i.rij[j])
                             bank_i.asset_i_avg_ir += bank_i.A
                             bank_i.asset_j_avg_ir += self.banks[j].A
                             # bank_i.asset_j += 1 - self.banks[j].p
@@ -1707,10 +1700,14 @@ class Model:
             bank_i.r = np.sum(bank_i.rij) / (self.config.N - 1)
             bank_i.asset_i_avg_ir = bank_i.asset_i_avg_ir / (self.config.N - 1)
             bank_i.asset_j_avg_ir = bank_i.asset_j_avg_ir / (self.config.N - 1)
-            if bank_i.r < min_r:
-                min_r = bank_i.r
+        max_c = max(self.banks, key=lambda k: k.C).C
+        min_r = min(self.banks, key=lambda k: k.r).r
+        if max_c is None:
+            return
         for bank in self.banks:
             bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
+
+    def setup_links(self):
         self.config.lender_change.step_setup_links(self)
         for bank in self.banks:
             log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
@@ -1751,6 +1748,20 @@ class Bank:
             return None
         else:
             return self.model.banks[self.lender].rij[self.id]
+
+    def not_balanced(self):
+        amount_borrowed = 0
+        for bank_i in self.active_borrowers:
+            amount_borrowed += self.active_borrowers[bank_i]
+        assets = round(self.L + self.C + self.R + amount_borrowed, 8)
+        liabilities = round(self.D + self.E + self.d + self.l, 8)
+        if self.failed or assets == liabilities:
+            if self.d > 0 and self.l > 0:
+                return f"{self.__str__(True)} d&l>0"
+            else:
+                return ""
+        else:
+            return f"{self.__str__(True)} {assets}!={liabilities}"
 
     def is_real_lender_or_borrower(self):
         return self.lender is not None or (self.get_loan_interest() is not None and self.l > 0)
@@ -1878,14 +1889,16 @@ class Bank:
             list_borrowers += self.model.banks[bank_i].get_id(short=True) + ','
             amount_borrowed += self.active_borrowers[bank_i]
         if amount_borrowed:
-            text += ' l={}'.format(Log.__format_number__(amount_borrowed))
+            text += ' ls={}'.format(Log.__format_number__(amount_borrowed))
             list_borrowers = list_borrowers[:-1] + ']'
         else:
             text += '        '
             list_borrowers = ''
         text += ' | D={} E={}'.format(Log.__format_number__(self.D), Log.__format_number__(self.E))
-        if details and hasattr(self, 'd') and self.d and self.l:
-            text += ' l={}'.format(Log.__format_number__(self.d))
+        if details and hasattr(self, 'l') and self.l:
+            text += ' l={}'.format(Log.__format_number__(self.l))
+        elif details and hasattr(self, 'd') and self.d:
+            text += ' d={}'.format(Log.__format_number__(self.d))
         else:
             text += '        '
         if details and hasattr(self, 's') and self.s:
@@ -1929,11 +1942,8 @@ class ModelOptimized(Model):
         rij = numerator / denominator
         return rij if rij >= 0 else self.config.r_i0
 
-    def setup_links(self):
-        max_c = super().setup_links_common_part()
-        if max_c is None:
-            return
-        min_r = float('inf')
+    def do_interest_rate(self):
+        super().do_interest_rate_common_part()
         for bank_i in self.banks:
             bank_i.asset_i_avg_ir = 0
             bank_i.asset_j_avg_ir = 0
@@ -1958,14 +1968,12 @@ class ModelOptimized(Model):
             bank_i.r = np.sum(bank_i.rij) / N_minus_1
             bank_i.asset_i_avg_ir /= N_minus_1
             bank_i.asset_j_avg_ir /= N_minus_1
-            min_r = min(min_r, bank_i.r)
-        # ----------
+        max_c = max(self.banks, key=lambda k: k.C).C
+        min_r = min(self.banks, key=lambda k: k.r).r
+        if max_c is None:
+            return
         for bank in self.banks:
             bank.mu = self.eta * (bank.C / max_c) + (1 - self.eta) * (min_r / bank.r)
-        self.config.lender_change.step_setup_links(self)
-        for bank in self.banks:
-            log_change_lender = self.config.lender_change.change_lender(self, bank, self.t)
-            self.log.debug('links', log_change_lender)
 
 
 class Utils:
