@@ -32,7 +32,7 @@ import warnings
 import re
 import json
 
-LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
+LENDER_CHANGE_DEFAULT = 'Boltzmann'
 LENDER_CHANGE_DEFAULT_P = 1.0
 
 
