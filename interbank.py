@@ -32,7 +32,7 @@ import warnings
 import re
 import json
 
-LENDER_CHANGE_DEFAULT = 'Boltzmann'
+LENDER_CHANGE_DEFAULT = 'ShockedMarket3'
 LENDER_CHANGE_DEFAULT_P = 1.0
 
 
@@ -79,7 +79,7 @@ class Config:
 
     # If true, psi variable will be ignored:
     psi_endogenous = True
-    psi: float = 0.0  # market power parameter : 0 perfect competence .. 1 monopoly
+    psi: float = 0.3  # market power parameter : 0 perfect competence .. 1 monopoly
 
     # Possible values for normalize_interest_rate_max:
     #  -3 -> we use cubic root

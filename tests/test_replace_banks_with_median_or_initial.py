@@ -47,7 +47,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
         self.doTest()
 
     def test_values_after_execution(self):
-        self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=False)
+        self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=True)
         # #2 will have new values with L,D,E equal to avg of values of #0 and #1:
         self.assertBank(bank=self.model.banks[2], bankrupted=True,
                         E=(self.model.banks[0].E+self.model.banks[1].E)/2,

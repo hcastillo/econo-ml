@@ -15,6 +15,7 @@ if %errorlevel%==0 (
  rem powershell -command "(Get-Content readme.md) -replace 'algorithm.png','doc/algorithm.png' | Out-File -encoding Default README.md"
  cd doc
  pdflatex algorithm.tex
+ pdflatex algorithm_boltzmann.tex
  del alg-000001.png
  pdftopng -r 300 algorithm.pdf alg
  cd ..

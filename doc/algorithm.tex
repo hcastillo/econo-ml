@@ -143,11 +143,20 @@ remember picture, overlay,
 
 \node[textnode, right=of shock1_text] (shock2_text) {
     \begin{tabular}{l|l}
-        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
-        $C^i_t\uparrow$ if $\Delta D>0$ &  $D^i_t$\\
-        $L^i_t$  & $E^i_t$ \\
-        $R^i_t\uparrow$ if $\Delta D>0$  & $d$ (demand of loan $\Delta D<0$)
-    \end{tabular}  };
+        \multicolumn{1}{c|}{\textbf{Lender}} &  \multicolumn{1}{c}{\textbf{Liab.}} \\ \hline
+        $C^i_t\uparrow$ &  $D^i_t$\\
+        $L^i_t$         & $E^i_t$ \\
+        $R^i_t\uparrow$ &
+    \end{tabular}
+
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Borrower}} &  \multicolumn{1}{c}{\textbf{Liab.}} \\ \hline
+        $C^i_t \downarrow$ &  $D^i_t$\\
+        $L^i_t$         & $E^i_t$ \\
+        $R^i_t \downarrow$ & $d$
+    \end{tabular}
+
+};
 
 \node[decision, right=of loans] (loans_text1) {
   $bank.d>0$? };
@@ -156,27 +165,33 @@ remember picture, overlay,
 
 \node[textnode, below=of loans_text1] (loans_text5) {
     \begin{tabular}{l|l}
-        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        \multicolumn{1}{c|}{\textbf{Lender}} &  \multicolumn{1}{c}{\textbf{Liab.}} \\ \hline
         $C^i_t$ &  $D^i_t$\\
         $L^i_t$  & $E^i_t$ \\
-        $R^i_t$  & $l$ (loan if borrower) \\
-        $s$ (loans if lender) &
-    \end{tabular}  };
+        $R^i_t$  & \\
+        $s$ &
+    \end{tabular}
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Borrower}} &  \multicolumn{1}{c}{\textbf{Liab}} \\ \hline
+        $C^i_t$ &  $D^i_t$\\
+        $L^i_t$  & $E^i_t$ \\
+        $R^i_t$  & $l$ \\
+    \end{tabular} };
 
 \node[decision, right=of loans_text1] (loans_text2) {
   $bank.d \le lender.s$? };
 \node[block, right=of loans_text2] (loans_text3) {
   \texttt{do\_firesales()}};
 
-\node[block, below=0.3cm of loans_text2] (loans_text4) {
+\node[block, below=0.3cm of loans_text3] (loans_text4) {
   Obtain loan};
 
 \draw[->] (loans) -- (loans_text1);
 \draw[->] (loans_text1) -- node[above, font=\scriptsize] {Yes: it's borrower}  (loans_text2);
 \draw[->] (loans_text1.north) -- ++(0,0.4) node[above, font=\scriptsize]{No: it's lender} --   ++ (-3,0) --   (loans);
 \draw[->] (loans_text2) -- node[above, font=\scriptsize] {No}  (loans_text3);
-\draw[->] (loans_text2.south) -- node[above, font=\scriptsize] {Yes}  (loans_text4);
-\draw[->] (loans_text3) -- ++(0,-1.7) -- (loans_text4);
+\draw[->] (loans_text2) -- node[above, font=\scriptsize] {Yes}  (loans_text4);
+\draw[->] (loans_text3) --  (loans_text4);
 % \draw[->] (loans_text4.west) -- ++(-1,0) |- ++(0,1.1) -- (loans);
 
 \node[textnode, right=of shock2] (shock2__text1) {
@@ -186,17 +201,17 @@ remember picture, overlay,
 
 \node[textnode, right=of shock2__text1] (shock2__text2) {
    \begin{tabular}{l|l}
-        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liab.}} \\ \hline
         $C^i_t \uparrow$ if $\Delta D>0$&  $D^i_t$\\
         $L^i_t$  & $E^i_t$ \\
-        $R^i_t \uparrow$ if $\Delta D>0$  & $d$ (demand of loan if $\Delta D<0$)
+        $R^i_t \uparrow$ if $\Delta D>0$  & $d$ if $\Delta D<0$
    \end{tabular}  };
 
 
 \node[decision, right=0.3cm of repayments] (repayments_text1) {
   $bank.l>0$? };
 \node[decision, right=2cm of repayments_text1] (repayments_text2) {
-  $loan+interest<C$? };
+  $loan+interest>C$? };
 \node[block, right=1cm of repayments_text2] (repayments_text3) {
   \texttt{do\_firesales()}};
 \node[decision, below=0.4cm of repayments_text2] (repayments_text4) {
@@ -204,17 +219,23 @@ remember picture, overlay,
 
 
 \node[textnode, left=0.1cm of repayments_text4] (repayments_text7) { \\
-Equity updated: \\
+Equity lender (prev. + loans - bad debt + firesales recovered): \\
 $E_t^i = E_{t-1}^i + \sum_{j} l_{t-1}^{i,j} r_{t-1}^{i,j} - \sum_{j \subseteq \theta_t^i} B_t^{i,j} - (1 - \rho) \tilde{L}_t^i$
     };
 
 
 \node[textnode, below=0.1cm of repayments_text7] (repayments_text8) { \\
     \begin{tabular}{l|l}
-        \multicolumn{1}{c|}{\textbf{Assets}} &  \multicolumn{1}{c}{\textbf{Liabilities}} \\ \hline
+        \multicolumn{1}{c|}{\textbf{Lender}} &  \multicolumn{1}{c}{\textbf{Liab.}} \\ \hline
         $C^i_t \uparrow$ &  $D^i_t$\\
-        $L^i_t$  & $E^i_t$ \\
+        $L^i_t$  & $E^i_t  \uparrow$  \\
         $R^i_t \uparrow$
+    \end{tabular}
+    \begin{tabular}{l|l}
+        \multicolumn{1}{c|}{\textbf{Borrower}} &  \multicolumn{1}{c}{\textbf{Liab.}} \\ \hline
+        $C^i_t \downarrow$ &  $D^i_t$\\
+        $L^i_t$  & $E^i_t  \downarrow$ \\
+        $R^i_t \downarrow$
     \end{tabular}  };
 
 
@@ -226,10 +247,11 @@ $E_t^i = E_{t-1}^i + \sum_{j} l_{t-1}^{i,j} r_{t-1}^{i,j} - \sum_{j \subseteq \t
 
 
 \draw[->] (repayments) -- (repayments_text1);
-\draw[->] (repayments_text1) -- node[above, font=\scriptsize] {Yes: pay loan}  (repayments_text2);
-\draw[->] (repayments_text1) -- node[above, font=\scriptsize] {No}  (repayments_text4);
-\draw[->] (repayments_text2) -- node[above, font=\scriptsize] {No}  (repayments_text3);
-\draw[->] (repayments_text4) -- node[below, font=\scriptsize] {Yes: shock2 negative and no capital}  (repayments_text3);
+\draw[->] (repayments_text1) -- node[above, font=\scriptsize] {Yes: borrower}  (repayments_text2);
+\draw[->] (repayments_text1) -- node[above, font=\scriptsize] {No: lender}  (repayments_text4);
+\draw[->] (repayments_text2) -- node[above, font=\scriptsize] {No} (repayments_text4);
+\draw[->] (repayments_text2) -- node[above, font=\scriptsize] {Yes}  (repayments_text3);
+\draw[->] (repayments_text4) -- node[right, font=\scriptsize] {Yes: shock2 negative and no capital}  (repayments_text3);
 \draw[->] (repayments_text4) -- node[below, font=\scriptsize] {No}  (repayments_text5);
 \draw[->] (repayments_text5) -- node[below, font=\scriptsize] {Yes}  (repayments_text6);
 
@@ -242,7 +264,6 @@ $E_t^i = E_{t-1}^i + \sum_{j} l_{t-1}^{i,j} r_{t-1}^{i,j} - \sum_{j \subseteq \t
   $\lambda ^j_t=\frac{L^j_t}{E^j_t}$
  };
 \node[textnode, right=0.3cm of ir_text1] (ir_text2) {
-  Rate for next period of time: \\
   $r_t^{i,j} = \frac{\chi A_t^i - \phi A_t^j - (1 - p_t^j)(\xi A_t^j - c_t^{i,j})}{p_t^j c_t^{i,j}} (1 + \psi)$
  };
 \draw[->] (ir) -- (ir_text1);

@@ -6,7 +6,6 @@ import interbank_lenderchange
 class ValuesAfterExecutionTestCase(unittest.TestCase):
 
     CONFIG = 'C_i0=30 D_i0=135 E_i0=15 L_i0=120 N=50 T=50 alfa=0.1 allow_replacement_of_bankrupted=True beta=5 chi=0.015 mu=0.7 omega=0.55 phi=0.25 psi=0.3 r_i0=0.02 reintroduce_with_median=False reserves=0.02 rho=0.3 xi=0.3'
-    # CONFIG = 'C_i0=30 D_i0=135 E_i0=15 L_i0=120 N=50 T=1000 alfa=0.1 allow_replacement_of_bankrupted=True asset_i_avg_ir=0.0 asset_j_avg_ir=0.0 beta=5 c_avg_ir=0.0 chi=0.015 detailed_equity=False max_value_psi=0.99 mu=0.7 normalize_interest_rate_max=-2 omega=0.55 p_avg_ir=0.0 phi=0.025 psi=0.3 psi_endogenous=False r_i0=0.02 reintroduce_with_median=False reserves=0.02 rho=0.3 xi=0.3'
     SEED = 39393
 
     def setUp(self):
@@ -33,16 +32,16 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         # print(self.model.banks[3].A)
         # print(self.model.banks[4].A)
         # print(self.model.banks[4].R)
-        self.assertEqual(self.model.banks[1].C,  29.151792021559686)
-        self.assertEqual(self.model.banks[3].D, 176.21777404471345)
+        self.assertEqual(self.model.banks[1].C,  3.9897946301528373)
+        self.assertEqual(self.model.banks[3].D, 139.4668368264057)
         self.assertEqual(self.model.banks[4].E, 15)
-        self.assertEqual(self.model.banks[0].A, 176.70008308425264)
-        self.assertEqual(self.model.banks[0].R, 3.2340016616850527)
-        self.assertEqual(self.model.banks[1].A, 151.88958369546907)
-        self.assertEqual(self.model.banks[2].A, 132.3365981860403)
-        self.assertEqual(self.model.banks[3].A, 191.21777404471342)
-        self.assertEqual(self.model.banks[4].A, 122.73199580871527)
-        self.assertEqual(self.model.banks[4].R, 2.1546399161743053)
+        self.assertEqual(self.model.banks[0].A, 187.7118464413857)
+        self.assertEqual(self.model.banks[0].R, 3.4542369288277133)
+        self.assertEqual(self.model.banks[1].A, 113.19682677073224)
+        self.assertEqual(self.model.banks[2].A, 137.06256246093136)
+        self.assertEqual(self.model.banks[3].A, 160.72630303066524)
+        self.assertEqual(self.model.banks[4].A, 183.35259626622235)
+        self.assertEqual(self.model.banks[4].R, 3.367051925324447)
         self.assertEqual(self.model.banks[4].R, self.model.banks[4].D*self.model.config.reserves)
 
 

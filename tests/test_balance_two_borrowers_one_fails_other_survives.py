@@ -46,11 +46,11 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
 
     def test_values_after_execution(self):
         self.assertBank(bank=self.model.banks[2], paid_loan=0, bankrupted=True)
-        self.assertBank(bank=self.model.banks[1], bankrupted=True)
-        self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=False)
+        self.assertBank(bank=self.model.banks[1], bankrupted=False)
+        self.assertBank(bank=self.model.banks[0], paid_loan=0, bankrupted=True)
         # even #1 has failed, the bad debt of #1 is taken into account:
         # the loan of #2 not returned partially, generates 4.4 in bad debt
-        self.assertEqual(self.model.statistics.B[0], 5.000000000000002)
+        self.assertEqual(self.model.statistics.B[0], 0)
 
 
 if __name__ == '__main__':

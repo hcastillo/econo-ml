@@ -26,3 +26,5 @@ tests/tests/
 tests/output/
 doc/*.log
 doc/*.aux
+auxil/*
+out/*
