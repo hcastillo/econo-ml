@@ -118,6 +118,12 @@
 that statistic is obtained</figcaption>
 </figure>
 
+<figure id="fig:algorithm_boltzmann" data-latex-placement="htb">
+<img src="doc/alg1-000001.png" />
+<figcaption>Change lender with Boltzmann: in blue there are the
+differences with previous algorithm</figcaption>
+</figure>
+
 - `interbank.py --seed 1234 --t 500 --p 0.2`: Execute the model with
   $T=500$ and $LenderChange$ algorithm of $ShockedMarket3$ with an
   Erdös-Réni with probability of attachment $p_a=0.2$ and using a seed

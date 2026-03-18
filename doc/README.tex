@@ -102,6 +102,12 @@ run_ppo.py --load ppo_10000 --save results_ppo.txt
   \label{fig:algorithm}
 \end{figure}
 
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\textwidth,keepaspectratio]{doc/alg1-000001}
+  \caption{Change lender with Boltzmann: in blue there are the differences with previous algorithm}
+  \label{fig:algorithm_boltzmann}
+\end{figure}
 
 \begin{itemize}
     \item \texttt{interbank.py --seed 1234 --t 500 --p 0.2}: Execute the model with $T=500$ and $LenderChange$ algorithm of $ShockedMarket3$ with an Erdös-Réni with probability of attachment $p_a=0.2$ and using a seed for generating random values of $1234$ (same results if you generate again with other equal parameters and repeat this integer number for seed).

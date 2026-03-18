@@ -17,7 +17,9 @@ if %errorlevel%==0 (
  pdflatex algorithm.tex
  pdflatex algorithm_boltzmann.tex
  del alg-000001.png
+ del alg1-000001.png
  pdftopng -r 300 algorithm.pdf alg
+ pdftopng -r 300 algorithm_boltzmann.pdf alg1
  cd ..
  pandoc doc\README.tex -t markdown+pipe_tables-simple_tables-multiline_tables -o README.md
  git add .

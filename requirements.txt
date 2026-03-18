@@ -1,13 +1,13 @@
 mock~=5.0.2
 numpy~=2.2
-stable-baselines3[extra]
-gymnasium~=0.28.1
+# stable-baselines3[extra]
+# gymnasium~=0.28.1
 pandas~=2.2
 torch~=2.6
 matplotlib~=3.10
-seaborn~=0.12.2
-gym~=0.26.2
-scikit-learn~=1.6
+# seaborn~=0.12.2
+# gym~=0.26.2
+# scikit-learn~=1.6
 scipy~=1.15
 statsmodels~=0.14
 networkx~=3.5
