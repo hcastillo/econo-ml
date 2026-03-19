@@ -19,9 +19,56 @@ class WholeExecution(unittest.TestCase):
               'mu=0.7 normalize_interest_rate_max=1 omega=0.55 phi=0.25 psi=0.0 r_i0=0.02 reintroduce_with_median=False'
               ' reserves=0.02 rho=0.3 xi=0.9')
 
-    RESULTS_INTEREST_RATE = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                             1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    RESULTS_INTEREST_RATE = [0.02,
+                             0.02,
+                             0.020000000000000007,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.020000000000000004,
+                             0.02,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.02,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.020000000000000004,
+                             0.02,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.02,
+                             0.020000000000000004,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.02,
+                             0.020000000000000004,
+                             0.02,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.020000000000000004,
+                             0.02,
+                             0.020000000000000004]
 
     RESULTS_EQUITY = [735.0, 703.0227952377907, 713.7509802382801, 620.9724234496186, 624.3673548568962,
                       669.6466633712489, 622.7187389965252, 570.4615731870316, 604.3137080896857, 596.0840878232249,
@@ -51,7 +98,7 @@ class WholeExecution(unittest.TestCase):
             os.remove('tests\\test_whole_execution_preferential_barabasi_pref.png')
 
     def test_values_after_execution(self):
-        self.assertEqual(list(self.generated_now_values.interest_rate), self.RESULTS_INTEREST_RATE)
+        self.assertEqual(list(self.generated_now_values.ir), self.RESULTS_INTEREST_RATE)
         self.assertEqual(list(self.generated_now_values.equity), self.RESULTS_EQUITY)
 
 

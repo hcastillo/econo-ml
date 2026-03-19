@@ -40,6 +40,7 @@ remember picture, overlay,
  textnode/.style={rectangle, align=left, minimum width=2.5cm, minimum height=0.8cm, font=\footnotesize},
  statistics/.style={rectangle, fill=lightgray!30, align=center, minimum width=1.5cm, minimum height=0.4cm, font=\scriptsize\ttfamily},
  iterate/.style={isosceles triangle,
+  isosceles triangle apex angle=20,
   draw,aspect=2,
   fill=gray!5,
   shape border rotate=0,
@@ -60,13 +61,13 @@ remember picture, overlay,
 \begin{scope}[shift={(current page)}, xshift=-6cm, yshift=10.5cm]
 \node[terminator] (start) {
   \texttt{model.initialize()} };
-\node[iterate, below=of start] (sim) {
+\node[iterate, below=0.7cm of start] (sim) {
   \texttt{model.simulate\_full()} \\$\forall t=0..T$};
-\node[block, below=of sim] (init) {
+\node[block, below=0.7cm of sim] (init) {
   \texttt{initialize\_step()}  };
-\node[block, below=of init] (links) {
+\node[block, below=0.3cm of init] (links) {
   \texttt{setup\_links()} };
-\node[block, below=of links] (shock1) {
+\node[block, below=0.3cm of links] (shock1) {
   \texttt{do\_shock("shock1")}  };
 \node[block, below=of shock1] (loans) {
   \texttt{do\_loans()} };
@@ -74,41 +75,62 @@ remember picture, overlay,
   \texttt{do\_shock("shock2")} };
 \node[block, below=of shock2] (repayments) {
   \texttt{do\_repayments()} };
-\node[block, text=blue, below=of repayments] (ir) {
+\node[block, text=blue, below=2cm of repayments] (ir) {
   \texttt{do\_interest\_rate()} };
 \node[terminator, right=of sim] (finish) {
   \texttt{model.finish()} };
 
-%
-%\node[statistics, anchor=north east, at=(shock1.south)] (shock1_stats) {
-%  potential\_lenders };
-%
-%\node[statistics, anchor=north east, at=(loans.south)] (loans_stats1) {
-%  psi\_lenders psi\_loans \\
-%  active\_lenders \\
-%  active\_borrowers};
-%
-%\node[statistics, right=0cm of loans_stats1] (loans_stats2) {
-%  leverage loans\\
-%  equity\_lenders\\
-%  systemic\_leverage
-%};
-%
-%\node[statistics, anchor=north east, at=(repayments.south)] (repayments_stats1) {
-%  liquidity best\_lender \\
-%  bankruptcies \\
-%  equity fitness};
-%
-%\node[statistics, right=0cm of repayments_stats1] (repayments_stats2) {
-%  policy deposits \\
-%  potential\_credit\_channels \\
-%  reserves
-%};
-%\node[statistics, anchor=north east, at=(ir.south)] (ir_stats) {
-%  P P\_max P\_min P\_std \\
-%  prob\_bankruptcy \\
-%  asset\_i asset\_j \\
-%  interest\_rate };
+
+
+\node[statistics, anchor=north east, at=(shock1.south)] (shock1_stats) {
+  incrD1  };
+
+\node[statistics, anchor=north east, at=(shock2.south)] (shock2_stats) {
+  incrD2 \\
+  incrD };
+
+\node[statistics, anchor=north east, at=(loans.south)] (loans_stats1) {
+  psi\_effective \\
+  active\_lenders \\
+  active\_borrowers};
+
+\node[statistics, right=0cm of loans_stats1] (loans_stats2) {
+  sum\_loans num\_loans leverage\\
+  equity\_lenders ir\_effective\\
+  systemic\_leverage };
+
+\node[statistics, right=0cm of loans_stats2, yshift=-0.1cm] (loans_stats3) {
+  num\_of\_rationed \\
+  rationing };
+
+\node[statistics, anchor=north east, at=(repayments.south)] (repayments_stats1) {
+  liquidity equity  \\
+  deposits bad\_debt \\
+  profits reserves };
+
+\node[statistics, right=0cm of repayments_stats1] (repayments_stats2) {
+  best\_lender \\
+  best\_lender\_clients \\
+  potential\_credit\_channels };
+
+\node[statistics, below=0cm of repayments_stats2,xshift=0.5cm] (repayments_stats3) {
+  bankruptcies \\
+  bankruptcy\_rationed };
+
+\node[statistics, below=0cm of repayments_stats1] (repayments_stats4) {
+  fitness \\
+  policy };
+
+
+
+\node[statistics, anchor=north east, at=(ir.south)] (ir_stats) {
+  asset\_i asset\_j \\
+  ir psi \\
+  potential\_lenders};
+
+\node[statistics, below=0.5cm of ir_stats] (repayments_stats4) {
+  prob\_bankruptcy \\
+  c num\_banks maxE };
 
 
 %\node[textnode, right=of start] (start_text) {
@@ -212,7 +234,7 @@ remember picture, overlay,
   $r_t^{i,j} = \frac{\chi A_t^i - \phi A_t^j - (1 - p_t^j)(\xi A_t^j - c_t^{i,j})}{p_t^j c_t^{i,j}} (1 + \psi)$
  };
 \node[textnode, text=blue, below=0.3cm of ir_text2] (ir_text3) {
-  Profits: \\
+  Fitness: \\
   $\mu_t^i =  \eta_t \frac{C_t^i}{C^{max}_t}  + (1 - \eta_t) \frac{r^{min}_t}{r_t^i} $
  };
 \draw[->] (ir) -- (ir_text1);

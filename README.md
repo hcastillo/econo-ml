@@ -188,9 +188,10 @@ usage. Possible statistics obtained from the model are:
 - **deposits**: Sum of deposits $D$ of banks (of their balance
   $L + C + R = D + E$)
 
-- **equity**: Sum of equity $E$ of all banks: $L + C + R = D + E$
+- **equity**: Sum of equity $E$ of all banks: $L + C + R = D + E$ (after
+  repayments)
 
-- **equity_lenders**: Average $E$ of banks who are lenders
+- **equity_lenders**: Average $E$ of banks who are lenders (after loans)
 
 - **fitness**: Fitness ($\mu$) of the bank
 
@@ -200,11 +201,19 @@ usage. Possible statistics obtained from the model are:
 - **grade_avg**: Average number of edges (connections) for the total
   banks
 
-- **incrementD**: Amount of ($\Delta D$) for the bank
+- **incrD1**: Amount of ($\Delta D$) for the bank in first shock
 
-- **interest_rate**: Interest rate $r$ of the bank
+- **incrD2**: Amount of ($\Delta D$) for the bank in second shock
 
-- **l_equity**: Log of equity ($log(E)$)
+- **incrD**: Sum of $\Delta D$ for both shocks
+
+- **ir**: Interest rate $r$ of the bank who are potential lenders
+  ($\Delta D>0$)
+
+- **ir_effective**: Interest rate $r$ of the bank who have really loans
+  with borrowers
+
+- **l_equity**: Log of equity ($\log(E)$)
 
 - **leverage**: Financial leverage ($l/E$) of the bank considering only
   the banks that are inside a loan, named **leverage\_** in Gretl due to
@@ -212,15 +221,13 @@ usage. Possible statistics obtained from the model are:
 
 - **liquidity**: Total liquidity $L$ of the Banks $L + C + R = D + E$
 
-- **loans**: Amount borrowed by the bank
-
-- **maxE**: $E_{max}$ of the system
+- **maxE**: $E_{\max}$ of the system
 
 - **num_banks**: Number of banks currently surviving in the model
   (interesting when **allow_replacement_of_bankrupted=False**)
 
-- **num_loans**: Num of loans in this step. Both global and
-  **stats_market** will be the same
+- **num_loans**: Num of loans. Value for **stats_market** and normal one
+  will be the same
 
 - **num_of_rationed**: Number of banks that were rationed in this step
   (needed money and were without any possible lender)
@@ -240,8 +247,11 @@ usage. Possible statistics obtained from the model are:
 
 - **profits**: Profits obtained in that step
 
-- **psi**: Power market ($psi$) of the banks who are lenders, value
-  $[0..1]$
+- **psi**: Power market ($psi$) of the banks who are potential lenders,
+  value $[0..1]$
+
+- **psi_effective**: Power market ($psi$) of the banks who are really
+  lenders with active loans, value $[0..1]$
 
 - **rationing**: Total amount of the loans $l$ of the banks
 
@@ -251,6 +261,8 @@ usage. Possible statistics obtained from the model are:
   values are obtained in the original statistics.
 
 - **reserves**: Reserves $R$ in the balance $L + C + R = D + E$
+
+- **sum_loans**: Amount borrowed by the bank
 
 - **systemic_leverage**: Financial leverage but considering in the mean
   the total banks of the model $N$
@@ -298,12 +310,12 @@ classified as:
 | **fitness** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
 | **gcs** | integer |  |  |  | $\checkmark$ |
 | **grade_avg** | integer |  |  |  | $\checkmark$ |
-| **incrementD** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
-| **interest_rate** | float | $\overline{x}/0$ | $\overline{x} / nan$ | $\checkmark$ |  |
+| **incrD,incrD1,incrD2** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
+| **ir** | float | $\overline{x}/0$ | $\overline{x} / nan$ | $\checkmark$ |  |
+| **ir_effective** | float | $\overline{x}/0$ | $\overline{x} / nan$ | $\checkmark$ |  |
 | **l_equity** | float | $\sum$ | $\sum$ |  |  |
 | **leverage** / **leverage\_** | float | $\overline{x}$ | $\overline{x}/nan$ | $\checkmark$ |  |
 | **liquidity** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
-| **loans** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
 | **maxE** | float | $\checkmark$ | $\checkmark$ |  |  |
 | **num_banks** | integer | $\checkmark$ | $\checkmark$ |  |  |
 | **num_loans** | integer | $\checkmark$ | $\checkmark$ | $\checkmark$ |  |
@@ -317,6 +329,7 @@ classified as:
 | **rationing** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
 | **real_t** | integer |  | $\checkmark$ |  |  |
 | **reserves** | float | $\sum$ | $\sum$ |  | $\checkmark$ |
+| **sum_loans** | float | $\sum$ | $\sum$ | $\checkmark$ |  |
 | **systemic_leverage** | float | $\overline{x}$ | $\overline{x}$ |  |  |
 
 :  Legend for the different columns are: $\checkmark$=value without any

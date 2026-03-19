@@ -65,36 +65,55 @@ remember picture, overlay,
 \node[terminator, right=of sim] (finish) {
   \texttt{model.finish()} };
 
+\node[statistics, right=0cm of links] (links_stats) {
+  communities gcs \\
+  communities\_not\_alone \\
+  grade\_avg };
 
 \node[statistics, anchor=north east, at=(shock1.south)] (shock1_stats) {
-  potential\_lenders };
+  incrD1  };
+
+\node[statistics, anchor=north east, at=(shock2.south)] (shock2_stats) {
+  incrD2 \\
+  incrD };
 
 \node[statistics, anchor=north east, at=(loans.south)] (loans_stats1) {
-  psi\_lenders psi\_loans \\
+  psi\_effective \\
   active\_lenders \\
   active\_borrowers};
 
 \node[statistics, right=0cm of loans_stats1] (loans_stats2) {
-  leverage loans\\
-  equity\_lenders\\
+  sum\_loans num\_loans leverage\\
+  equity\_lenders ir\_effective\\
   systemic\_leverage
 };
 
+\node[statistics, right=0cm of loans_stats2, yshift=-0.1cm] (loans_stats3) {
+  num\_of\_rationed \\
+  rationing };
+
 \node[statistics, anchor=north east, at=(repayments.south)] (repayments_stats1) {
-  liquidity best\_lender \\
-  bankruptcies \\
-  equity fitness};
+  liquidity equity  \\
+  deposits bad\_debt \\
+  profits reserves };
 
 \node[statistics, right=0cm of repayments_stats1] (repayments_stats2) {
-  policy deposits \\
+  best\_lender \\
+  best\_lender\_clients };
+
+\node[statistics, below=0cm of repayments_stats1, xshift=-1.5cm] (repayments_stats3) {
   potential\_credit\_channels \\
-  reserves
-};
-\node[statistics, anchor=north east, at=(ir.south)] (ir_stats) {
-  P P\_max P\_min P\_std \\
+  bankruptcies \\
+  bankruptcy\_rationed };
+
+\node[statistics, below=0cm of repayments_stats3] (repayments_stats4) {
   prob\_bankruptcy \\
+  c num\_banks maxE };
+
+\node[statistics, anchor=north east, at=(ir.south)] (ir_stats) {
   asset\_i asset\_j \\
-  interest\_rate psi };
+  ir psi \\
+  potential\_lenders};
 
 
 \node[textnode, right=of start] (start_text) {
@@ -113,8 +132,9 @@ remember picture, overlay,
     $bank.active\_borrowers=0 ... $
     };
 
-\node[textnode, right=of links] (links_text) {
-    Using Barabási–Albert graph of $m$ edges or Erdös-Rényi graph with probability of attachment $p_a$.};
+\node[textnode, right=of links, xshift=2cm] (links_text) {
+    Using Barabási–Albert graph of $m$ edges or \\
+    Erdös-Rényi graph with probability of attachment $p_a$.};
 
 
 \node[textnode, right=of shock1] (shock1_text) {

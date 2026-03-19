@@ -26,7 +26,7 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
 
     def test_values_after_execution(self):
         self.assertTrue(np.array_equal(self.model1.statistics.B, self.model2.statistics.B))
-        self.assertTrue(np.array_equal(self.model1.statistics.interest_rate, self.model2.statistics.interest_rate))
+        self.assertTrue(np.array_equal(self.model1.statistics.ir, self.model2.statistics.ir))
 
 if __name__ == '__main__':
     unittest.main()

@@ -129,4 +129,4 @@ def mockedShock(model, whichShock):
                     bank.do_fire_sales(bank.d, f"fire sale to cover shock", whichShock)
                 else:
                     bank.C = 0
-        model.statistics.incrementD[model.t] += bank.incrD
+        model.statistics.incrD[model.t] += bank.incrD

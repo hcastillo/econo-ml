@@ -19,7 +19,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
     #     if self.backward_enabled:
     #         self.banks_backward_copy = copy.deepcopy(self.banks)
     #     self.do_shock('shock1')
-    #     self.statistics.compute_potential_lenders() <--------------------------------
+    #     self.statistics.compute_ir_assets_psi_potential_lenders() <--------------------------------
     #     if not isinstance(self.config.lender_change, lc.Boltzmann):
     #         self.do_interest_rate()
     #     self.do_loans()
@@ -46,7 +46,7 @@ class BalanceTestCase(tests.interbank_testclass.InterbankTest):
             if bank.not_balanced():
                 BalanceTestCase.errors_in_balance.append(f"t={self.t} {bank.not_balanced()} shock2")
 
-    @patch.object(interbank.Statistics, "compute_potential_lenders", check_balance1)
+    @patch.object(interbank.Statistics, "compute_ir_assets_psi_potential_lenders", check_balance1)
     @patch.object(interbank.Model, "do_repayments", check_balance2)
     def setUp(self):
         self.configureTest(N=3, T=5,

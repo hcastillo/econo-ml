@@ -7,6 +7,7 @@
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{pdfpages}
+\usepackage{amsopn}
 
 
 \title{econo-ml: Reinforce Learning Policy Recommendation for Interbank Network Stability}
@@ -136,30 +137,34 @@ This statistics collect data in each time for the average or individually, depen
     \item \textbf{communities}: Subsets of nodes with higher internal edge density than connections to the rest of the graph
     \item \textbf{communities\_not\_alone}:  Number of \textbf{communities} that are not formed by only one node
     \item \textbf{deposits}: Sum of deposits $D$ of banks (of their balance $L + C + R = D + E$)
-    \item \textbf{equity}: Sum of equity $E$ of all banks: $L + C + R = D + E$
-    \item \textbf{equity\_lenders}: Average $E$ of banks who are lenders
+    \item \textbf{equity}: Sum of equity $E$ of all banks: $L + C + R = D + E$ (after repayments)
+    \item \textbf{equity\_lenders}: Average $E$ of banks who are lenders (after loans)
     \item \textbf{fitness}: Fitness ($\mu$) of the bank
     \item \textbf{gcs}: When we use an Erdös–Rényi graph, the Giant Component Size is the largest number of nodes that are interconnected.
     \item \textbf{grade\_avg}: Average number of edges (connections) for the total banks
-    \item \textbf{incrementD}: Amount of ($ \Delta D$) for the bank
-    \item \textbf{interest\_rate}: Interest rate $r$ of the bank
-    \item \textbf{l\_equity}: Log of equity ($log(E)$)
+    \item \textbf{incrD1}: Amount of ($ \Delta D$) for the bank in first shock
+    \item \textbf{incrD2}: Amount of ($ \Delta D$) for the bank in second shock
+    \item \textbf{incrD}: Sum of $ \Delta D$ for both shocks
+    \item \textbf{ir}: Interest rate $r$ of the bank who are potential lenders ($\Delta D>0$)
+    \item \textbf{ir\_effective}: Interest rate $r$ of the bank who have really loans with borrowers
+    \item \textbf{l\_equity}: Log of equity ($\log(E)$)
     \item \textbf{leverage}: Financial leverage ($l/E$) of the bank considering only the banks that are inside a loan, named \textbf{leverage\_} in Gretl due to name restrictions of the environment.
     \item \textbf{liquidity}: Total liquidity $L$ of the Banks  $L + C + R = D + E$
-    \item \textbf{loans}: Amount borrowed by the bank
-    \item \textbf{maxE}: $E_{max}$ of the system
+    \item \textbf{maxE}: $E_{\max}$ of the system
     \item \textbf{num\_banks}: Number of banks currently surviving in the model (interesting when \textbf{allow\_replacement\_of\_bankrupted=False})
-    \item \textbf{num\_loans}:  Num of loans in this step. Both global and \textbf{stats\_market} will be the same
+    \item \textbf{num\_loans}:  Num of loans. Value for \textbf{stats\_market} and normal one will be the same
     \item \textbf{num\_of\_rationed}: Number of banks that were rationed in this step (needed money and were without any possible lender)
     \item \textbf{policy}: Policy recommendation $\eta$ of the system in the range $[0..1]$. As $\eta$ is a global value, the same number applies for all banks.
     \item \textbf{potential\_credit\_channels}:  Considering there is a graph of connections between banks, then \textbf{number\_of\_edges()} in the graph
     \item \textbf{potential\_lenders}: Number of banks in the first shock having a positive shock ($ \Delta D$)
     \item \textbf{prob\_bankruptcy}: Probability of bankruptcy $p_b=1-\frac{E}{E_{max}}$, between $[0..1]$
     \item \textbf{profits}: Profits obtained in that step
-    \item \textbf{psi}: Power market ($psi$) of the banks who are lenders, value $[0..1]$
+    \item \textbf{psi}: Power market ($psi$) of the banks who are potential lenders, value $[0..1]$
+    \item \textbf{psi\_effective}: Power market ($psi$) of the banks who are really lenders with active loans, value $[0..1]$
     \item \textbf{rationing}: Total amount of the loans $l$ of the banks
     \item \textbf{real\_t}: Times in which are no loans are removed in the extra statistics generated when we use \textbf{--stats\_market}. Real $t$ instants of time are stored in this variable to track when were really those values are obtained in the original statistics.
     \item \textbf{reserves}: Reserves $R$ in the balance $L + C + R = D + E$
+    \item \textbf{sum\_loans}: Amount borrowed by the bank
     \item \textbf{systemic\_leverage}: Financial leverage but considering in the mean the total banks of the model $N$
 \end{itemize}
 
@@ -197,12 +202,12 @@ Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{fitness}           & float & $\overline{x}$ & $\overline{x}/nan $ &  $\checkmark$  & \\
 \textbf{gcs}               & integer &  &   &  & $\checkmark$ \\
 \textbf{grade\_avg}        & integer &  &   &  & $\checkmark$\\
-\textbf{incrementD}        &  float &   $\sum$  &  $\sum$  &  &  $\checkmark$  \\
-\textbf{interest\_rate}    &  float &  $\overline{x}/0$ & $\overline{x} / nan $  & $\checkmark$ &  \\
+\textbf{incrD,incrD1,incrD2} &  float &   $\sum$  &  $\sum$  &  &  $\checkmark$  \\
+\textbf{ir}                &  float &  $\overline{x}/0$ & $\overline{x} / nan $  & $\checkmark$ &  \\
+\textbf{ir\_effective}     &  float &  $\overline{x}/0$ & $\overline{x} / nan $  & $\checkmark$ &  \\
 \textbf{l\_equity}         & float &  $ \sum$ &  $ \sum $ & & \\
 \textbf{leverage} / \textbf{leverage\_}         & float  &  $\overline{x}$ & $\overline{x}/nan $  & $\checkmark$  &  \\
 \textbf{liquidity}         &  float &  $\sum$ &  $\sum$ &  $\checkmark$ &    \\
-\textbf{loans}             & float &  $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
 \textbf{maxE}        &  float &  $\checkmark$ & $\checkmark$ &  & \\
 \textbf{num\_banks}        &  integer &  $\checkmark$ & $\checkmark$ &  & \\
 \textbf{num\_loans}        &  integer &  $ \checkmark$ &  $\checkmark$ & $\checkmark$ &  \\
@@ -216,6 +221,7 @@ Name & Type & Global & \textbf{stats\_market} & Individual & Graphs \\
 \textbf{rationing}         &  float &  $\sum$ &  $\sum$ &  & $\checkmark$  \\
 \textbf{real\_t}         &  integer &  &  $\checkmark$ &  &   \\
 \textbf{reserves}          & float & $ \sum$ &  $ \sum$ &  & $\checkmark$ \\
+\textbf{sum\_loans}        & float &  $ \sum$ &  $ \sum$ & $\checkmark$ &  \\
 \textbf{systemic\_leverage} & float &  $\overline{x}$ & $ \overline{x} $  &  &  \\
 \hline
 \end{tabular}

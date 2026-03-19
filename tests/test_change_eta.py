@@ -28,7 +28,7 @@ class ValuesAfterExecutionTestCase(unittest.TestCase):
         # model1 and model2 have different eta and so they will evolve different:
         self.assertNotEqual(self.model1.banks[0].get_id(), self.model2.banks[0].get_id())
         self.assertFalse(np.array_equal(self.model1.statistics.B, self.model2.statistics.B))
-        self.assertFalse(np.array_equal(self.model1.statistics.interest_rate, self.model2.statistics.interest_rate))
+        self.assertFalse(np.array_equal(self.model1.statistics.ir, self.model2.statistics.ir))
 
 
 if __name__ == '__main__':
