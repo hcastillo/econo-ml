@@ -6,7 +6,7 @@
 #
 #
 # author: hector@bith.net
-# date:   04/2023, 09/2025
+# date:   04/2023, 09/2025, 03/2026
 
 import copy
 import random
@@ -114,7 +114,7 @@ class Config:
     # what elements are in the results.csv file, and also which are plot.
     # 1 if also plot, 0 not to plot:
     ELEMENTS_STATISTICS_NO_PLOT = ['best_lender_clients', 'fitness', 'policy', 'leverage', 'systemic_leverage',
-                                   'loans', 'potential_lenders', 'active_lenders', 'active_borrowers',
+                                   'sum_loans', 'potential_lenders', 'active_lenders', 'active_borrowers',
                                    'prob_bankruptcy']
     ELEMENTS_STATISTICS_NO_SHOW = ['gcs', 'grade_avg', 'communities', 'communities_not_alone']
 
@@ -339,6 +339,8 @@ class Statistics:
                 self.model.config.lender_change.determine_current_communities_not_alone())
             self.gcs[self.model.t] = self.model.config.lender_change.determine_current_graph_gcs()
             self.grade_avg[self.model.t] = self.model.config.lender_change.determine_current_graph_grade_avg()
+        if self.statistics_stats_market:
+            self.statistics_stats_market.compute_statistics_of_graph()
 
     def compute_ir_assets_psi_potential_lenders(self):
         asset_i = []
@@ -393,8 +395,8 @@ class Statistics:
                 for bank_that_is_borrower in bank.active_borrowers:
                     this_bank_loans += bank.active_borrowers[bank_that_is_borrower]
                     this_bank_num_loans += 1
-                self.compute_individual_banks_statistics(bank, 'loans', this_bank_loans)
-                self.compute_individual_banks_statistics(bank, 'num_loans', this_bank_loans)
+                self.compute_individual_banks_statistics(bank, 'sum_loans', this_bank_loans)
+                self.compute_individual_banks_statistics(bank, 'num_loans', this_bank_num_loans)
                 sum_loans += this_bank_loans
                 if this_bank_loans:
                     equity_lenders.append(bank.E)
@@ -415,6 +417,8 @@ class Statistics:
         if self.model.config.psi_endogenous:
             self.psi_effective[self.model.t] = np.mean(psi_effective) if psi_effective\
                 else (np.nan if self.stats_market else 0.0)
+        if self.statistics_stats_market:
+            self.statistics_stats_market.compute_loans()
 
     def compute_leverage(self):
         leverage_of_lenders = []
@@ -517,7 +521,6 @@ class Statistics:
                 continue
             if bank.E > maxE:
                 maxE = bank.E
-
         probabilities_bankruptcy = []
         probabilities_lc = []
         lender_capacities = []
@@ -726,7 +729,7 @@ class Statistics:
                         line += '{}{}'.format(delimiter, i)
                     else:
                         line += '{}{}'.format(delimiter, element[i])
-                        if self.stats_market and name_element == 'loans' and element[i] == 0:
+                        if self.stats_market and name_element == 'sum_loans' and element[i] == 0:
                             save_line = False
                             break
                 if save_line:
@@ -793,7 +796,7 @@ class Statistics:
                             string_obs += f'{math.log(variable[i])} '
                         except ValueError:
                             string_obs += 'nan '
-                    if self.stats_market and variable_name == 'loans' and variable[i] == 0:
+                    if self.stats_market and variable_name == 'sum_loans' and variable[i] == 0:
                         save_instance = False
                         break
             if save_instance:
@@ -1249,7 +1252,8 @@ class Model:
         if not isinstance(self.config.lender_change, lc.Boltzmann):
             self.do_interest_rate()
             self.statistics.compute_ir_assets_psi_potential_lenders()
-        self.do_loans()
+        num_of_rationed, total_rationed = self.do_loans()
+        self.statistics.compute_rationed_rationing(num_of_rationed,total_rationed)
         self.statistics.compute_loans()
         self.statistics.compute_leverage()
         self.log.debug_banks()
@@ -1476,7 +1480,6 @@ class Model:
                     self.banks[bank.lender].rij[bank.id] = math.cbrt(self.banks[bank.lender].rij[bank.id]) \
                         if self.config.normalize_interest_rate_max == -3 else \
                         math.sqrt(self.banks[bank.lender].rij[bank.id])
-
         num_of_rationed = 0
         total_rationed = 0
         total_demanded = 0
@@ -1523,7 +1526,7 @@ class Model:
                     pass  # can skip string building/logging
             bank.rationing = rationing_of_bank
             bank.d = 0
-        self.statistics.compute_rationed_rationing(num_of_rationed, total_rationed)
+        return num_of_rationed, total_rationed
 
     def do_repayments(self):
         total_profits = 0
